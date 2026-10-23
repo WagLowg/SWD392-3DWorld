@@ -2,8 +2,9 @@ import { StrictMode, useEffect, useState, type FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Box, ArrowRight } from 'lucide-react';
 import '../ai/styles/global.css';
-import { api, ApiError, type User } from '../ai/lib/api';
 import { TextField, Segmented } from '../ai/components/ui';
+import { authService } from '../services/auth/auth.service';
+import { ApiClientError } from '../services/http';
 import { fetchMe } from '../shared/auth';
 import { safeNext, MODULES } from '../shared/modules';
 
@@ -26,10 +27,14 @@ function LoginPage() {
     setBusy(true);
     setError('');
     try {
-      await api<{ user: User }>(`/api/auth/${mode}`, { body: form });
+      if (mode === 'login') {
+        await authService.login({ email: form.email, password: form.password });
+      } else {
+        await authService.register(form);
+      }
       location.replace(next);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Có lỗi xảy ra.');
+      setError(err instanceof ApiClientError ? err.message : 'Có lỗi xảy ra.');
       setBusy(false);
     }
   };

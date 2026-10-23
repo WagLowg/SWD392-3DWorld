@@ -1,13 +1,12 @@
+import { authService, type AuthUser } from '../services/auth/auth.service'
 import { loginHref } from './modules'
 
-export type SessionUser = { id: string; email: string; name: string; role: string }
+export type SessionUser = AuthUser
 
 /** Người dùng hiện tại (cookie httpOnly do backend cấp), null nếu chưa đăng nhập. */
 export async function fetchMe(): Promise<SessionUser | null> {
   try {
-    const res = await fetch('/api/auth/me', { credentials: 'same-origin' })
-    if (!res.ok) return null
-    const data = await res.json()
+    const data = await authService.getCurrentUser()
     return data.user ?? null
   } catch {
     return null
@@ -15,7 +14,7 @@ export async function fetchMe(): Promise<SessionUser | null> {
 }
 
 export async function logout(redirectTo = '/') {
-  await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {})
+  await authService.logout().catch(() => {})
   location.assign(redirectTo)
 }
 

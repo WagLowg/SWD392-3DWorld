@@ -7,11 +7,11 @@ import { resolve } from 'node:path'
  * Mỗi module là một trang riêng (multi-page) để CSS của Landing / AI / Studio không đè nhau.
  * Thêm module mới: tạo <module>/index.html + src/<module>/main.tsx rồi khai báo ở đây.
  */
-const MODULES = ['ai', 'studio', 'marketplace', 'pod', 'login'] as const
+const MODULES = ['ai', 'studio', 'marketplace', 'pod', 'login', 'portal'] as const
 
 const input = Object.fromEntries([
-  ['main', resolve(__dirname, 'index.html')],
-  ...MODULES.map((m) => [m, resolve(__dirname, `${m}/index.html`)]),
+  ['main', resolve(import.meta.dirname, 'index.html')],
+  ...MODULES.map((m) => [m, resolve(import.meta.dirname, `${m}/index.html`)]),
 ])
 
 /** Dev server: /ai/models, /marketplace/abc… trả về index.html của đúng module (SPA fallback). */
