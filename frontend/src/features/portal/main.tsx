@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { AppProviders } from '../../app/providers/AppProviders'
 import { App } from './App'
-import './styles.css'
+import './portal.css'
 
 const rootElement = document.getElementById('root')
 

@@ -29,6 +29,21 @@ export function normalizeHttpError(error: unknown): ApiClientError {
       })
     }
 
+    // Envelope { status, message, data } của Backend mới không có `code`
+    const envelopeMessage =
+      responseBody &&
+      typeof responseBody === 'object' &&
+      typeof (responseBody as { message?: unknown }).message === 'string'
+        ? (responseBody as { message: string }).message
+        : undefined
+    if (status && envelopeMessage) {
+      return new ApiClientError(status, {
+        code: `HTTP_${status}`,
+        message: envelopeMessage,
+        correlationId: correlationHeader,
+      })
+    }
+
     return new ApiClientError(status, {
       code: status ? `HTTP_${status}` : 'NETWORK_ERROR',
       message: status

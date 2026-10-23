@@ -1,0 +1,9 @@
+/*
+ * Thứ tự layer: CSS cũ của bản đồ FRD (styles.css) nằm trên preflight nhưng dưới utilities
+ * → màn FRD cũ giữ nguyên giao diện, màn mới dùng Tailwind không bị `a { color: inherit }` đè.
+ */
+@layer theme, base, legacy, components, utilities;
+
+@import "tailwindcss";
+@import "./styles.css" layer(legacy);
+@import "../shared/ui/theme.css";

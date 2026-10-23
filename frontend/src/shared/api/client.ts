@@ -1,5 +1,10 @@
 import axios, { type AxiosRequestConfig } from 'axios'
+<<<<<<< HEAD:frontend/src/shared/api/client.ts
 import { env } from '../config/env'
+=======
+import { env } from '../../config/env'
+import { tokenStore } from '../auth/token'
+>>>>>>> 1fc0e32357a9aa864933cad3201aa7a66639e148:frontend/src/services/http/client.ts
 import { normalizeHttpError } from './errors'
 
 export type HttpRequestConfig<Data = unknown> = AxiosRequestConfig<Data> & {
@@ -17,9 +22,26 @@ export const axiosClient = axios.create({
   xsrfHeaderName: 'X-XSRF-TOKEN',
 })
 
+/** API công khai: không gửi token (Backend từ chối token hỏng kể cả ở endpoint permitAll). */
+const PUBLIC_AUTH = /\/api\/auth\/(login|register|verify-email|resend-verification|forgot-password|reset-password)$/
+
+// Backend mới xác thực bằng JWT Bearer; cookie phiên vẫn được gửi kèm (withCredentials) cho Backend cũ.
+axiosClient.interceptors.request.use((config) => {
+  if (PUBLIC_AUTH.test(config.url ?? '')) return config
+  const token = tokenStore.get()
+  if (token && !config.headers.has('Authorization')) config.headers.set('Authorization', `Bearer ${token}`)
+  return config
+})
+
 axiosClient.interceptors.response.use(
   (response) => response,
-  (error: unknown) => Promise.reject(normalizeHttpError(error)),
+  (error: unknown) => {
+    const normalized = normalizeHttpError(error)
+    // Token hết hạn / bị thu hồi → bỏ token, đánh dấu phiên hết hạn (MP-104).
+    // Không áp dụng cho 401 "A valid Bearer token is required" (lỗi khác của Backend, vd. /api/catalog).
+    if (normalized.status === 401 && /invalid|expired|revoked/i.test(normalized.message)) tokenStore.expire()
+    return Promise.reject(normalized)
+  },
 )
 
 function prepareConfig<Data>(config: HttpRequestConfig<Data>): AxiosRequestConfig<Data> {
