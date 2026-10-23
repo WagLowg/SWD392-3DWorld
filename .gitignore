@@ -1,0 +1,19 @@
+# secrets
+.env
+**/.env
+
+# frontend
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# backend
+backend/target/
+backend/data/
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

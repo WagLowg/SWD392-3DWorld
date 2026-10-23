@@ -1,0 +1,57 @@
+# Cấu hình đọc từ biến môi trường hoặc file backend/.env (xem .env.example).
+spring:
+  application:
+    name: threedworld-backend
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    # Supabase: jdbc:postgresql://<host>:5432/postgres?sslmode=require  (xem README)
+    # Để trống → H2 file local (chế độ PostgreSQL) để chạy thử không cần Supabase.
+    url: ${DB_URL:jdbc:h2:file:./data/3dworld;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 60MB
+      max-request-size: 80MB
+  jackson:
+    default-property-inclusion: always
+
+server:
+  port: ${PORT:8080}
+  error:
+    whitelabel:
+      enabled: false
+  compression:
+    enabled: true
+    mime-types: application/json,text/html,text/css,application/javascript,model/gltf-binary
+
+app:
+  # Bí mật ký JWT (>= 32 ký tự). Đổi khi deploy.
+  jwt-secret: ${JWT_SECRET:dev-only-secret-change-me-dev-only-secret-change-me}
+  session-days: 7
+  cookie-secure: ${COOKIE_SECURE:false}
+  signup-bonus-credits: ${SIGNUP_BONUS_CREDITS:200}
+  # Cho phép nút "Nạp credit demo" (tắt khi lên production thật)
+  demo-topup-enabled: ${DEMO_TOPUP_ENABLED:true}
+  # Thư mục build frontend (frontend/dist). Nếu tồn tại, Spring Boot phục vụ luôn website.
+  frontend-dist: ${FRONTEND_DIST:../frontend/dist}
+  storage:
+    # cloudinary://<api_key>:<api_secret>@<cloud_name> — để trống → lưu file local (./data/storage)
+    cloudinary-url: ${CLOUDINARY_URL:}
+    folder: ${CLOUDINARY_FOLDER:3dworld}
+    local-dir: ${LOCAL_STORAGE_DIR:./data/storage}
+  meshy:
+    # Để trống → chế độ MOCK (không gọi Meshy, không tốn credit)
+    api-key: ${MESHY_API_KEY:}
+    base-url: ${MESHY_BASE_URL:https://api.meshy.ai}
+    webhook-secret: ${MESHY_WEBHOOK_SECRET:}
+
+logging:
+  level:
+    com.threedworld: INFO
