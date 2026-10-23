@@ -2,7 +2,7 @@
  * Bản đồ module của 3DWorld. Mỗi module là một trang (entry) riêng của Vite,
  * dùng chung domain + cookie đăng nhập do backend Spring Boot cấp.
  *
- * Marketplace và POD hiện là trang "sắp ra mắt" (src/marketplace, src/pod) — code tiếp ở đó.
+ * Marketplace và POD hiện là trang "sắp ra mắt" trong src/features/.
  */
 export type ModuleId = 'ai' | 'studio' | 'marketplace' | 'pod'
 
@@ -22,6 +22,6 @@ export function loginHref(next: string = location.pathname + location.search + l
 
 /** Chỉ cho phép quay về đường dẫn nội bộ (chống open-redirect). */
 export function safeNext(next: string | null | undefined, fallback = '/ai/') {
-  if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/login')) return fallback
+  if (!next?.startsWith('/') || next.startsWith('//') || next.startsWith('/login')) return fallback
   return next
 }

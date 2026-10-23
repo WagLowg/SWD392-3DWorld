@@ -1,71 +1,76 @@
 # 3DWorld
 
-Monorepo cho nền tảng 3DWorld, gồm Landing Page, AI Studio, 3D Studio, Marketplace, Print On Demand và backend Spring Boot.
+Repository gồm các ứng dụng độc lập của nền tảng 3DWorld. Mỗi chức năng chỉ có một source chính; không copy Landing, AI hoặc Studio vào `frontend`.
 
-## Cấu trúc hiện tại
+## Cấu trúc thống nhất
 
 ```text
 SWD392-3DWorld/
-├─ frontend/                 # Web app hợp nhất (Vite + React + TypeScript)
-│  ├─ src/landing/           # Landing Page hiện có
-│  ├─ src/ai/                # AI Generator + luồng Meshy hiện có
-│  ├─ src/studio/            # 3D Studio hiện có
-│  ├─ src/marketplace/       # Entry Marketplace
-│  ├─ src/pod/               # Entry Print On Demand
-│  ├─ src/portal/            # Skeleton nghiệp vụ theo FRD v1.2
-│  ├─ src/core/              # API/routing foundation dùng chung cho code mới
-│  └─ portal/index.html      # Entry độc lập tại /portal/
-├─ backend/                  # Spring Boot REST API
-├─ landingPage/              # Nguồn Landing ban đầu, giữ để đối chiếu
-├─ AI/                       # Nguồn AI ban đầu, giữ để đối chiếu
-└─ Studio/                   # Nguồn Studio ban đầu, giữ để đối chiếu
+├── backend/                 # Spring Boot backend hiện có của AI/Studio
+│   ├── src/
+│   └── pom.xml
+├── frontend/                # Frontend nghiệp vụ mới: Auth, Marketplace, POD, Portal
+│   ├── src/
+│   │   ├── app/             # Khởi động app, provider và route dùng chung
+│   │   ├── features/        # Code chia theo nghiệp vụ
+│   │   │   ├── auth/
+│   │   │   ├── marketplace/
+│   │   │   ├── pod/
+│   │   │   └── portal/
+│   │   ├── shared/          # API client, config, component, utility, store dùng chung
+│   │   └── test/
+│   ├── public/
+│   └── package.json
+├── landingPage/             # Landing Page của team — source chính, giữ độc lập
+├── Studio/                  # 3D Studio của team — source chính, giữ độc lập
+├── AI/                      # AI Studio + Meshy — source chính, kiểm tra/tích hợp sau
+└── docs/
 ```
 
-## Chạy frontend
+Các bản copy cũ `frontend/src/landing`, `frontend/src/studio` và `frontend/src/ai` đã được bỏ để tránh sửa hai nơi rồi lệch code.
+
+## Chạy từng phần
+
+Landing Page:
 
 ```bash
-cd frontend
-npm ci
+cd landingPage
+npm install
 npm run dev
 ```
 
-Kiểm tra code trước khi tạo PR:
+Frontend nghiệp vụ:
 
 ```bash
-npm run typecheck
-npm run lint
-npm run test
-npm run build
+cd frontend
+npm install
+npm run dev
 ```
 
-- Landing: `http://localhost:5173/`
-- AI Studio: `http://localhost:5173/ai/`
-- 3D Studio: `http://localhost:5173/studio/`
-- Marketplace: `http://localhost:5173/marketplace/`
-- Print On Demand: `http://localhost:5173/pod/`
-- FRD Product Portal: `http://localhost:5173/portal/`
+3D Studio:
 
-## Nguyên tắc phát triển skeleton
+```bash
+cd Studio
+npm install
+npm run dev
+```
 
-- `src/portal/requirements.ts` là route map và traceability map từ màn hình sang mã FR.
-- Landing, AI Studio/Meshy và 3D Studio hiện tại là source chính thức, được dùng trực tiếp; Portal không copy hoặc dựng lại ba module này.
-- Feature mới gọi Axios qua `src/services/http`; không tự quyết định amount, owner, role, approval hay payment status ở frontend.
-- React Query quản lý server state; Zustand chỉ quản lý client/UI state; form dùng React Hook Form + Zod.
-- Mỗi màn hình phải xử lý loading, empty, error/retry, permission denied, expired/stale và success.
-- Landing, AI Generator và 3D Studio hiện tại là module độc lập; không import CSS chéo sang Portal.
-- Không mở route/API mua bán, chuyển nhượng hoặc cho thuê file số trong Version 1.
-- Design Service (`SCR-36` đến `SCR-38`) đang blocked cho tới khi migration và transaction source riêng được duyệt. Không dùng bảng POD để thay thế.
+AI Studio:
 
-## Thứ tự triển khai theo FRD
+```bash
+cd AI
+npm install
+npm run dev
+```
 
-1. **W0** — Account, capability, policy và audit nền.
-2. **W1** — Storefront, catalog vật lý, Seller Products, moderation, Model Library và Viewer.
-3. **W2** — Cart, checkout, physical orders, payment/wallet, AI và Editor save/reopen.
-4. **W3** — Fulfillment tài chính, POD, refund/review và operations.
-5. **W4** — Design Service sau khi schema gap được phê duyệt.
+Trong `frontend`, các URL hiện có là `/login/`, `/register/`, `/marketplace/`, `/pod/` và `/portal/`. Truy cập `/` sẽ chuyển đến `/portal/`. Landing Page chạy từ package `landingPage`.
 
-Tài liệu nguồn: `3DWorld_SWD_FRD_V1_ERD_Aligned.docx`, Version 1.2 ngày 23/10/2026.
+## Quy tắc ngắn
 
-Xem thêm ranh giới tích hợp tại [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md).
+- Nghiệp vụ chỉ dùng trong một module: đặt trong `frontend/src/features/<module>`.
+- Axios client, utility hoặc UI dùng từ hai module trở lên: đặt trong `frontend/src/shared`.
+- Provider và route cấp ứng dụng: đặt trong `frontend/src/app`.
+- Không tạo lại `src/landing`, `src/ai` hay `src/studio` bên trong `frontend`.
+- Không commit `.env`, `node_modules`, `dist`, `target` hoặc dữ liệu runtime.
 
-Quy trình và quy ước code chung cho team: [`docs/FRONTEND_TEAM_GUIDE.md`](docs/FRONTEND_TEAM_GUIDE.md).
+Xem quy trình code tại [docs/FRONTEND_TEAM_GUIDE.md](docs/FRONTEND_TEAM_GUIDE.md).

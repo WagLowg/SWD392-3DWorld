@@ -1,17 +1,22 @@
-# secrets
-.env
-**/.env
-
-# frontend
-frontend/node_modules/
-frontend/dist/
-node_modules/
-dist/
+# dependencies and generated output (all packages)
+**/node_modules/
+**/dist/
+**/target/
+backend/data/
+AI/server/data/
 *.tsbuildinfo
 
-# backend
-backend/target/
-backend/data/
+# secrets (keep committed templates)
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# package-manager and test caches
+**/.vite/
+**/.cache/
+**/coverage/
+*.log
 
 # IDE / OS
 .idea/
