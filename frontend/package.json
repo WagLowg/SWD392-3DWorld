@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "preview": "vite preview",
-    "lint": "biome lint src/app src/config src/core src/services src/stores src/portal",
+    "lint": "biome lint src/app src/config src/core src/services src/stores src/portal src/shared src/features src/login src/marketplace",
     "format": "biome format --write src/app src/config src/core src/services src/stores src/portal",
     "format:check": "biome format src/app src/config src/core src/services src/stores src/portal",
     "test": "vitest run",

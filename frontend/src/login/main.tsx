@@ -1,78 +1,47 @@
-import { StrictMode, useEffect, useState, type FormEvent } from 'react';
-import { createRoot } from 'react-dom/client';
-import { Box, ArrowRight } from 'lucide-react';
-import '../ai/styles/global.css';
-import { TextField, Segmented } from '../ai/components/ui';
-import { authService } from '../services/auth/auth.service';
-import { ApiClientError } from '../services/http';
-import { fetchMe } from '../shared/auth';
-import { safeNext, MODULES } from '../shared/modules';
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { AppProviders } from '../app/providers/AppProviders'
+import { ForgotPasswordPage } from '../features/auth/pages/ForgotPasswordPage'
+import { LoginPage } from '../features/auth/pages/LoginPage'
+import { RegisterPage } from '../features/auth/pages/RegisterPage'
+import { ResetPasswordPage } from '../features/auth/pages/ResetPasswordPage'
+import { VerifyEmailPage } from '../features/auth/pages/VerifyEmailPage'
+import { ErrorScreen } from '../shared/ui/ErrorScreen'
+import './login.css'
 
-/** Trang đăng nhập / đăng ký dùng chung cho mọi module (cookie phiên do Spring Boot cấp). */
-function LoginPage() {
-  const next = safeNext(new URLSearchParams(location.search).get('next'));
-  const [mode, setMode] = useState<'login' | 'register'>(() => (new URLSearchParams(location.search).get('mode') === 'register' ? 'register' : 'login'));
-  const [form, setForm] = useState({ email: '', name: '', password: '' });
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [checking, setChecking] = useState(true);
+const rootElement = document.getElementById('root')
+if (!rootElement) throw new Error('Không tìm thấy phần tử #root để khởi tạo trang đăng nhập.')
 
-  // Đã đăng nhập rồi thì quay lại luôn
-  useEffect(() => {
-    fetchMe().then((u) => (u ? location.replace(next) : setChecking(false)));
-  }, [next]);
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setError('');
-    try {
-      if (mode === 'login') {
-        await authService.login({ email: form.email, password: form.password });
-      } else {
-        await authService.register(form);
-      }
-      location.replace(next);
-    } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Có lỗi xảy ra.');
-      setBusy(false);
-    }
-  };
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
-
-  if (checking) return <div style={{ display: 'grid', placeItems: 'center', height: '100vh' }}><div className="spinner" /></div>;
-
-  return (
-    <div className="auth">
-      <section className="auth-hero">
-        <a href="/" className="brand"><Box size={28} color="var(--primary)" strokeWidth={1.8} /><span>3DWorld<small>FROM IMAGINATION TO REALITY</small></span></a>
-        <div>
-          <h1>Một tài khoản cho <em>cả thế giới 3D</em> của bạn.</h1>
-          <p>Tạo mô hình bằng AI từ ảnh, tự dựng mô hình trong 3D Studio, mua sản phẩm in sẵn và đặt in theo yêu cầu — tất cả dùng chung một tài khoản.</p>
-        </div>
-        <div className="auth-steps">
-          {MODULES.map((m, i) => <span key={m.id}>{String(i + 1).padStart(2, '0')} · {m.label}</span>)}
-        </div>
-      </section>
-      <section className="auth-form">
-        <form onSubmit={submit} noValidate>
-          <div>
-            <h2>{mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}</h2>
-            <p className="muted" style={{ margin: '4px 0 0' }}>Đăng nhập để tạo mô hình, lưu dự án và đặt in.</p>
-          </div>
-          <Segmented value={mode} onChange={(m) => { setMode(m); setError(''); }} label="Chế độ" options={[{ value: 'login', label: 'Đăng nhập' }, { value: 'register', label: 'Đăng ký' }]} />
-          {mode === 'register' && <TextField label="Tên hiển thị" value={form.name} onChange={set('name')} autoComplete="name" required />}
-          <TextField label="Email" type="email" value={form.email} onChange={set('email')} autoComplete="email" required />
-          <TextField label="Mật khẩu" type="password" value={form.password} onChange={set('password')} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} hint={mode === 'register' ? 'Tối thiểu 8 ký tự.' : undefined} required />
-          {error && <div className="banner danger" role="alert">{error}</div>}
-          <button className="btn primary block" disabled={busy}>
-            {busy ? <span className="spinner" /> : <>{mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}<ArrowRight size={16} /></>}
-          </button>
-          <a href="/" className="muted small" style={{ textAlign: 'center' }}>← Về trang chủ 3DWorld</a>
-        </form>
-      </section>
-    </div>
-  );
-}
-
-createRoot(document.getElementById('root')!).render(<StrictMode><LoginPage /></StrictMode>);
+/**
+ * Trang tài khoản dùng chung (basename /login):
+ *   /                 MP 007 Đăng nhập (?next=…)
+ *   /register         MP 005 Đăng ký
+ *   /verify-email     MP 006 Xác thực email (?email&token từ link email)
+ *   /forgot-password  MP 008 Quên mật khẩu
+ *   /reset-password   MP 009 Đặt lại mật khẩu (?email&token)
+ * Link email của Backend = {APP_BASE_URL}/verify-email | /reset-password → đặt APP_BASE_URL=<origin>/login.
+ */
+createRoot(rootElement).render(
+  <StrictMode>
+    <AppProviders>
+      <BrowserRouter basename="/login">
+        <Routes>
+          <Route index element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
+          <Route path="verify-email" element={<VerifyEmailPage />} />
+          <Route path="forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="reset-password" element={<ResetPasswordPage />} />
+          <Route
+            path="*"
+            element={
+              <div className="min-h-screen bg-gradient-to-b from-[#FFF7EC] to-[#FFE2CC] py-10 font-body text-ink">
+                <ErrorScreen kind="404" />
+              </div>
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+    </AppProviders>
+  </StrictMode>,
+)

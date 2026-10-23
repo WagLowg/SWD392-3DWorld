@@ -9,7 +9,7 @@ export type ModuleId = 'ai' | 'studio' | 'marketplace' | 'pod'
 export const MODULES: { id: ModuleId; label: string; short: string; href: string; ready: boolean }[] = [
   { id: 'ai', label: 'AI Studio', short: 'AI', href: '/ai/', ready: true },
   { id: 'studio', label: '3D Studio', short: 'Studio', href: '/studio/', ready: true },
-  { id: 'marketplace', label: 'Marketplace', short: 'Market', href: '/marketplace/', ready: false },
+  { id: 'marketplace', label: 'Marketplace', short: 'Market', href: '/marketplace/', ready: true },
   { id: 'pod', label: 'In 3D (POD)', short: 'POD', href: '/pod/', ready: false },
 ]
 

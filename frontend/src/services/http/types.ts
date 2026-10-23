@@ -27,3 +27,11 @@ export class ApiClientError extends Error {
     this.name = 'ApiClientError'
   }
 }
+
+/** Envelope chung của Backend OpenAPI: { status, message, data, timestamp }. */
+export type ApiEnvelope<T> = {
+  status: number
+  message: string
+  data: T
+  timestamp: string
+}

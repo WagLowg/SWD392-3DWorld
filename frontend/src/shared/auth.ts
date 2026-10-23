@@ -1,16 +1,62 @@
-import { authService, type AuthUser } from '../services/auth/auth.service'
+import { type AuthUser, authService } from '../services/auth/auth.service'
+import { tokenStore } from '../services/auth/token'
 import { loginHref } from './modules'
 
 export type SessionUser = AuthUser
 
-/** Người dùng hiện tại (cookie httpOnly do backend cấp), null nếu chưa đăng nhập. */
-export async function fetchMe(): Promise<SessionUser | null> {
+type MeEnvelope = {
+  user?: AuthUser
+  data?: {
+    userId?: number | string
+    email?: string
+    fullName?: string
+    phone?: string | null
+    emailVerified?: boolean
+    roles?: string[]
+    capabilities?: string[]
+  } | null
+}
+
+/**
+ * Người dùng hiện tại, null nếu chưa đăng nhập.
+ * Hỗ trợ cả Backend cũ ({ user }) và Backend OpenAPI ({ data: UserResponse }).
+ */
+export async function fetchMe(signal?: AbortSignal): Promise<SessionUser | null> {
   try {
-    const data = await authService.getCurrentUser()
-    return data.user ?? null
+    const res = (await authService.getCurrentUser(signal)) as MeEnvelope
+    if (res.user) return res.user
+    const d = res.data
+    if (!d?.email) return null
+    return {
+      id: String(d.userId ?? ''),
+      email: d.email,
+      name: d.fullName || d.email.split('@')[0],
+      role: d.roles?.[0] ?? 'CUSTOMER',
+      phone: d.phone ?? null,
+      emailVerified: d.emailVerified,
+      roles: d.roles ?? [],
+      capabilities: d.capabilities ?? [],
+    }
   } catch {
     return null
   }
+}
+
+/** Có token trong phiên nhưng /api/auth/me thất bại → phiên đã hết hạn (MP-104). */
+export function hasStoredSession() {
+  return !!tokenStore.get() || tokenStore.wasExpired()
+}
+
+/** Người bán: có quyền quản lý gian hàng hoặc xử lý đơn. */
+export function isSeller(user: SessionUser | null | undefined) {
+  if (!user) return false
+  const caps = user.capabilities ?? []
+  const roles = user.roles ?? [user.role]
+  return (
+    caps.includes('STOREFRONT_MANAGE_OWN') ||
+    caps.includes('ORDER_PROCESS_EXISTING') ||
+    roles.some((r) => /SELLER/i.test(r))
+  )
 }
 
 export async function logout(redirectTo = '/') {
