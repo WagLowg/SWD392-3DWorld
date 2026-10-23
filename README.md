@@ -16,7 +16,7 @@ SWD392-3DWorld/
 │  ├─ src/core/              # API/routing foundation dùng chung cho code mới
 │  └─ portal/index.html      # Entry độc lập tại /portal/
 ├─ backend/                  # Spring Boot REST API
-├─ Landing page/             # Nguồn Landing ban đầu, giữ để đối chiếu
+├─ landingPage/              # Nguồn Landing ban đầu, giữ để đối chiếu
 ├─ AI/                       # Nguồn AI ban đầu, giữ để đối chiếu
 └─ Studio/                   # Nguồn Studio ban đầu, giữ để đối chiếu
 ```
