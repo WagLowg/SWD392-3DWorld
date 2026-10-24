@@ -2,12 +2,12 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { CheckCircle2, MailCheck, XCircle } from 'lucide-react'
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link, useSearchParams } from 'react-router-dom'
-import { authService } from '../services/auth.service'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
 import { Field, FormError, inputClass, SubmitButton } from '../../../shared/ui/form'
 import { AuthLayout } from '../components/AuthLayout'
 import { type EmailOnlyValues, emailOnlySchema, TOKEN_PATTERN } from '../schemas/auth.schemas'
+import { authService } from '../services/auth.service'
 
 type State = 'idle' | 'verifying' | 'success' | 'failed'
 
@@ -23,6 +23,7 @@ export function VerifyEmailPage() {
   const [state, setState] = useState<State>(token ? 'verifying' : 'idle')
   const [error, setError] = useState('')
   const started = useRef(false)
+  const navigate = useNavigate()
 
   useEffect(() => {
     document.title = 'Xác thực email · 3DWorld'
@@ -42,6 +43,14 @@ export function VerifyEmailPage() {
       })
   }, [email, token])
 
+  useEffect(() => {
+    if (state !== 'success') return
+    const timer = window.setTimeout(() => {
+      navigate(`/?verified=1&email=${encodeURIComponent(email)}`, { replace: true })
+    }, 1500)
+    return () => window.clearTimeout(timer)
+  }, [email, navigate, state])
+
   return (
     <AuthLayout eyebrow="Xác thực email" title="Xác Thực Email" accent="Kích Hoạt Tài Khoản.">
       {state === 'verifying' && (
@@ -54,14 +63,14 @@ export function VerifyEmailPage() {
         <Result
           icon={<CheckCircle2 size={30} />}
           tone="bg-mint text-[#0f5132]"
-          title="Email đã được xác thực"
-          body="Tài khoản của bạn đã kích hoạt đầy đủ. Đăng nhập để tiếp tục."
+          title="Đăng nhập thành công"
+          body="Email đã được xác thực và tài khoản đã được kích hoạt. Đang chuyển bạn đến trang đăng nhập…"
           action={
             <Link
               to={`/?verified=1&email=${encodeURIComponent(email)}`}
               className="rounded-full bg-ink px-6 py-3 font-label text-sm font-semibold text-white hover:bg-violet"
             >
-              Đăng nhập
+              Đến trang đăng nhập
             </Link>
           }
         />

@@ -1,11 +1,13 @@
+import { LogOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link } from '../../lib/PageLink'
-import { useSession } from '../../lib/useSession'
+import { logout } from '../../../auth/services/session'
 import { WORLDS } from '../../config/content'
 import { ROUTES } from '../../config/routes'
+import { Link } from '../../lib/PageLink'
+import { useSession } from '../../lib/useSession'
+import { S } from '../../state/scene'
 import { useUI } from '../../state/store'
 import { WORLD_ANCHORS, worldProgress } from '../../state/timeline'
-import { S } from '../../state/scene'
 import { scrollToTime } from '../director'
 
 export function Logo({ className = '' }: { className?: string }) {
@@ -19,7 +21,16 @@ export function Logo({ className = '' }: { className?: string }) {
           </linearGradient>
         </defs>
         <circle cx="32" cy="32" r="17" fill="url(#lg)" />
-        <ellipse cx="32" cy="32" rx="29" ry="9" fill="none" stroke="#202027" strokeWidth="4.5" transform="rotate(-20 32 32)" />
+        <ellipse
+          cx="32"
+          cy="32"
+          rx="29"
+          ry="9"
+          fill="none"
+          stroke="#202027"
+          strokeWidth="4.5"
+          transform="rotate(-20 32 32)"
+        />
         <rect x="46" y="10" width="9" height="9" rx="2.5" fill="#FFE58F" />
       </svg>
       <span className="font-display text-[1.15rem] font-bold tracking-tight">
@@ -77,9 +88,23 @@ export function LandingNavigation() {
         </ul>
 
         <div className="flex items-center gap-1.5">
-          <Link to={user ? ROUTES.aiStudio : ROUTES.signIn} className="hidden rounded-full px-4 py-2 text-sm font-semibold text-ink/80 hover:bg-white sm:inline-block">
+          <Link
+            to={user ? ROUTES.aiStudio : ROUTES.signIn}
+            className="hidden rounded-full px-4 py-2 text-sm font-semibold text-ink/80 hover:bg-white sm:inline-block"
+          >
             {user ? user.name : 'Sign In'}
           </Link>
+          {user && (
+            <button
+              type="button"
+              onClick={() => void logout('/')}
+              className="hidden h-9 w-9 items-center justify-center rounded-full text-ink/60 transition-colors hover:bg-white hover:text-red-600 sm:inline-flex"
+              aria-label="Đăng xuất"
+              title="Đăng xuất"
+            >
+              <LogOut size={17} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => go(0)}
@@ -125,10 +150,24 @@ export function LandingNavigation() {
             ))}
           </ul>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <Link to={user ? ROUTES.aiStudio : ROUTES.signIn} className="rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold">
-              {user ? user.name : 'Sign In'}
-            </Link>
-            <button type="button" onClick={() => go(0)} className="rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white">
+            {user ? (
+              <button
+                type="button"
+                onClick={() => void logout('/')}
+                className="flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold"
+              >
+                <LogOut size={16} /> Đăng xuất
+              </button>
+            ) : (
+              <Link to={ROUTES.signIn} className="rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold">
+                Sign In
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={() => go(0)}
+              className="rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white"
+            >
               Explore 3DWorld
             </button>
           </div>
@@ -169,7 +208,9 @@ export function WorldProgress() {
             >
               <span
                 className={`eyebrow hidden whitespace-nowrap rounded-full bg-white/80 px-2.5 py-1 text-[0.62rem] text-ink transition-all duration-300 md:inline-block ${
-                  active === i ? 'opacity-100' : 'translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100'
+                  active === i
+                    ? 'opacity-100'
+                    : 'translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100'
                 }`}
               >
                 {w.label}

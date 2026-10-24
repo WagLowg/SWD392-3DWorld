@@ -7,6 +7,14 @@ function isApiErrorBody(value: unknown): value is ApiErrorBody {
   return typeof body.code === 'string' && typeof body.message === 'string'
 }
 
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    Object.values(value).every((message) => typeof message === 'string')
+  )
+}
+
 export function normalizeHttpError(error: unknown): ApiClientError {
   if (error instanceof ApiClientError) return error
 
@@ -37,9 +45,13 @@ export function normalizeHttpError(error: unknown): ApiClientError {
         ? (responseBody as { message: string }).message
         : undefined
     if (status && envelopeMessage) {
+      const data = (responseBody as { data?: unknown }).data
       return new ApiClientError(status, {
         code: `HTTP_${status}`,
         message: envelopeMessage,
+        fieldErrors: isStringRecord(data)
+          ? Object.entries(data).map(([field, message]) => ({ field, message }))
+          : undefined,
         correlationId: correlationHeader,
       })
     }

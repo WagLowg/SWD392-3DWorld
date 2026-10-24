@@ -1,4 +1,4 @@
-import { http } from '../../../shared/api'
+import { http, type ApiEnvelope } from '../../../shared/api'
 import { tokenStore } from '../../../shared/session/token'
 
 export type AuthUser = {
@@ -6,7 +6,8 @@ export type AuthUser = {
   email: string
   name: string
   role: string
-  /** Các trường dưới có từ Backend OpenAPI (UserResponse). */
+  avatarUrl?: string | null
+  dateOfBirth?: string | null
   phone?: string | null
   emailVerified?: boolean
   roles?: string[]
@@ -23,39 +24,61 @@ export type RegisterInput = LoginInput & {
   phone?: string
 }
 
-type AuthResponse = {
-  user: AuthUser
+type BackendUserResponse = {
+  userId: number
+  email: string
+  fullName: string
+  avatarUrl: string | null
+  dateOfBirth: string | null
+  phone: string | null
+  emailVerified: boolean
+  roles: string[]
+  capabilities: string[]
 }
 
-/** Response của Backend JWT: { status, message, data: { accessToken, expiresAt, user } }. */
-type TokenEnvelope = {
-  data?: { accessToken?: string; expiresAt?: string } | null
+type LoginResponse = {
+  accessToken: string
+  tokenType: 'Bearer' | string
+  expiresAt: string
+  user: BackendUserResponse
 }
 
-function saveToken(res: unknown) {
-  const data = (res as TokenEnvelope | null)?.data
-  if (data?.accessToken) tokenStore.set(data.accessToken, data.expiresAt)
-  return res
+function mapUser(user: BackendUserResponse): AuthUser {
+  return {
+    id: String(user.userId),
+    email: user.email,
+    name: user.fullName || user.email.split('@')[0],
+    role: user.roles[0] ?? 'CUSTOMER',
+    avatarUrl: user.avatarUrl,
+    dateOfBirth: user.dateOfBirth,
+    phone: user.phone,
+    emailVerified: user.emailVerified,
+    roles: user.roles,
+    capabilities: user.capabilities,
+  }
 }
 
 export const authService = {
-  getCurrentUser(signal?: AbortSignal) {
-    return http.get<AuthResponse>('/api/auth/me', { signal })
+  async getCurrentUser(signal?: AbortSignal) {
+    const response = await http.get<ApiEnvelope<BackendUserResponse>>('/api/auth/me', { signal })
+    return mapUser(response.data)
   },
 
   async login(input: LoginInput) {
     tokenStore.clear()
-    return saveToken(await http.post<AuthResponse, LoginInput>('/api/auth/login', input)) as AuthResponse
+    const response = await http.post<ApiEnvelope<LoginResponse>, LoginInput>('/api/auth/login', input)
+    tokenStore.set(response.data.accessToken, response.data.expiresAt)
+    return mapUser(response.data.user)
   },
 
-  /** RegisterRequest (OpenAPI): email, password, fullName, phone — Backend từ chối trường lạ. */
-  register(input: RegisterInput) {
-    return http.post<AuthResponse>('/api/auth/register', {
+  async register(input: RegisterInput) {
+    const response = await http.post<ApiEnvelope<BackendUserResponse>>('/api/auth/register', {
       email: input.email,
       password: input.password,
       fullName: input.name,
       phone: input.phone || null,
     })
+    return mapUser(response.data)
   },
 
   /** Link trong email có dạng {APP_BASE_URL}/verify-email?email=…&token=… */

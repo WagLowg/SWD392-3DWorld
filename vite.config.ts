@@ -37,7 +37,17 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), moduleFallback()],
   server: {
     port: 5173,
-    proxy: { '/api': `http://localhost:${process.env.API_PORT || 8080}` },
+    proxy: {
+      '/api': {
+        target: `http://localhost:${process.env.API_PORT || 8080}`,
+        changeOrigin: true,
+        configure(proxy) {
+          // Browser gọi cùng origin Vite; request từ dev proxy sang BE là server-to-server.
+          // Bỏ Origin của :5173 để Spring không xử lý nhầm như một request CORS trực tiếp.
+          proxy.on('proxyReq', (proxyRequest) => proxyRequest.removeHeader('origin'))
+        },
+      },
+    },
   },
   build: {
     chunkSizeWarningLimit: 2000,

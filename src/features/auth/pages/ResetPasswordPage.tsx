@@ -64,7 +64,12 @@ export function ResetPasswordPage() {
             xuất.
           </p>
           <form onSubmit={submit} noValidate className="mt-6 space-y-4">
-            <Field id={`${uid}-pw`} label="Mật khẩu mới *" error={errors.password?.message} hint="8–72 ký tự.">
+            <Field
+              id={`${uid}-pw`}
+              label="Mật khẩu mới *"
+              error={errors.password?.message}
+              hint="Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt."
+            >
               <PasswordInput
                 id={`${uid}-pw`}
                 autoComplete="new-password"
