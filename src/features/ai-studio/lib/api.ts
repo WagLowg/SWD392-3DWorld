@@ -1,3 +1,5 @@
+import { tokenStore } from '../../../shared/session/token';
+
 export type User = { id: string; email: string; name: string; role: string };
 
 export type GenConfig = {
@@ -83,11 +85,16 @@ export const authEvents = new EventTarget();
 
 export async function api<T>(path: string, opts: Opts = {}): Promise<T> {
   const isForm = opts.body instanceof FormData;
+  const token = tokenStore.get();
   let res: Response;
   try {
     res = await fetch(path, {
       method: opts.method || (opts.body ? 'POST' : 'GET'),
-      headers: { ...(opts.body && !isForm ? { 'Content-Type': 'application/json' } : {}), ...opts.headers },
+      headers: {
+        ...(opts.body && !isForm ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...opts.headers,
+      },
       body: opts.body ? (isForm ? (opts.body as FormData) : JSON.stringify(opts.body)) : undefined,
       credentials: 'same-origin',
       signal: opts.signal,
@@ -98,7 +105,7 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T> {
   }
   const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
   if (!res.ok) {
-    const err = data?.error || {};
+    const err = data?.error || data || {};
     if (res.status === 401 && !path.startsWith('/api/auth/')) authEvents.dispatchEvent(new Event('expired'));
     throw new ApiError(res.status, err.code || 'HTTP_' + res.status, err.message || `Lỗi ${res.status}`, err);
   }

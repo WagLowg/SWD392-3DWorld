@@ -2,15 +2,22 @@ import { z } from 'zod'
 
 const email = z.string().trim().min(1, 'Nhập email.').email('Email không hợp lệ.').max(320)
 
-/** Backend: 8–72 byte UTF-8. */
+/** Backend: 8+ ký tự, có hoa/thường/số/ký tự đặc biệt và tối đa 72 byte UTF-8. */
 const password = z
   .string()
   .min(8, 'Mật khẩu tối thiểu 8 ký tự.')
+  .regex(/[a-z]/, 'Mật khẩu cần có ít nhất một chữ thường.')
+  .regex(/[A-Z]/, 'Mật khẩu cần có ít nhất một chữ hoa.')
+  .regex(/[0-9]/, 'Mật khẩu cần có ít nhất một chữ số.')
+  .regex(/[^A-Za-z0-9]/, 'Mật khẩu cần có ít nhất một ký tự đặc biệt.')
   .refine((v) => new TextEncoder().encode(v).length <= 72, 'Mật khẩu tối đa 72 byte.')
 
 export const loginSchema = z.object({
   email,
-  password: z.string().min(1, 'Nhập mật khẩu.'),
+  password: z
+    .string()
+    .min(1, 'Nhập mật khẩu.')
+    .refine((v) => new TextEncoder().encode(v).length <= 72, 'Mật khẩu tối đa 72 byte.'),
 })
 export type LoginValues = z.infer<typeof loginSchema>
 

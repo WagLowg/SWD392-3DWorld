@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-react';
 import { api, authEvents, type User, type Wallet } from './api';
+import { fetchMe, logout as logoutSession } from '../../auth/services/session';
 
 // ---------------- Toasts ----------------
 type ToastKind = 'success' | 'error' | 'warning' | 'info';
@@ -57,10 +58,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const toast = useToast();
 
   useEffect(() => {
-    Promise.all([api<{ user: User | null }>('/api/auth/me'), api<{ provider: 'meshy' | 'mock' }>('/api/health')])
-      .then(([me, h]) => { setUser(me.user); setProvider(h.provider); })
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+    let active = true;
+
+    fetchMe()
+      .then((sessionUser) => {
+        if (active) setUser(sessionUser);
+      })
+      .catch(() => {
+        if (active) setUser(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    // AI service có thể khởi động riêng; lỗi health không được chặn phiên đăng nhập hay treo toàn màn hình.
+    api<{ provider: 'meshy' | 'mock' }>('/api/health')
+      .then((health) => {
+        if (active) setProvider(health.provider);
+      })
+      .catch(() => {
+        if (active) setProvider(null);
+      });
+
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -78,8 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => { if (user) refreshWallet(); else setWallet(null); }, [user, refreshWallet]);
 
   const logout = useCallback(async () => {
-    await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    location.assign('/');
+    await logoutSession('/');
   }, []);
 
   const value = useMemo(() => ({ user, loading, provider, wallet, refreshWallet, setUser, logout }), [user, loading, provider, wallet, refreshWallet, logout]);

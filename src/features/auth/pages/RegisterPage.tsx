@@ -38,7 +38,19 @@ export function RegisterPage() {
       // Backend gửi email xác thực ngay sau khi đăng ký
       navigate(`/verify-email?email=${encodeURIComponent(v.email)}&sent=1`)
     } catch (e) {
-      setError('root', { message: e instanceof ApiClientError ? e.message : 'Không tạo được tài khoản.' })
+      if (e instanceof ApiClientError) {
+        const fields = new Set(['fullName', 'email', 'phone', 'password'])
+        let hasFieldError = false
+        for (const error of e.body.fieldErrors ?? []) {
+          if (fields.has(error.field)) {
+            setError(error.field as 'fullName' | 'email' | 'phone' | 'password', { message: error.message })
+            hasFieldError = true
+          }
+        }
+        if (!hasFieldError) setError('root', { message: e.message })
+      } else {
+        setError('root', { message: 'Không tạo được tài khoản.' })
+      }
     }
   })
 
@@ -78,7 +90,12 @@ export function RegisterPage() {
             {...register('phone')}
           />
         </Field>
-        <Field id={`${uid}-pw`} label="Mật khẩu *" error={errors.password?.message} hint="8–72 ký tự.">
+        <Field
+          id={`${uid}-pw`}
+          label="Mật khẩu *"
+          error={errors.password?.message}
+          hint="Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt."
+        >
           <PasswordInput
             id={`${uid}-pw`}
             autoComplete="new-password"

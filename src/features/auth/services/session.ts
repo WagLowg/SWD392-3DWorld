@@ -4,39 +4,10 @@ import { authService, type AuthUser } from './auth.service'
 
 export type SessionUser = AuthUser
 
-type MeEnvelope = {
-  user?: AuthUser
-  data?: {
-    userId?: number | string
-    email?: string
-    fullName?: string
-    phone?: string | null
-    emailVerified?: boolean
-    roles?: string[]
-    capabilities?: string[]
-  } | null
-}
-
-/**
- * Người dùng hiện tại, null nếu chưa đăng nhập.
- * Hỗ trợ cả Backend cũ ({ user }) và Backend OpenAPI ({ data: UserResponse }).
- */
+/** Người dùng hiện tại theo ApiResponse<UserResponse> của Spring Boot, null nếu chưa đăng nhập. */
 export async function fetchMe(signal?: AbortSignal): Promise<SessionUser | null> {
   try {
-    const res = (await authService.getCurrentUser(signal)) as MeEnvelope
-    if (res.user) return res.user
-    const d = res.data
-    if (!d?.email) return null
-    return {
-      id: String(d.userId ?? ''),
-      email: d.email,
-      name: d.fullName || d.email.split('@')[0],
-      role: d.roles?.[0] ?? 'CUSTOMER',
-      phone: d.phone ?? null,
-      emailVerified: d.emailVerified,
-      roles: d.roles ?? [],
-      capabilities: d.capabilities ?? [],
-    }
+    return await authService.getCurrentUser(signal)
   } catch {
     return null
   }
