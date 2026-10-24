@@ -2,6 +2,7 @@
 
 Frontend là một Vite multi-page application: một package và một dev server, nhưng mỗi module lớn có React root riêng để CSS, router và vòng đời Three.js không ảnh hưởng lẫn nhau.
 
+
 ```text
 Browser
   ├─ /                    → Landing
