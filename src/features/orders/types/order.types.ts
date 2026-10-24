@@ -17,6 +17,16 @@ export type Order = {
   status: OrderStatus | string
   createdAt: string
   items: OrderItem[]
+  /** Mã đơn hiển thị do Backend sinh. */
+  orderCode?: string
+  /** Các đơn con cùng một lần checkout dùng chung id này. */
+  checkoutGroupId?: string
+  reservationExpiresAt?: string | null
+  reservationStatus?: string | null
+  commissionRateSnapshot?: number | null
+  refundWindowHoursSnapshot?: number | null
+  autoConfirmHoursSnapshot?: number | null
+  shippingAddressSnapshot?: string | null
 }
 
 /**

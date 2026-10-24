@@ -14,9 +14,12 @@ export const addressService = {
 
 export const orderService = {
   /** Tách các món đã chọn thành một đơn con cho mỗi xưởng và giữ chỗ tồn kho. */
-  async checkout(input: CheckoutInput, idempotencyKey: string) {
-    return (await http.post<ApiEnvelope<Order[]>, CheckoutInput>('/api/orders/checkout', input, { idempotencyKey }))
-      .data
+  async checkout(input: CheckoutInput) {
+    return (
+      await http.post<ApiEnvelope<Order[]>, CheckoutInput>('/api/orders/checkout', input, {
+        idempotencyKey: input.idempotencyKey,
+      })
+    ).data
   },
 
   async mine(signal?: AbortSignal) {

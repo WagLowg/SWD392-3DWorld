@@ -88,3 +88,7 @@ export function useRemoveCartItem() {
 export function useRevalidateCart() {
   return useCartMutation(() => cartService.revalidate(), 'Đã kiểm tra lại tồn kho & giá.')
 }
+
+export function useAcknowledgePrice() {
+  return useCartMutation((itemId: number) => cartService.acknowledgePrice(itemId), 'Đã chấp nhận giá mới.')
+}

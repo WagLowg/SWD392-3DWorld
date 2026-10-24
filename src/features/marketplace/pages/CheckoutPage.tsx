@@ -36,8 +36,19 @@ type PaymentMethod = 'zalopay' | 'cod'
 
 type PaymentState = { orderId: number; payment?: Payment; error?: string }
 
+function addressLine(a: Address) {
+  return [a.addressLine, a.ward, a.district, a.province || a.city].filter(Boolean).join(', ')
+}
+
 function addressSnapshot(a: Address) {
-  return [a.recipientName, a.phone, [a.addressLine, a.city].filter(Boolean).join(', ')].filter(Boolean).join(' | ')
+  return [a.recipientName, a.phone, addressLine(a)].filter(Boolean).join(' | ')
+}
+
+function formatTime(iso: string) {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
 }
 
 function newKey() {
@@ -188,17 +199,17 @@ function CheckoutForm({
   const groups = groupByStorefront(items, index)
   const subtotal = items.reduce((s, i) => s + (Number(i.lineTotal) || 0), 0)
   const busy = checkout.isPending || pay.isPending
+  const priceChanged = items.filter((i) => i.priceChanged)
 
   const submit = async () => {
     if (!address) return setError('Vui lòng chọn hoặc thêm địa chỉ nhận hàng.')
+    if (priceChanged.length) return setError('Có món đã đổi giá — vui lòng chấp nhận giá mới trong giỏ hàng.')
     setError('')
     try {
       const placed = await checkout.mutateAsync({
-        input: {
-          cartItemIds: items.map((i) => i.itemId),
-          shippingAddressSnapshot: addressSnapshot(address),
-          shippingAddressId: address.id,
-        },
+        cartItemIds: items.map((i) => i.itemId),
+        shippingAddressSnapshot: addressSnapshot(address),
+        shippingAddressId: address.id,
         idempotencyKey: idempotencyKey.current,
       })
       idempotencyKey.current = newKey()
@@ -274,7 +285,7 @@ function CheckoutForm({
                       )}
                     </span>
                     <span className="mt-1 block text-sm text-ink-soft">
-                      {[a.addressLine, a.city].filter(Boolean).join(', ')}
+                      {addressLine(a)}
                     </span>
                   </span>
                 </label>
@@ -443,12 +454,21 @@ function CheckoutForm({
             </span>
           </label>
 
+          {priceChanged.length > 0 && (
+            <p className="mt-3 rounded-xl bg-peach/60 px-4 py-3 text-sm text-orange-deep">
+              {priceChanged.length} món đã đổi giá.{' '}
+              <Link to="/cart" className="font-semibold underline">
+                Quay lại giỏ để chấp nhận giá mới
+              </Link>
+            </p>
+          )}
+
           {error && <p className="mt-3 rounded-xl bg-[#ffdad6] px-4 py-3 text-sm text-danger">{error}</p>}
 
           <button
             type="button"
             onClick={submit}
-            disabled={!agree || !address || busy}
+            disabled={!agree || !address || busy || priceChanged.length > 0}
             className="mt-5 flex w-full items-center justify-between gap-3 rounded-full bg-ink py-2.5 pl-6 pr-2.5 font-label text-sm font-semibold text-white transition hover:bg-violet disabled:opacity-40"
           >
             <span>{busy ? 'Đang xử lý…' : method === 'cod' ? 'Xác Nhận Đặt Hàng' : 'Xác Nhận Thanh Toán'}</span>
@@ -531,11 +551,19 @@ function OrderResult({
           return (
             <section key={order.id} className="rounded-[2rem] bg-white/90 p-6 shadow-soft">
               <div className="flex items-center justify-between gap-3">
-                <StorefrontBadge storefrontId={order.storefrontId} sub={`Đơn con #${order.id}`} />
+                <StorefrontBadge
+                  storefrontId={order.storefrontId}
+                  sub={`Đơn con ${order.orderCode ?? `#${order.id}`}`}
+                />
                 <span className="rounded-full bg-violet-soft px-3 py-1 font-label text-[11px] font-semibold text-violet">
                   {order.status}
                 </span>
               </div>
+              {order.reservationExpiresAt && (
+                <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-peach/50 px-3 py-1 font-label text-[11px] font-semibold text-orange-deep">
+                  <Clock size={12} /> Giữ chỗ tồn kho đến {formatTime(order.reservationExpiresAt)}
+                </p>
+              )}
               <ul className="mt-4 space-y-1.5 text-sm">
                 {order.items.map((i) => (
                   <li key={i.id} className="flex justify-between gap-3">

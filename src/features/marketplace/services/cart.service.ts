@@ -20,6 +20,11 @@ export const cartService = {
     return (await http.delete<CartEnvelope>(`/api/cart/items/${itemId}`)).data
   },
 
+  /** Chấp nhận giá hiện tại của một món đã đổi giá (priceChanged). */
+  async acknowledgePrice(itemId: number) {
+    return (await http.post<CartEnvelope>(`/api/cart/items/${itemId}/acknowledge-price`)).data
+  },
+
   /** Kiểm tra lại trạng thái sản phẩm/variant và tồn kho trước khi thanh toán. */
   async revalidate() {
     return (await http.post<CartEnvelope>('/api/cart/revalidate')).data

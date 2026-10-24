@@ -20,7 +20,7 @@ export function AddressForm({ onCreated, onCancel }: { onCreated: (address: Addr
     formState: { errors },
   } = useForm<AddressFormValues>({
     resolver: zodResolver(addressSchema),
-    defaultValues: { recipientName: '', phone: '', addressLine: '', city: '' },
+    defaultValues: { recipientName: '', phone: '', addressLine: '', ward: '', district: '', city: '' },
   })
 
   const submit = handleSubmit(async (values) => {
@@ -29,7 +29,11 @@ export function AddressForm({ onCreated, onCancel }: { onCreated: (address: Addr
         recipientName: values.recipientName,
         addressLine: values.addressLine,
         phone: values.phone || undefined,
+        ward: values.ward || undefined,
+        district: values.district || undefined,
+        // Backend có cả city và province — gửi cùng giá trị để tương thích.
         city: values.city || undefined,
+        province: values.city || undefined,
       })
       onCreated(address)
     } catch (error) {
@@ -67,8 +71,20 @@ export function AddressForm({ onCreated, onCancel }: { onCreated: (address: Addr
           id={`${uid}-addressLine`}
           {...register('addressLine')}
           autoComplete="street-address"
-          placeholder="Số nhà, đường, phường/xã, quận/huyện"
+          placeholder="Số nhà, tên đường"
           aria-invalid={!!errors.addressLine}
+          className={field}
+        />
+      </Field>
+      <Field id={`${uid}-ward`} label="Phường / Xã" error={errors.ward?.message}>
+        <input id={`${uid}-ward`} {...register('ward')} aria-invalid={!!errors.ward} className={field} />
+      </Field>
+      <Field id={`${uid}-district`} label="Quận / Huyện" error={errors.district?.message}>
+        <input
+          id={`${uid}-district`}
+          {...register('district')}
+          autoComplete="address-level2"
+          aria-invalid={!!errors.district}
           className={field}
         />
       </Field>

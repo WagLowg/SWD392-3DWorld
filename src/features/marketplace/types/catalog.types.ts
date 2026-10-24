@@ -56,6 +56,10 @@ export type CartItem = {
   quantity: number
   lineTotal: number
   unavailable: boolean
+  /** Giá lúc thêm vào giỏ, có khi giá variant đã đổi. */
+  previousUnitPrice?: number | null
+  /** true → người mua phải chấp nhận giá mới (POST /api/cart/items/{id}/acknowledge-price) trước khi đặt. */
+  priceChanged?: boolean
 }
 
 export type Cart = {
@@ -75,6 +79,9 @@ export type Address = {
   phone?: string | null
   addressLine: string
   city?: string | null
+  province?: string | null
+  district?: string | null
+  ward?: string | null
   isDefault: boolean
 }
 
@@ -83,13 +90,18 @@ export type AddressInput = {
   phone?: string
   addressLine: string
   city?: string
+  province?: string
+  district?: string
+  ward?: string
 }
 
 export type CheckoutInput = {
   cartItemIds: number[]
   /** Bản chụp địa chỉ dạng chuỗi, lưu độc lập cho từng đơn con. */
-  shippingAddressSnapshot: string
-  shippingAddressId?: number
+  shippingAddressSnapshot?: string
+  shippingAddressId: number
+  /** Bắt buộc trong body theo CheckoutRequest; giữ nguyên khi thử lại cùng một lần đặt. */
+  idempotencyKey: string
 }
 
 export type OrderItem = {
@@ -111,6 +123,14 @@ export type Order = {
   status: string
   createdAt: string
   items: OrderItem[]
+  orderCode?: string
+  checkoutGroupId?: string
+  reservationExpiresAt?: string | null
+  reservationStatus?: string | null
+  commissionRateSnapshot?: number | null
+  refundWindowHoursSnapshot?: number | null
+  autoConfirmHoursSnapshot?: number | null
+  shippingAddressSnapshot?: string | null
 }
 
 export type Payment = {

@@ -19,7 +19,7 @@ import { ProductMedia } from '../components/ProductMedia'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { StorefrontBadge } from '../components/StorefrontBadge'
 import { ApiNote, PageHeading, QuantityStepper } from '../../../shared/ui/primitives'
-import { useCart, useRemoveCartItem, useRevalidateCart, useUpdateCartItem } from '../hooks/useCart'
+import { useAcknowledgePrice, useCart, useRemoveCartItem, useRevalidateCart, useUpdateCartItem } from '../hooks/useCart'
 import { useSession } from '../../../shared/session/useSession'
 import { groupByStorefront, storefrontName } from '../lib/cart'
 import { formatAttributes, formatVnd } from '../lib/format'
@@ -157,6 +157,7 @@ function CartContent({ items }: { items: CartItem[] }) {
   const quantity = chosen.reduce((s, i) => s + i.quantity, 0)
   const allChecked = buyable.length > 0 && chosen.length === buyable.length
   const hasUnknown = groups.some((g) => g.storefrontId === null)
+  const priceChanged = chosen.filter((i) => i.priceChanged)
 
   const removeSelected = async () => {
     for (const item of chosen) await remove.mutateAsync(item.itemId).catch(() => undefined)
@@ -314,9 +315,14 @@ function CartContent({ items }: { items: CartItem[] }) {
             </div>
             <p className="text-right font-label text-[11px] text-ink-soft">Chưa bao gồm cước vận chuyển xưởng</p>
           </div>
+          {priceChanged.length > 0 && (
+            <p className="mt-4 rounded-2xl bg-peach/60 p-3 text-xs text-orange-deep">
+              {priceChanged.length} món đã thay đổi giá. Vui lòng chấp nhận giá mới ở từng món trước khi đặt hàng.
+            </p>
+          )}
           <button
             type="button"
-            disabled={!chosen.length}
+            disabled={!chosen.length || priceChanged.length > 0}
             onClick={() => navigate(`/checkout?items=${chosen.map((i) => i.itemId).join(',')}`)}
             className="mt-5 flex w-full items-center justify-between gap-2 rounded-full bg-ink py-2 pl-6 pr-2 font-label text-sm font-semibold text-white transition hover:bg-violet disabled:opacity-40"
           >
@@ -361,7 +367,8 @@ function CartRow({ item, checked, onCheck }: { item: CartItem; checked: boolean;
   const info = useVariantIndexStore((s) => s.variants[item.variantId])
   const update = useUpdateCartItem()
   const remove = useRemoveCartItem()
-  const busy = update.isPending || remove.isPending
+  const acknowledge = useAcknowledgePrice()
+  const busy = update.isPending || remove.isPending || acknowledge.isPending
   const attrs = formatAttributes(info?.attributes)
 
   return (
@@ -382,6 +389,29 @@ function CartRow({ item, checked, onCheck }: { item: CartItem; checked: boolean;
           </code>
         </p>
         {attrs && <p className="mt-1.5 text-xs text-ink-soft">{attrs}</p>}
+        {item.priceChanged && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-peach/60 px-3 py-2 text-xs text-orange-deep">
+            <AlertTriangle size={13} />
+            <span>
+              Giá đã đổi
+              {item.previousUnitPrice != null && (
+                <>
+                  {' '}
+                  từ <s>{formatVnd(item.previousUnitPrice)}</s>
+                </>
+              )}{' '}
+              thành <strong>{formatVnd(item.unitPrice)}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => acknowledge.mutate(item.itemId)}
+              disabled={busy}
+              className="rounded-full bg-ink px-3 py-1 font-label text-[11px] font-semibold text-white hover:bg-violet disabled:opacity-50"
+            >
+              Chấp nhận giá mới
+            </button>
+          </div>
+        )}
       </div>
       <div className="text-right">
         <p className="font-display text-lg font-bold text-orange-deep">{formatVnd(item.lineTotal)}</p>

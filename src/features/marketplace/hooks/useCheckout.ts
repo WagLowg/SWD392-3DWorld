@@ -26,8 +26,7 @@ export function useCreateAddress() {
 export function useCheckout() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ input, idempotencyKey }: { input: CheckoutInput; idempotencyKey: string }) =>
-      orderService.checkout(input, idempotencyKey),
+    mutationFn: (input: CheckoutInput) => orderService.checkout(input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: cartKey }),
   })
 }
