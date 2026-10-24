@@ -1,85 +1,76 @@
 # Frontend Team Guide
 
-Tài liệu này giúp team thống nhất: code ở đâu, gọi API qua đâu và tránh tạo folder trùng.
+Tài liệu này giúp team biết nên đặt code ở đâu và các phần kết nối với nhau như thế nào. Đây là quy ước chung để tránh trùng code, không bắt buộc một feature nhỏ phải tạo đủ mọi folder.
 
-## 1. Cấu trúc chung
+## 1. Nhìn nhanh cấu trúc
 
 ```text
-frontend/src/
-├── app/                         # Điểm khởi động, providers, routing cấp app
-│   ├── providers/
-│   └── routing/
-├── features/                    # Chia code theo nghiệp vụ
+src/
+├── app/                         # Provider, routing và cấu hình cấp app
+├── features/                    # Mỗi nghiệp vụ có một source chính
+│   ├── landing/
 │   ├── auth/
+│   ├── ai-studio/
+│   ├── studio/
 │   ├── marketplace/
 │   ├── pod/
+│   ├── account/
+│   ├── orders/
+│   ├── models/
+│   ├── buyer/
+│   ├── seller/
+│   ├── wallet/
+│   ├── design/
+│   ├── ops/
 │   └── portal/
-├── shared/                      # Phần thật sự dùng chung
-│   ├── api/                     # Axios instance, normalize lỗi, API types chung
+├── shared/
+│   ├── api/                     # Axios client, lỗi và type API chung
 │   ├── config/                  # Biến môi trường public
-│   ├── lib/                     # Hàm tiện ích không chứa nghiệp vụ
-│   └── stores/                  # Zustand store dùng toàn frontend
+│   ├── session/                 # Hook phiên đăng nhập dùng chung
+│   └── ui/                      # Component dùng ở nhiều feature
 └── test/                        # Setup test chung
+
+entries/                         # HTML entry, không chứa business logic
+public/                          # File tĩnh
 ```
 
-Ba ứng dụng đã có không nằm trong `frontend/src`:
+Landing, AI Studio và 3D Studio đã nằm trong `src/features`. Không tạo lại project riêng như `landingPage`, `Studio`, `AI/client` hoặc một thư mục `frontend` lồng bên trong repo.
+
+## 2. Một feature thường có gì?
+
+Ví dụ với POD:
 
 ```text
-landingPage/                     # Landing source chính
-Studio/                          # 3D Studio source chính
-AI/                              # AI Studio + Meshy source chính
+src/features/pod/
+├── pages/                       # Màn hình gắn với route
+├── components/                  # UI chỉ dùng trong POD
+├── hooks/                       # React Query hook hoặc logic React
+├── services/                    # Hàm gọi API POD
+├── schemas/                     # Zod schema cho form/input
+├── types/                       # Request, response và model TypeScript
+└── main.tsx                     # Entry nếu POD là một module riêng
 ```
 
-Không tạo lại `frontend/src/landing`, `frontend/src/studio` hoặc `frontend/src/ai`.
+Chỉ tạo folder khi thật sự có file thuộc loại đó. Component chỉ dùng trong một page có thể đặt gần page; khi nhiều nơi dùng mới tách ra.
 
-## 2. Code một chức năng ở đâu?
-
-Ví dụ làm chức năng tạo yêu cầu POD:
+## 3. Luồng code và gọi API
 
 ```text
-features/pod/
-├── pages/
-│   ├── customer/
-│   ├── staff/
-│   └── admin/
-├── components/
-├── hooks/
-├── services/
-├── schemas/
-├── types/
-└── routes.tsx
-```
-
-Ý nghĩa:
-
-- `pages/`: màn hình gắn với route.
-- `components/`: UI chỉ phục vụ feature này.
-- `hooks/`: React Query hook hoặc logic React tái sử dụng trong feature.
-- `services/`: hàm gọi API của feature.
-- `schemas/`: Zod schema cho form/input.
-- `types/`: request, response và model TypeScript.
-- `routes.tsx`: route của feature nếu feature có nhiều màn hình.
-
-Không cần tạo đủ mọi folder từ đầu. Chỉ tạo khi có file thật.
-
-## 3. Luồng gọi API
-
-```text
-Page
-  ↓
-Hook (TanStack Query / Mutation)
-  ↓
-Feature Service
-  ↓
-shared/api/client.ts (Axios)
-  ↓
+Page / Component
+    ↓
+Hook (TanStack Query hoặc mutation)
+    ↓
+Feature service
+    ↓
+shared/api (Axios)
+    ↓
 Backend REST API
 ```
 
 Ví dụ:
 
 ```ts
-// features/pod/services/pod.service.ts
+// src/features/pod/services/pod.service.ts
 import { http } from '../../../shared/api'
 import type { PrintRequest } from '../types/pod.types'
 
@@ -89,43 +80,54 @@ export const podService = {
 }
 ```
 
-Page không gọi `axios` trực tiếp. Toàn bộ frontend dùng chung client trong `shared/api`.
+Ưu tiên gọi API qua service của feature. Không tạo Axios instance mới cho từng module; client chung đã xử lý base URL, cookie, JWT và chuẩn hóa lỗi.
 
-## 4. Dùng state đúng chỗ
+## 4. Chọn nơi lưu state
 
-| Loại state | Công cụ |
+| Loại state | Nên dùng |
 |---|---|
-| Dữ liệu từ backend, loading, cache | TanStack Query |
-| Form | React Hook Form + Zod |
-| UI state dùng nhiều component | Zustand |
-| State nhỏ chỉ trong một component | `useState` |
+| Dữ liệu backend, loading, cache | TanStack Query |
+| Form và validate | React Hook Form + Zod |
+| UI state dùng qua nhiều component | Zustand |
+| State nhỏ trong một component | `useState` |
 
-Không copy toàn bộ dữ liệu backend vào Zustand nếu TanStack Query đã quản lý dữ liệu đó.
+Không cần đưa dữ liệu backend vào Zustand nếu TanStack Query đã quản lý dữ liệu đó.
 
-## 5. Khi nào đưa vào shared?
+## 5. Khi nào dùng `shared`?
 
-- Chỉ một feature dùng: để trong `features/<feature>`.
-- Từ hai feature trở lên cùng dùng: cân nhắc chuyển sang `shared`.
-- Không đưa business logic vào component UI dùng chung.
-- Không tạo một Axios instance mới cho từng feature.
+- Một feature dùng: để trong `src/features/<feature>`.
+- Nhiều feature dùng: cân nhắc chuyển sang `src/shared`.
+- Auth/session nằm ở `features/auth`; các feature khác import lại, không tự lưu token riêng.
+- Business logic vẫn ở feature, không đưa vào component UI chung.
 
-## 6. Route và entry hiện tại
+## 6. Route và entry
 
-| URL | Source |
+| URL | Source chính |
 |---|---|
-| `/login/`, `/register/` | `features/auth/` |
-| `/marketplace/` | `features/marketplace/` |
-| `/pod/` | `features/pod/` |
-| `/portal/` | `features/portal/` |
+| `/` | `src/features/landing` |
+| `/login/*` | `src/features/auth` |
+| `/ai/*` | `src/features/ai-studio` |
+| `/studio/*` | `src/features/studio` |
+| `/marketplace/*` | `src/features/marketplace` |
+| `/pod/*` | `src/features/pod` |
+| `/portal/*` | `src/features/portal` và các feature nghiệp vụ |
 
-Landing, Studio và AI là package độc lập. Khi deploy chung domain, việc ghép route thực hiện ở reverse proxy/hosting, không copy code qua lại.
+`vite.config.ts` ánh xạ URL đến file trong `entries/`. Khi thêm một module độc lập mới, tạo một HTML entry nhỏ và thêm tên module vào cấu hình Vite; code thật vẫn đặt trong `src/features`.
 
-## 7. Cách chạy
+## 7. Cách làm một task mới
 
-Frontend nghiệp vụ:
+1. Xác định task thuộc feature nào.
+2. Đọc contract API backend và type response trước.
+3. Thêm type/schema, sau đó viết service gọi API.
+4. Viết hook nếu màn hình cần cache hoặc mutation.
+5. Ghép page/component và route.
+6. Chạy typecheck, test liên quan và build trước khi push.
+
+## 8. Chạy dự án
+
+Tất cả lệnh frontend chạy tại root `SWD392-3DWorld`:
 
 ```bash
-cd frontend
 npm install
 npm run dev
 ```
@@ -139,27 +141,4 @@ npm run test
 npm run build
 ```
 
-Muốn chạy Landing, Studio hoặc AI thì vào đúng folder của ứng dụng đó và chạy script của package tương ứng.
-
-## 8. Git và file không được push
-
-`.gitignore` ở root áp dụng cho toàn repository:
-
-```text
-**/node_modules/
-**/dist/
-**/target/
-**/.env
-**/coverage/
-```
-
-Được commit `.env.example`, không commit `.env` thật. Sau khi clone, mỗi thành viên chạy `npm install` để tạo lại `node_modules` trên máy.
-
-## 9. Nhớ nhanh
-
-- Code theo nghiệp vụ trong `features`.
-- Code dùng chung thật sự trong `shared`.
-- Provider và routing cấp app trong `app`.
-- Kiểm tra contract backend trước khi viết service/type.
-- Không copy Landing, Studio hoặc AI vào frontend.
-- Không commit dependency, build output hoặc secret.
+`.gitignore` ở root áp dụng cho toàn repo. Commit `.env.example`, không commit `.env`, `node_modules`, `dist`, `target`, coverage hoặc dữ liệu runtime.

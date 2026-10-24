@@ -1,19 +1,12 @@
 {
-  "name": "3dworld-ai-studio",
+  "name": "3dworld-ai-server",
   "private": true,
   "version": "1.0.0",
   "description": "3DWorld AI Studio – Image to 3D với Meshy API",
-  "workspaces": [
-    "server",
-    "client"
-  ],
+  "workspaces": ["server"],
   "scripts": {
-    "dev": "concurrently -n api,web -c cyan,magenta \"npm:dev -w server\" \"npm:dev -w client\"",
-    "build": "npm run build -w client",
+    "dev": "npm run dev -w server",
     "start": "npm run start -w server",
     "test:smoke": "node server/scripts/smoke.mjs http://localhost:8787"
-  },
-  "devDependencies": {
-    "concurrently": "^9.1.2"
   }
 }

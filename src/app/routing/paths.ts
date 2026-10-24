@@ -1,0 +1,21 @@
+/** Route helpers tập trung để feature không tự ghép URL rải rác. */
+export const paths = {
+  home: '/',
+  login: (next = '/') => `/login/?next=${encodeURIComponent(next)}`,
+  ai: '/ai/',
+  aiGenerator: '/ai/studio',
+  aiHistory: '/ai/models',
+  studio: '/studio/',
+  marketplace: '/marketplace/',
+  marketplaceProduct: (productId: string) => `/marketplace/${productId}`,
+  marketplaceCatalog: '/marketplace/products',
+  marketplaceCart: '/marketplace/cart',
+  marketplaceCheckout: '/marketplace/checkout',
+  pod: '/pod/',
+  portal: '/portal/',
+  profile: '/portal/profile',
+  cart: '/portal/cart',
+  orders: '/portal/orders',
+  notifications: '/portal/notifications',
+  model: (modelId: string) => `/portal/models/${modelId}`,
+} as const

@@ -1,0 +1,90 @@
+/* Design tokens 3DWorld (Stitch · MP 001–090). Dùng chung cho Marketplace, Portal, Login.
+   Mỗi entry CSS: @import "tailwindcss"; rồi @import file này. */
+@theme {
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-label: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-surface: #fbf8ff;
+  --color-surface-low: #f5f2fc;
+  --color-surface-mid: #efecf6;
+  --color-surface-high: #eae7f1;
+  --color-ink: #1b1b22;
+  --color-ink-soft: #5d5a68;
+  --color-line: #e4e1eb;
+
+  --color-orange: #f07a2e;
+  --color-orange-deep: #9c4400;
+  --color-violet: #5f36e4;
+  --color-violet-soft: #e6deff;
+  --color-teal: #0b6682;
+  --color-teal-soft: #bce9ff;
+  --color-mint: #d6f5e4;
+  --color-butter: #fff1c2;
+  --color-peach: #ffe4d4;
+  --color-danger: #ba1a1a;
+
+  --shadow-soft:
+    0 16px 36px rgba(240, 122, 46, 0.06), 0 24px 48px rgba(121, 85, 255, 0.05), 0 4px 12px rgba(85, 85, 106, 0.04);
+  --shadow-lift:
+    0 22px 48px rgba(240, 122, 46, 0.1), 0 30px 60px rgba(121, 85, 255, 0.09), 0 6px 16px rgba(85, 85, 106, 0.06);
+
+  --animate-fade-up: fade-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-slide-in: slide-in 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes slide-in {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: none;
+    }
+  }
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-width: 320px;
+  overflow-x: hidden;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-violet);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
