@@ -136,3 +136,24 @@ const ACCENTS = [
 export function accentFor(seed: number) {
   return ACCENTS[Math.abs(seed) % ACCENTS.length]
 }
+
+const BADGE_LABELS: Record<string, string> = {
+  BEST_SELLER: 'Bán chạy',
+  BESTSELLER: 'Bán chạy',
+  NEW: 'Mới ra mắt',
+  HOT: 'Đang hot',
+  FEATURED: 'Nổi bật',
+  STAFF_PICK: 'Tuyển chọn',
+  LIMITED: 'Giới hạn',
+}
+
+/** badgeType của ProductSummary → nhãn tiếng Việt. */
+export function badgeLabel(code: string | null | undefined) {
+  if (!code) return ''
+  return BADGE_LABELS[code.toUpperCase()] ?? categoryLabel(code)
+}
+
+/** Số sao trung bình làm tròn 1 chữ số, vd. "4,8". */
+export function formatRating(value: number | null | undefined) {
+  return (Math.round((Number(value) || 0) * 10) / 10).toLocaleString('vi-VN')
+}

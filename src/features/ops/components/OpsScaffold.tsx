@@ -23,6 +23,7 @@ import {
 import { QueryState } from '../../../shared/ui/QueryState'
 import type { OpsCase, OpsDomain } from '../data/ops.fixtures'
 import { useDecide, useOpsCase, useOpsList } from '../hooks/useOps'
+import { REAL_OPS_DOMAINS } from '../services/ops.api'
 import { OPS_STATUS } from '../lib/status'
 
 /* ------------------------------------------------------------- queue page */
@@ -58,7 +59,7 @@ export function OpsQueue(cfg: QueueConfig) {
 
   return (
     <>
-      <MockNotice api={cfg.api} />
+      {!REAL_OPS_DOMAINS.has(cfg.domain) && <MockNotice api={cfg.api} />}
       <Hero
         code={cfg.code}
         eyebrow={cfg.eyebrow}
@@ -141,7 +142,7 @@ export function OpsReview(cfg: ReviewConfig) {
 
   return (
     <>
-      <MockNotice api={cfg.api} />
+      {!REAL_OPS_DOMAINS.has(cfg.domain) && <MockNotice api={cfg.api} />}
       <QueryState isLoading={q.isLoading} error={q.error}>
         {q.data &&
           (() => {

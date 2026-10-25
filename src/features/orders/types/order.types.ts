@@ -5,6 +5,9 @@ export type OrderItem = {
   quantity: number
   unitPrice: number
   lineTotal: number
+  /** Bản chụp tên & thuộc tính sản phẩm lúc đặt. */
+  productTitle?: string | null
+  attributes?: string | null
 }
 
 /** Đơn con vật lý — mỗi xưởng (storefront) một đơn. */
@@ -27,6 +30,55 @@ export type Order = {
   refundWindowHoursSnapshot?: number | null
   autoConfirmHoursSnapshot?: number | null
   shippingAddressSnapshot?: string | null
+  cancellationReason?: string | null
+  cancelledAt?: string | null
+  deliveredAt?: string | null
+  receivedAt?: string | null
+  /** Hạn cuối gửi yêu cầu hoàn tiền (tính từ lúc xác nhận nhận hàng). */
+  refundDeadlineAt?: string | null
+  /** Hệ thống tự xác nhận nhận hàng lúc này nếu người mua không thao tác. */
+  autoConfirmDueAt?: string | null
+  shippingPackageCount?: number | null
+  shippingWeightGrams?: number | null
+}
+
+export type OrderHistoryEntry = {
+  id: number
+  fromStatus?: string | null
+  toStatus: string
+  changedAt: string
+  changedByUserId?: number | null
+  reason?: string | null
+}
+
+export type PackageItem = { orderItemId: number; variantId: number; quantity: number }
+
+export type ShippingPackage = {
+  id: number
+  code: string
+  index: number
+  profileCode: string
+  productWeightGrams: number
+  packagingWeightGrams: number
+  packageWeightGrams: number
+  packagingCost: number
+  items: PackageItem[]
+}
+
+export type PackagingProfile = {
+  id: number
+  code: string
+  name: string
+  lengthCm: number
+  widthCm: number
+  heightCm: number
+  maxProductWeightGrams: number
+  supportsFragile: boolean
+  allowedPackingGroups?: string | null
+}
+
+export type SavePackagesInput = {
+  packages: { packagingProfileId: number; items: { orderItemId: number; quantity: number }[] }[]
 }
 
 /**

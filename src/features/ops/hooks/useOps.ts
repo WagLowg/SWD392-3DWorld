@@ -3,7 +3,7 @@ import { useMockAction } from '../../../shared/mock/useMockAction'
 import type { OpsDomain } from '../data/ops.fixtures'
 import { opsService } from '../services/ops.service'
 
-const K = ['ops-mock'] as const
+const K = ['ops'] as const
 export const opsKeys = {
   all: K,
   list: (d: OpsDomain) => [...K, d] as const,

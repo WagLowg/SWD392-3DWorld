@@ -2,7 +2,7 @@ import type { VariantInfo } from '../stores/variant-index.store'
 import type { CartItem } from '../types/catalog.types'
 
 export type CartGroup = {
-  /** null khi chưa biết món thuộc xưởng nào (CartItemResponse chưa có storefrontId). */
+  /** null khi chưa biết món thuộc xưởng nào (Backend cũ chưa trả storefrontId). */
   storefrontId: number | null
   items: CartItem[]
   subtotal: number
@@ -13,7 +13,7 @@ export type CartGroup = {
 export function groupByStorefront(items: CartItem[], index: Record<number, VariantInfo>): CartGroup[] {
   const groups = new Map<number | null, CartGroup>()
   for (const item of items) {
-    const storefrontId = index[item.variantId]?.storefrontId ?? null
+    const storefrontId = item.storefrontId ?? index[item.variantId]?.storefrontId ?? null
     const group = groups.get(storefrontId) ?? { storefrontId, items: [], subtotal: 0, quantity: 0 }
     group.items.push(item)
     group.subtotal += Number(item.lineTotal) || 0

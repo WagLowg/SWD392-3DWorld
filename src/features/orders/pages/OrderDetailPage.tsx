@@ -1,30 +1,35 @@
-import { ArrowLeft, MapPin, Truck, Undo2 } from 'lucide-react'
+import { ArrowLeft, Boxes, History, MapPin, Truck, Undo2, XCircle } from 'lucide-react'
 import { type ReactNode, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { formatDateTime } from '../../../shared/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
-import { ApiNote, Breadcrumbs } from '../../../shared/ui/primitives'
+import { Breadcrumbs } from '../../../shared/ui/primitives'
+import { ConfirmReceivedButton } from '../../buyer/components/ConfirmReceivedDialog'
 import { QueryState } from '../../../shared/ui/QueryState'
 import {
   OrderItemRow,
   OrderMoney,
   OrderStatusBadge,
   OrderTimeline,
+  displayOrderCode,
   orderCode,
   REFUNDABLE,
   ShipmentStatusBadge,
   StorefrontLabel,
 } from '../components/OrderParts'
 import { PayOrderButton } from '../components/PayOrderButton'
-import { useBuyerShipments, useMyOrders } from '../hooks/useOrders'
+import { useBuyerShipments, useOrder, useOrderHistory, useOrderPackages } from '../hooks/useOrders'
+import { statusMeta } from '../lib/status'
 import { useOrderPaymentsStore } from '../stores/order-payments.store'
 
-/** MP 025 · Chi Tiết Đơn Hàng Người Mua (lấy từ /api/orders/mine — chưa có API chi tiết riêng). */
+/** MP 025 · Chi Tiết Đơn Hàng Người Mua — GET /api/orders/{id}, /history, /packages, /shipments. */
 export function OrderDetailPage() {
   const orderId = Number(useParams().orderId)
-  const orders = useMyOrders()
-  const order = orders.data?.find((o) => o.id === orderId)
+  const orders = useOrder(orderId)
+  const order = orders.data
   const shipments = useBuyerShipments(order ? orderId : undefined)
+  const history = useOrderHistory(order ? orderId : undefined)
+  const packages = useOrderPackages(order ? orderId : undefined)
   const payment = useOrderPaymentsStore((s) => s.byOrder[orderId])
 
   useEffect(() => {
@@ -48,7 +53,7 @@ export function OrderDetailPage() {
                     </Link>
                   ),
                 },
-                { label: `Chi tiết ${orderCode(order.id)}` },
+                { label: `Chi tiết ${displayOrderCode(order)}` },
               ]}
             />
             <Link
@@ -62,7 +67,7 @@ export function OrderDetailPage() {
           <section className="mt-4 grid gap-4 rounded-[2rem] bg-white/95 p-6 shadow-soft sm:grid-cols-4">
             <Info
               label="Mã đơn physical"
-              value={<span className="font-display text-2xl font-bold">{orderCode(order.id)}</span>}
+              value={<span className="font-display text-2xl font-bold">{displayOrderCode(order)}</span>}
             />
             <Info label="Xưởng chế tác" value={<StorefrontLabel id={order.storefrontId} />} />
             <Info label="Trạng thái" value={<OrderStatusBadge status={order.status} />} />
@@ -126,10 +131,57 @@ export function OrderDetailPage() {
                 <h2 className="inline-flex items-center gap-2 font-display text-xl font-bold">
                   <MapPin size={19} className="text-orange" /> Địa chỉ nhận hàng
                 </h2>
-                <ApiNote className="mt-3">
-                  OrderResponse chưa trả bản chụp địa chỉ giao hàng (shippingAddressSnapshot) — sẽ hiển thị khi Backend
-                  bổ sung.
-                </ApiNote>
+                <p className="mt-3 whitespace-pre-line rounded-2xl bg-surface-low p-4 text-sm">
+                  {order.shippingAddressSnapshot || 'Đơn không lưu bản chụp địa chỉ.'}
+                </p>
+              </section>
+
+              {!!packages.data?.length && (
+                <section className="rounded-[2rem] bg-white/95 p-6 shadow-soft">
+                  <h2 className="inline-flex items-center gap-2 font-display text-xl font-bold">
+                    <Boxes size={19} className="text-violet" /> Kiện hàng ({packages.data.length})
+                  </h2>
+                  <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+                    {packages.data.map((p) => (
+                      <li key={p.id} className="rounded-2xl bg-surface-low p-4 text-sm">
+                        <p className="font-semibold">
+                          Kiện {p.index} · <span className="font-mono text-xs text-violet">{p.code}</span>
+                        </p>
+                        <p className="text-xs text-ink-soft">
+                          Hộp {p.profileCode} · {p.packageWeightGrams} g · {p.items.reduce((s, i) => s + i.quantity, 0)}{' '}
+                          món
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              <section className="rounded-[2rem] bg-white/95 p-6 shadow-soft">
+                <h2 className="inline-flex items-center gap-2 font-display text-xl font-bold">
+                  <History size={19} className="text-orange" /> Lịch sử trạng thái
+                </h2>
+                {history.isLoading ? (
+                  <div className="mt-4 h-16 animate-pulse rounded-2xl bg-surface-low" />
+                ) : history.data?.length ? (
+                  <ol className="mt-4 space-y-3 border-l-2 border-line pl-5">
+                    {history.data.map((h) => (
+                      <li key={h.id} className="relative text-sm">
+                        <span className="absolute -left-[27px] top-1 h-3 w-3 rounded-full bg-orange" />
+                        <p className="font-semibold">
+                          {h.fromStatus ? `${statusMeta(h.fromStatus).label} → ` : ''}
+                          {statusMeta(h.toStatus).label}
+                        </p>
+                        <p className="text-xs text-ink-soft">
+                          {formatDateTime(h.changedAt)}
+                          {h.reason ? ` · ${h.reason}` : ''}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="mt-4 text-sm text-ink-soft">Chưa có thay đổi trạng thái.</p>
+                )}
               </section>
             </div>
 
@@ -144,9 +196,39 @@ export function OrderDetailPage() {
                     Giao dịch ZaloPay #{payment.transactionId}
                   </p>
                 )}
+                {order.reservationExpiresAt && order.status === 'PENDING_PAYMENT' && (
+                  <p className="mt-3 rounded-xl bg-peach/50 px-3 py-2 text-xs text-orange-deep">
+                    Giữ chỗ tồn kho đến {formatDateTime(order.reservationExpiresAt)}
+                  </p>
+                )}
+                {order.autoConfirmDueAt && order.status === 'DELIVERED' && (
+                  <p className="mt-3 rounded-xl bg-surface-low px-3 py-2 text-xs text-ink-soft">
+                    Hệ thống tự xác nhận nhận hàng lúc {formatDateTime(order.autoConfirmDueAt)}
+                  </p>
+                )}
+                {order.refundDeadlineAt && (
+                  <p className="mt-3 rounded-xl bg-teal-soft/60 px-3 py-2 text-xs text-teal">
+                    Hạn yêu cầu hoàn tiền: {formatDateTime(order.refundDeadlineAt)}
+                  </p>
+                )}
+                {order.status === 'CANCELLED' && (
+                  <p className="mt-3 rounded-xl bg-[#ffdad6] px-3 py-2 text-xs text-danger">
+                    Đã huỷ{order.cancelledAt ? ` lúc ${formatDateTime(order.cancelledAt)}` : ''}
+                    {order.cancellationReason ? ` — ${order.cancellationReason}` : ''}
+                  </p>
+                )}
                 <div className="mt-5 grid gap-2">
                   {order.status === 'PENDING_PAYMENT' && (
                     <PayOrderButton orderId={order.id} amount={order.totalAmount} className="justify-center" />
+                  )}
+                  {order.status === 'DELIVERED' && <ConfirmReceivedButton orderId={order.id} />}
+                  {['CREATED', 'PENDING_PAYMENT'].includes(order.status) && (
+                    <Link
+                      to={`/orders/${order.id}/cancel`}
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-surface-low px-5 py-2.5 font-label text-sm font-semibold text-danger hover:bg-surface-high"
+                    >
+                      <XCircle size={15} /> Huỷ đơn
+                    </Link>
                   )}
                   {REFUNDABLE.includes(order.status) && (
                     <Link
@@ -157,11 +239,6 @@ export function OrderDetailPage() {
                     </Link>
                   )}
                 </div>
-                {['CREATED', 'PENDING_PAYMENT'].includes(order.status) && (
-                  <ApiNote className="mt-3">
-                    Người mua chưa có API huỷ đơn; đơn chờ thanh toán quá hạn sẽ tự huỷ.
-                  </ApiNote>
-                )}
               </section>
             </aside>
           </div>

@@ -1,14 +1,88 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSession } from '../../../shared/session/useSession'
-import { buyerOrderService, paymentService, sellerOrderService } from '../services/order.service'
+import { buyerOrderService, orderService, paymentService, sellerOrderService } from '../services/order.service'
 import { useOrderPaymentsStore } from '../stores/order-payments.store'
-import type { RefundInput, ShipmentEvent } from '../types/order.types'
+import type { RefundInput, SavePackagesInput, ShipmentEvent } from '../types/order.types'
 
 export const orderKeys = {
   mine: ['orders', 'mine'] as const,
   seller: ['orders', 'seller'] as const,
   buyerShipments: (orderId: number) => ['orders', orderId, 'shipments', 'buyer'] as const,
   sellerShipments: (orderId: number) => ['orders', orderId, 'shipments', 'seller'] as const,
+  detail: (orderId: number) => ['orders', orderId, 'detail'] as const,
+  history: (orderId: number) => ['orders', orderId, 'history'] as const,
+  packages: (orderId: number) => ['orders', orderId, 'packages'] as const,
+  packagingProfiles: ['shipping', 'packaging-profiles'] as const,
+}
+
+const validId = (id: number | undefined): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0
+
+export function useOrder(orderId: number | undefined) {
+  return useQuery({
+    queryKey: orderKeys.detail(orderId ?? -1),
+    queryFn: ({ signal }) => orderService.detail(orderId as number, signal),
+    enabled: validId(orderId),
+  })
+}
+
+export function useOrderHistory(orderId: number | undefined) {
+  return useQuery({
+    queryKey: orderKeys.history(orderId ?? -1),
+    queryFn: ({ signal }) => orderService.history(orderId as number, signal),
+    enabled: validId(orderId),
+  })
+}
+
+export function useOrderPackages(orderId: number | undefined) {
+  return useQuery({
+    queryKey: orderKeys.packages(orderId ?? -1),
+    queryFn: ({ signal }) => orderService.packages(orderId as number, signal),
+    enabled: validId(orderId),
+  })
+}
+
+export function usePackagingProfiles(enabled = true) {
+  return useQuery({
+    queryKey: orderKeys.packagingProfiles,
+    queryFn: ({ signal }) => sellerOrderService.packagingProfiles(signal),
+    staleTime: 5 * 60_000,
+    enabled,
+  })
+}
+
+/** Làm mới mọi query của một đơn + danh sách. */
+function useRefreshOrder() {
+  const qc = useQueryClient()
+  return (orderId: number) => {
+    qc.invalidateQueries({ queryKey: ['orders', orderId] })
+    qc.invalidateQueries({ queryKey: orderKeys.mine })
+    qc.invalidateQueries({ queryKey: orderKeys.seller })
+  }
+}
+
+export function useCancelOrder() {
+  const refresh = useRefreshOrder()
+  return useMutation({
+    mutationFn: ({ orderId, reason }: { orderId: number; reason: string }) => buyerOrderService.cancel(orderId, reason),
+    onSuccess: (_, v) => refresh(v.orderId),
+  })
+}
+
+export function useConfirmReceived() {
+  const refresh = useRefreshOrder()
+  return useMutation({
+    mutationFn: (orderId: number) => buyerOrderService.confirmReceived(orderId),
+    onSuccess: (_, orderId) => refresh(orderId),
+  })
+}
+
+export function useSavePackages() {
+  const refresh = useRefreshOrder()
+  return useMutation({
+    mutationFn: ({ orderId, input }: { orderId: number; input: SavePackagesInput }) =>
+      sellerOrderService.savePackages(orderId, input),
+    onSuccess: (_, v) => refresh(v.orderId),
+  })
 }
 
 export function useMyOrders() {
@@ -59,7 +133,7 @@ export function useSellerOrderActions() {
   const qc = useQueryClient()
   const refresh = (orderId: number) => {
     qc.invalidateQueries({ queryKey: orderKeys.seller })
-    qc.invalidateQueries({ queryKey: orderKeys.sellerShipments(orderId) })
+    qc.invalidateQueries({ queryKey: ['orders', orderId] })
   }
   return {
     updateStatus: useMutation({

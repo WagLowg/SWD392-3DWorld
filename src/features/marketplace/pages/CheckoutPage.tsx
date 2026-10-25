@@ -28,6 +28,7 @@ import { useAddresses, useCheckout, useZaloPayPayment } from '../hooks/useChecko
 import { useSession } from '../../../shared/session/useSession'
 import { groupByStorefront, storefrontName } from '../lib/cart'
 import { formatAttributes, formatVnd } from '../lib/format'
+import { paymentResultUrl } from '../lib/payment'
 import { useVariantIndexStore } from '../stores/variant-index.store'
 import { useOrderPaymentsStore } from '../../orders/stores/order-payments.store'
 import type { Address, Order, Payment } from '../types/catalog.types'
@@ -338,9 +339,9 @@ function CheckoutForm({
                 return (
                   <li key={item.itemId} className="flex items-center gap-4 py-4">
                     <ProductMedia
-                      src={info?.image}
+                      src={item.thumbnailUrl ?? info?.image}
                       alt=""
-                      seed={info?.productId ?? item.variantId}
+                      seed={item.productId ?? info?.productId ?? item.variantId}
                       className="h-16 w-16 shrink-0 rounded-2xl"
                     />
                     <div className="min-w-0 flex-1">
@@ -614,6 +615,14 @@ function OrderResult({
       </div>
 
       <div className="flex flex-wrap justify-center gap-3">
+        {method === 'zalopay' && (
+          <Link
+            to={paymentResultUrl('order', orders.map((o) => o.id)).replace('/marketplace', '')}
+            className="rounded-full bg-[#0068ff] px-6 py-3 font-label text-sm font-semibold text-white hover:opacity-90"
+          >
+            Tôi đã thanh toán — kiểm tra kết quả
+          </Link>
+        )}
         <a
           href="/portal/orders"
           className="rounded-full bg-ink px-6 py-3 font-label text-sm font-semibold text-white hover:bg-violet"

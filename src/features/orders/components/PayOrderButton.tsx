@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { ApiClientError } from '../../../shared/api'
 import { formatVnd } from '../../../shared/format'
 import { useToast } from '../../../shared/ui/toast'
+import { paymentResultUrl } from '../../marketplace/lib/payment'
 import { usePayOrder } from '../hooks/useOrders'
 
 /** Tạo liên kết ZaloPay cho đơn chờ thanh toán (POST /api/payments/zalopay). */
@@ -21,14 +22,22 @@ export function PayOrderButton({
 
   if (url) {
     return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noreferrer"
-        className={`inline-flex items-center gap-2 rounded-full bg-[#0068ff] px-5 py-2.5 font-label text-sm font-semibold text-white hover:opacity-90 ${className}`}
-      >
-        Mở ZaloPay <ExternalLink size={14} />
-      </a>
+      <>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className={`inline-flex items-center gap-2 rounded-full bg-[#0068ff] px-5 py-2.5 font-label text-sm font-semibold text-white hover:opacity-90 ${className}`}
+        >
+          Mở ZaloPay <ExternalLink size={14} />
+        </a>
+        <a
+          href={paymentResultUrl('order', [orderId])}
+          className={`inline-flex items-center gap-2 rounded-full bg-surface-low px-5 py-2.5 font-label text-sm font-semibold hover:bg-surface-high ${className}`}
+        >
+          Tôi đã thanh toán — kiểm tra kết quả
+        </a>
+      </>
     )
   }
   return (

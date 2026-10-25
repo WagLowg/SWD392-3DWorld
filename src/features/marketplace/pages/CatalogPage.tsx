@@ -7,19 +7,22 @@ import { Pagination } from '../../../shared/ui/Pagination'
 import { ProductCard, ProductCardSkeleton, SKELETON_KEYS } from '../components/ProductCard'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { ApiNote, PageHeading } from '../../../shared/ui/primitives'
-import { useCatalog, useCategories, useProductDetails } from '../hooks/useCatalog'
+import { useCatalog, useCategories } from '../hooks/useCatalog'
 import { useSession } from '../../../shared/session/useSession'
-import { activeVariants, categoryLabel, formatVnd, parseAttributes, summarizeVariants } from '../lib/format'
-import type { ProductDetail, ProductSummary } from '../types/catalog.types'
+import { categoryLabel, formatVnd } from '../lib/format'
+import type { CatalogSort, ProductSummary } from '../types/catalog.types'
 
 const PAGE_SIZE = 12
 
-const SORTS = [
-  { value: '', label: 'Mới nhất tuyển chọn' },
+const SORTS: { value: CatalogSort; label: string }[] = [
+  { value: 'newest', label: 'Mới nhất' },
+  { value: 'best_selling', label: 'Bán chạy nhất' },
+  { value: 'rating', label: 'Đánh giá cao' },
   { value: 'price_asc', label: 'Giá thấp → cao' },
   { value: 'price_desc', label: 'Giá cao → thấp' },
-  { value: 'name', label: 'Tên A → Z' },
-] as const
+]
+
+const isSort = (v: string): v is CatalogSort => SORTS.some((s) => s.value === v)
 
 const PRICE_PRESETS = [
   { label: 'Dưới 350k', min: '', max: '350000' },
@@ -34,17 +37,24 @@ export function CatalogPage() {
   const keyword = params.get('q') ?? ''
   const category = params.get('category') ?? ''
   const page = Math.max(0, Number(params.get('page') ?? 1) - 1) || 0
-  const sort = params.get('sort') ?? ''
+  const sortParam = params.get('sort') ?? ''
+  const sort: CatalogSort = isSort(sortParam) ? sortParam : 'newest'
   const min = params.get('min') ?? ''
   const max = params.get('max') ?? ''
-  const material = params.get('material') ?? ''
   const ready = params.get('ready') === '1'
 
-  const catalog = useCatalog({ keyword, category, page, size: PAGE_SIZE })
+  const catalog = useCatalog({
+    keyword,
+    category,
+    minPrice: min ? Number(min) : undefined,
+    maxPrice: max ? Number(max) : undefined,
+    sort,
+    page,
+    size: PAGE_SIZE,
+  })
   const categories = useCategories()
   const session = useSession()
   const items = catalog.data?.items ?? []
-  const detailQueries = useProductDetails(items.map((p) => p.id))
 
   useEffect(() => {
     document.title = 'Khám Phá Vật Phẩm · Chợ Đồ Chơi 3DWorld'
@@ -62,51 +72,8 @@ export function CatalogPage() {
     })
   }
 
-  // Bộ lọc phía client (API chưa hỗ trợ): giá, chất liệu, còn hàng, sắp xếp
-  const details = useMemo(() => {
-    const map = new Map<number, ProductDetail>()
-    detailQueries.forEach((q, i) => {
-      if (q.data && items[i]) map.set(items[i].id, q.data)
-    })
-    return map
-  }, [detailQueries, items])
-
-  const materials = useMemo(() => {
-    const set = new Set<string>()
-    for (const d of details.values())
-      for (const v of activeVariants(d.variants)) {
-        const m = parseAttributes(v.attributes).material
-        if (m) set.add(m)
-      }
-    return [...set].sort()
-  }, [details])
-
-  const clientFiltered = !!(min || max || material || ready || sort)
-  const detailsLoading = detailQueries.some((q) => q.isLoading)
-
-  const visible = useMemo(() => {
-    if (!clientFiltered) return items
-    const minN = min ? Number(min) : undefined
-    const maxN = max ? Number(max) : undefined
-    const rows = items
-      .map((p) => ({ p, d: details.get(p.id) }))
-      .filter(({ d }) => {
-        if (!d) return false
-        const s = summarizeVariants(d.variants)
-        if (!s) return false
-        if (minN !== undefined && s.maxPrice < minN) return false
-        if (maxN !== undefined && s.minPrice > maxN) return false
-        if (ready && s.available <= 0) return false
-        if (material && !activeVariants(d.variants).some((v) => parseAttributes(v.attributes).material === material))
-          return false
-        return true
-      })
-    const price = (d?: ProductDetail) => summarizeVariants(d?.variants)?.minPrice ?? 0
-    if (sort === 'price_asc') rows.sort((a, b) => price(a.d) - price(b.d))
-    if (sort === 'price_desc') rows.sort((a, b) => price(b.d) - price(a.d))
-    if (sort === 'name') rows.sort((a, b) => a.p.title.localeCompare(b.p.title, 'vi'))
-    return rows.map(({ p }) => p)
-  }, [items, details, clientFiltered, min, max, material, ready, sort])
+  // "Còn hàng" lọc trên trang hiện tại (API chưa có tham số available)
+  const visible = useMemo(() => (ready ? items.filter((p) => p.available !== false) : items), [items, ready])
 
   const chips = [
     category && { key: 'category', label: `Danh mục: ${categoryLabel(category)}` },
@@ -115,7 +82,6 @@ export function CatalogPage() {
       key: 'price',
       label: `Giá: ${min ? formatVnd(Number(min)) : '0₫'} – ${max ? formatVnd(Number(max)) : '∞'}`,
     },
-    material && { key: 'material', label: `Chất liệu: ${material}` },
     ready && { key: 'ready', label: 'Còn hàng' },
   ].filter(Boolean) as { key: string; label: string }[]
 
@@ -169,7 +135,7 @@ export function CatalogPage() {
             Sắp xếp:
             <select
               value={sort}
-              onChange={(e) => update({ sort: e.target.value }, false)}
+              onChange={(e) => update({ sort: e.target.value === 'newest' ? '' : e.target.value })}
               className="rounded-full bg-surface-low px-4 py-2 text-sm font-semibold text-ink outline-none"
             >
               {SORTS.map((s) => (
@@ -182,22 +148,7 @@ export function CatalogPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-line pt-4">
-          <PriceRange min={min} max={max} onApply={(a, b) => update({ min: a, max: b }, false)} />
-          <label className="flex items-center gap-2 font-label text-xs font-semibold text-ink-soft">
-            Chất liệu:
-            <select
-              value={material}
-              onChange={(e) => update({ material: e.target.value }, false)}
-              className="min-w-40 rounded-full bg-surface-low px-4 py-2 text-sm font-semibold text-ink outline-none"
-            >
-              <option value="">Tất cả chất liệu</option>
-              {materials.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </label>
+          <PriceRange min={min} max={max} onApply={(a, b) => update({ min: a, max: b })} />
           <label className="ml-auto inline-flex cursor-pointer items-center gap-2 font-label text-xs font-semibold">
             <input
               type="checkbox"
@@ -239,16 +190,15 @@ export function CatalogPage() {
             </span>
           )}
         </div>
-        {clientFiltered && (
+        {ready && (
           <ApiNote>
-            Lọc giá, chất liệu, còn hàng và sắp xếp đang áp dụng trên trang hiện tại — API /api/catalog mới hỗ trợ
-            keyword, category, page, size.
+            "Còn hàng" đang lọc trên trang hiện tại — /api/catalog chưa có tham số lọc theo tồn kho.
           </ApiNote>
         )}
       </div>
 
       <div className="mt-8">
-        {catalog.isLoading || (clientFiltered && detailsLoading && !visible.length) ? (
+        {catalog.isLoading ? (
           <Grid>
             {SKELETON_KEYS.map((k) => (
               <ProductCardSkeleton key={k} />

@@ -1,32 +1,49 @@
-import { ArrowRight, ShoppingCart, Store, Truck } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { ArrowRight, ShoppingCart, Star, Store, Truck } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAddToCart } from '../hooks/useCart'
-import { useProductDetail } from '../hooks/useCatalog'
-import { accentFor, activeVariants, categoryLabel, formatAttributes, formatVnd, summarizeVariants } from '../lib/format'
+import { catalogKeys } from '../hooks/useCatalog'
+import { accentFor, activeVariants, badgeLabel, categoryLabel, formatRating, formatVnd } from '../lib/format'
+import { catalogService } from '../services/catalog.service'
+import { useVariantIndexStore } from '../stores/variant-index.store'
 import type { ProductSummary } from '../types/catalog.types'
 import { ProductMedia } from './ProductMedia'
-import { StockBar } from '../../../shared/ui/primitives'
 
+/** Thẻ sản phẩm: dùng thẳng các trường của ProductSummary (ảnh, giá, đánh giá, còn hàng). */
 export function ProductCard({ product, index = 0 }: { product: ProductSummary; index?: number }) {
   const navigate = useNavigate()
-  const { data: detail, isLoading } = useProductDetail(product.id)
+  const queryClient = useQueryClient()
   const { addToCart, isPending } = useAddToCart()
+  const [loadingDetail, setLoadingDetail] = useState(false)
 
-  const summary = summarizeVariants(detail?.variants)
-  const variants = activeVariants(detail?.variants)
-  const stock = variants.reduce((s, v) => s + Math.max(0, v.stock ?? 0), 0)
-  const firstAttr = formatAttributes(variants[0]?.attributes)
   const accent = accentFor(product.id)
-  const available = summary?.available ?? 0
-  const soldOut = !!summary && available <= 0
-  const lowStock = !soldOut && available > 0 && available <= 5
+  const soldOut = product.available === false
+  const minPrice = product.price ?? null
+  const maxPrice = product.maxPrice ?? minPrice
+  const hasRange = minPrice !== null && maxPrice !== null && maxPrice > minPrice
+  const reviews = product.reviewCount ?? 0
   const href = `/${product.id}`
 
   // 1 variant còn hàng → thêm thẳng vào giỏ; nhiều variant → mở chi tiết để chọn.
-  const onQuickAdd = () => {
-    const only = variants.length === 1 ? variants[0] : undefined
-    if (only && only.available > 0) addToCart({ variantId: only.id, quantity: 1 })
-    else navigate(href)
+  const onQuickAdd = async () => {
+    setLoadingDetail(true)
+    try {
+      const detail = await queryClient.fetchQuery({
+        queryKey: catalogKeys.detail(product.id),
+        queryFn: ({ signal }) => catalogService.detail(product.id, signal),
+        staleTime: 60_000,
+      })
+      useVariantIndexStore.getState().register(detail)
+      const variants = activeVariants(detail.variants)
+      const only = variants.length === 1 ? variants[0] : undefined
+      if (only && only.available > 0) await addToCart({ variantId: only.id, quantity: 1 })
+      else navigate(href)
+    } catch {
+      navigate(href)
+    } finally {
+      setLoadingDetail(false)
+    }
   }
 
   return (
@@ -36,7 +53,7 @@ export function ProductCard({ product, index = 0 }: { product: ProductSummary; i
     >
       <Link to={href} className="relative block" aria-label={product.title}>
         <ProductMedia
-          src={detail?.media?.[0]}
+          src={product.thumbnailUrl ?? undefined}
           alt={product.title}
           seed={product.id}
           className="aspect-[4/3.6] rounded-[1.6rem]"
@@ -48,30 +65,29 @@ export function ProductCard({ product, index = 0 }: { product: ProductSummary; i
                 {categoryLabel(product.category)}
               </span>
             )}
-            {firstAttr && (
-              <span className="max-w-[9rem] truncate rounded-full bg-white/90 px-2.5 py-1 font-label text-[11px] font-semibold">
-                {firstAttr}
+            {product.badgeType && (
+              <span className="rounded-full bg-butter px-2.5 py-1 font-label text-[11px] font-semibold text-[#6b4e00]">
+                {badgeLabel(product.badgeType)}
               </span>
             )}
           </div>
-          {soldOut ? (
+          {soldOut && (
             <span className="shrink-0 rounded-full bg-ink px-2.5 py-1 font-label text-[11px] font-semibold text-white">
               Hết hàng
             </span>
-          ) : lowStock ? (
-            <span className="shrink-0 rounded-full bg-danger px-2.5 py-1 font-label text-[11px] font-semibold text-white">
-              Sắp hết hàng
-            </span>
-          ) : null}
+          )}
         </div>
       </Link>
 
       <div className="flex flex-1 flex-col px-2 pb-1.5 pt-4">
         <div className="flex items-center justify-between gap-2 font-label text-[11px] font-semibold">
-          <span className="inline-flex items-center gap-1 text-ink">
+          <Link
+            to={`/shop/${product.storefrontId}`}
+            className="inline-flex items-center gap-1 text-ink hover:text-violet"
+          >
             <Store size={12} className="text-violet" /> Xưởng #{product.storefrontId}
-          </span>
-          {summary && !soldOut && (
+          </Link>
+          {!soldOut && (
             <span className="inline-flex items-center gap-1 text-teal">
               <Truck size={12} /> Sẵn sàng gửi
             </span>
@@ -84,32 +100,21 @@ export function ProductCard({ product, index = 0 }: { product: ProductSummary; i
         >
           {product.title}
         </Link>
-        <p className="mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-ink-soft">
-          {summary
-            ? `${summary.variantCount} phiên bản${firstAttr ? ` · ${firstAttr}` : ''}${summary.minPrice !== summary.maxPrice ? ` · ${formatVnd(summary.minPrice)} – ${formatVnd(summary.maxPrice)}` : ''}`
-            : 'Đang tải thông tin phiên bản…'}
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-soft">
+          <span className="inline-flex items-center gap-1">
+            <Star size={13} className={reviews ? 'fill-orange text-orange' : 'text-line'} />
+            {reviews ? `${formatRating(product.averageRating)} (${reviews})` : 'Chưa có đánh giá'}
+          </span>
+          {!!product.salesCount && <span>Đã bán {product.salesCount.toLocaleString('vi-VN')}</span>}
         </p>
-
-        {summary && (
-          <div className="mt-4 space-y-1.5">
-            <StockBar available={available} stock={stock} />
-            <p
-              className={`text-right font-label text-[11px] font-semibold ${lowStock ? 'text-danger' : 'text-ink-soft'}`}
-            >
-              {soldOut ? 'Tạm hết hàng' : lowStock ? `Chỉ còn ${available} chiếc!` : `Còn ${available} sản phẩm`}
-            </p>
-          </div>
-        )}
 
         <div className="mt-auto flex items-end justify-between gap-3 pt-4">
           <div className="min-w-0">
             <p className="font-label text-[11px] font-semibold text-ink-soft">Giá đóng gói vật lý:</p>
-            {isLoading ? (
-              <div className="mt-1 h-7 w-28 animate-pulse rounded-full bg-surface-mid" />
-            ) : summary ? (
+            {minPrice !== null ? (
               <p className="font-display text-2xl font-bold">
-                {summary.minPrice !== summary.maxPrice && <span className="mr-1 text-sm text-ink-soft">từ</span>}
-                {formatVnd(summary.minPrice).replace('₫', '')}
+                {hasRange && <span className="mr-1 text-sm text-ink-soft">từ</span>}
+                {formatVnd(minPrice).replace('₫', '')}
                 <span className="text-base text-orange">₫</span>
               </p>
             ) : (
@@ -120,7 +125,7 @@ export function ProductCard({ product, index = 0 }: { product: ProductSummary; i
             <button
               type="button"
               onClick={onQuickAdd}
-              disabled={isPending || soldOut || !summary}
+              disabled={isPending || loadingDetail || soldOut}
               aria-label={`Thêm ${product.title} vào giỏ`}
               className="grid h-10 w-10 place-items-center rounded-full transition hover:bg-surface-low disabled:opacity-35"
             >

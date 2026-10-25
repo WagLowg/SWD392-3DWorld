@@ -16,8 +16,15 @@ export type SellerApplication = {
   phoneVerified: boolean
   bank: { bankName: string; accountMasked: string; holder: string; status: 'PENDING' | 'APPROVED' | 'REJECTED' } | null
   evidence: string[]
+  /** Link/mô tả minh chứng gửi trong evidenceReference. */
+  evidenceLink?: string
   reviewerNote?: string
   submittedAt?: string
+  /** Đủ điều kiện nộp (email + SĐT + ngân hàng đã xác thực). */
+  eligible?: boolean
+  verifiedBankAvailable?: boolean
+  /** Có khi đã tạo gian hàng. */
+  storefrontId?: number
   audit: AuditEntry[]
 }
 
@@ -42,7 +49,7 @@ export const application: SellerApplication = {
 
 /* --------------------------------------------------------- subscription */
 
-export type Plan = { id: string; name: string; price: number; period: string; perks: string[]; commission: number; highlight?: boolean }
+export type Plan = { id: string; name: string; price: number; period: string; perks: string[]; commission?: number; highlight?: boolean }
 
 export const plans: Plan[] = [
   { id: 'basic', name: 'Maker Basic', price: 150_000, period: 'tháng', commission: 8, perks: ['Tối đa 20 sản phẩm', 'Hỗ trợ email', 'Báo cáo doanh thu cơ bản'] },
@@ -87,7 +94,10 @@ export type Storefront = {
   name: string
   slogan: string
   description: string
-  status: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED'
+  status: 'ACTIVE' | 'EXPIRING' | 'EXPIRED' | 'SUSPENDED' | 'INACTIVE'
+  verificationStatus?: string
+  expiresAt?: string
+  available?: boolean
   city: string
   rating: number
   reviewCount: number
@@ -113,7 +123,7 @@ export const storefront: Storefront = {
 
 /* -------------------------------------------------------------- products */
 
-export type ProductStatus = 'PUBLISHED' | 'PENDING_REVIEW' | 'DRAFT' | 'REJECTED' | 'HIDDEN'
+export type ProductStatus = 'PUBLISHED' | 'PENDING_REVIEW' | 'DRAFT' | 'REJECTED' | 'HIDDEN' | 'ARCHIVED'
 
 export type SellerVariant = {
   id: number
@@ -129,6 +139,7 @@ export type SellerVariant = {
 
 export type SellerProduct = {
   id: number
+  storefrontId?: number
   title: string
   category: string
   status: ProductStatus
@@ -137,8 +148,11 @@ export type SellerProduct = {
   polygonCount: number
   manifold: boolean
   media: number
+  mediaItems?: { id: number; url: string; sortOrder: number; variantId?: number | null }[]
   variants: SellerVariant[]
   rejectReason?: string
+  /** Bản sửa đổi chờ duyệt (Admin gửi kèm khi duyệt). */
+  revision?: string
   updatedAt: string
   sold: number
   audit: AuditEntry[]

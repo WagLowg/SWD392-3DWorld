@@ -7,14 +7,16 @@ import { HeroSection } from '../components/HeroSection'
 import { EcosystemSection, PolicySection } from '../components/InfoSections'
 import { ProductCard, ProductCardSkeleton, SKELETON_KEYS } from '../components/ProductCard'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
-import { useCatalog, useCategories } from '../hooks/useCatalog'
+import { useCatalog, useCategories, useFeatured } from '../hooks/useCatalog'
 import { useSession } from '../../../shared/session/useSession'
 import { categoryLabel } from '../lib/format'
 
 /** MP 001 · Trang Chủ Chợ Đồ Chơi */
 export function HomePage() {
-  const featured = useCatalog({ page: 0, size: 5 })
-  const curated = useCatalog({ page: 0, size: 6 })
+  const featured = useFeatured(5)
+  const newest = useCatalog({ page: 0, size: 5, sort: 'newest' }, featured.isSuccess && !featured.data.items.length)
+  const curated = useCatalog({ page: 0, size: 6, sort: 'best_selling' })
+  const heroItems = featured.data?.items.length ? featured.data.items : (newest.data?.items ?? [])
   const categories = useCategories()
 
   useEffect(() => {
@@ -23,7 +25,7 @@ export function HomePage() {
 
   return (
     <>
-      <HeroSection featured={featured.data?.items ?? []} />
+      <HeroSection featured={heroItems} />
 
       <section className="mx-auto mt-14 max-w-[1320px] px-4 md:px-8">
         <HomeSearch categories={categories.data?.categories ?? []} total={categories.data?.total} />

@@ -1,10 +1,10 @@
-import { EyeOff, Pencil, Play } from 'lucide-react'
+import { Archive, EyeOff, Pencil, Play, Send } from 'lucide-react'
 import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { formatDateTime, formatVnd } from '../../../shared/format'
 import { AuditTimeline, Btn, DataTable, DetailLayout, Hero, KeyValues, MockNotice, Pill, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
-import { categoryLabel } from '../../marketplace/lib/format'
+import { categoryLabel, resolveMediaUrl } from '../../marketplace/lib/format'
 import { useSellerProduct, useSetProductStatus } from '../hooks/useSeller'
 import { PRODUCT_STATUS } from '../lib/status'
 
@@ -20,7 +20,7 @@ export function SellerProductDetailPage() {
 
   return (
     <>
-      <MockNotice api="/api/seller/products/{id}" />
+      <MockNotice partial="Số lượng đã bán" api="salesCount trong ProductView" />
       <QueryState isLoading={q.isLoading} error={q.error}>
         {q.data &&
           (() => {
@@ -42,10 +42,19 @@ export function SellerProductDetailPage() {
                           Tạm dừng bán
                         </Btn>
                       ) : p.status === 'HIDDEN' ? (
-                        <Btn variant="orange" icon={Play} onClick={() => setStatus.mutate({ id: p.id, status: 'PUBLISHED', note: 'Mở bán lại' })}>
-                          Mở bán lại
+                        <Btn variant="orange" icon={Play} onClick={() => setStatus.mutate({ id: p.id, status: 'PENDING_REVIEW', note: 'Nộp duyệt mở bán lại' })}>
+                          Nộp duyệt mở bán lại
+                        </Btn>
+                      ) : p.status === 'DRAFT' || p.status === 'REJECTED' ? (
+                        <Btn variant="orange" icon={Send} onClick={() => setStatus.mutate({ id: p.id, status: 'PENDING_REVIEW', note: 'Gửi duyệt' })}>
+                          Gửi duyệt
                         </Btn>
                       ) : null}
+                      {p.status !== 'ARCHIVED' && (
+                        <Btn icon={Archive} onClick={() => setStatus.mutate({ id: p.id, status: 'ARCHIVED', note: 'Lưu trữ' })}>
+                          Lưu trữ
+                        </Btn>
+                      )}
                     </>
                   }
                 />
@@ -53,7 +62,19 @@ export function SellerProductDetailPage() {
                   main={
                     <>
                       <Section title="Mô tả & quy cách" aside={<StatusPill status={p.status} map={PRODUCT_STATUS} />}>
+                        {p.rejectReason && (
+                          <p className="mb-3 rounded-2xl bg-[#ffdad6] p-3 text-sm text-danger">
+                            <strong>Lý do từ chối:</strong> {p.rejectReason}
+                          </p>
+                        )}
                         <p className="text-sm leading-relaxed text-ink-soft">{p.description}</p>
+                        {!!p.mediaItems?.length && (
+                          <div className="mt-4 flex gap-2 overflow-x-auto">
+                            {p.mediaItems.map((m) => (
+                              <img key={m.id} src={resolveMediaUrl(m.url)} alt="" className="h-24 w-24 shrink-0 rounded-2xl object-cover" />
+                            ))}
+                          </div>
+                        )}
                         <div className="mt-4">
                           <KeyValues
                             cols={3}

@@ -4,17 +4,17 @@ import type { ProductStatus, SellerApplication, SellerProduct, Storefront } from
 import { sellerService } from '../services/seller.service'
 
 export const sellerKeys = {
-  all: ['seller-mock'] as const,
-  application: ['seller-mock', 'application'] as const,
-  subscription: ['seller-mock', 'subscription'] as const,
-  storefront: ['seller-mock', 'storefront'] as const,
-  products: ['seller-mock', 'products'] as const,
-  product: (id: number) => ['seller-mock', 'products', id] as const,
-  inventory: ['seller-mock', 'inventory'] as const,
-  disputes: ['seller-mock', 'disputes'] as const,
-  dispute: (id: string) => ['seller-mock', 'disputes', id] as const,
-  earnings: ['seller-mock', 'earnings'] as const,
-  earning: (id: string) => ['seller-mock', 'earnings', id] as const,
+  all: ['seller'] as const,
+  application: ['seller', 'application'] as const,
+  subscription: ['seller', 'subscription'] as const,
+  storefront: ['seller', 'storefront'] as const,
+  products: ['seller', 'products'] as const,
+  product: (id: number) => ['seller', 'products', id] as const,
+  inventory: ['seller', 'inventory'] as const,
+  disputes: ['seller', 'disputes'] as const,
+  dispute: (id: string) => ['seller', 'disputes', id] as const,
+  earnings: ['seller', 'earnings'] as const,
+  earning: (id: string) => ['seller', 'earnings', id] as const,
 }
 
 export const useApplication = () => useQuery({ queryKey: sellerKeys.application, queryFn: sellerService.application })
@@ -33,19 +33,42 @@ const ALL = [sellerKeys.all]
 
 export const useSubmitApplication = () =>
   useMockAction(
-    (patch: Partial<Pick<SellerApplication, 'storefrontName' | 'description' | 'address' | 'technologies'>>) =>
-      sellerService.submitApplication(patch),
+    (
+      patch: Pick<SellerApplication, 'storefrontName' | 'description' | 'address' | 'technologies'> & {
+        evidence?: string
+      },
+    ) => sellerService.submitApplication(patch),
     ALL,
     'Đã nộp hồ sơ — chờ chuyên viên xét duyệt.',
   )
-export const useRenew = () => useMockAction((planId: string) => sellerService.renew(planId), ALL, 'Đã gia hạn gói xưởng.')
+export const useCreateStorefront = () =>
+  useMockAction(
+    (input: { name: string; description?: string }) => sellerService.createStorefront(input),
+    ALL,
+    'Đã tạo gian hàng — thanh toán gói để kích hoạt.',
+  )
+export const useRenew = () =>
+  useMockAction((planId: string) => sellerService.renew(planId), ALL, 'Đang chuyển sang ZaloPay để thanh toán gói…')
+export const useUploadProductMedia = () =>
+  useMockAction(
+    ({ productId, file, sortOrder }: { productId: number; file: File; sortOrder?: number }) =>
+      sellerService.uploadMedia(productId, file, sortOrder),
+    ALL,
+    'Đã tải ảnh lên — sản phẩm cần nộp duyệt lại.',
+  )
+export const useRemoveProductMedia = () =>
+  useMockAction(
+    ({ productId, mediaId }: { productId: number; mediaId: number }) => sellerService.removeMedia(productId, mediaId),
+    ALL,
+    'Đã gỡ ảnh.',
+  )
 export const useUpdateStorefront = () =>
   useMockAction((patch: Partial<Storefront>) => sellerService.updateStorefront(patch), ALL, 'Đã lưu hồ sơ gian hàng.')
 export const useSaveProduct = () =>
   useMockAction(
     ({ input, submit }: { input: Parameters<typeof sellerService.saveProduct>[0]; submit: boolean }) => sellerService.saveProduct(input, submit),
     ALL,
-    (p: SellerProduct) => (p.status === 'PENDING_REVIEW' ? 'Đã gửi duyệt sản phẩm.' : 'Đã lưu bản nháp.'),
+    (p: SellerProduct) => (p.status === 'PENDING_REVIEW' ? 'Đã gửi duyệt sản phẩm.' : 'Đã lưu sản phẩm.'),
   )
 export const useSetProductStatus = () =>
   useMockAction(

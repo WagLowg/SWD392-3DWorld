@@ -1,8 +1,7 @@
 import { ArrowRight, ChevronLeft, ChevronRight, CreditCard, PackageCheck, Printer, Sparkles, Truck } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useProductDetail } from '../hooks/useCatalog'
-import { categoryLabel, formatVnd, summarizeVariants } from '../lib/format'
+import { badgeLabel, categoryLabel, formatVnd } from '../lib/format'
 import type { ProductSummary } from '../types/catalog.types'
 import { ProductMedia } from './ProductMedia'
 
@@ -70,8 +69,6 @@ export function HeroSection({ featured }: { featured: ProductSummary[] }) {
 function FeaturedShowcase({ items }: { items: ProductSummary[] }) {
   const [index, setIndex] = useState(0)
   const current = items[index % Math.max(items.length, 1)]
-  const { data: detail } = useProductDetail(current?.id)
-  const summary = summarizeVariants(detail?.variants)
   const go = (delta: number) => setIndex((i) => (i + delta + items.length) % items.length)
 
   return (
@@ -80,7 +77,7 @@ function FeaturedShowcase({ items }: { items: ProductSummary[] }) {
         {current ? (
           <ProductMedia
             key={current.id}
-            src={detail?.media?.[0]}
+            src={current.thumbnailUrl ?? undefined}
             alt={current.title}
             seed={current.id}
             className="aspect-[4/3.4] rounded-[2rem]"
@@ -89,7 +86,7 @@ function FeaturedShowcase({ items }: { items: ProductSummary[] }) {
           <div className="aspect-[4/3.4] animate-pulse rounded-[2rem] bg-gradient-to-br from-violet-soft via-peach to-mint" />
         )}
         <span className="absolute left-7 top-7 inline-flex items-center gap-1.5 rounded-full bg-butter px-3 py-1 font-label text-[11px] font-semibold">
-          <Sparkles size={12} /> Mới Ra Mắt
+          <Sparkles size={12} /> {current?.badgeType ? badgeLabel(current.badgeType) : 'Nổi bật'}
         </span>
         {items.length > 0 && (
           <span className="absolute right-7 top-7 rounded-full bg-white/90 px-3 py-1 font-label text-[11px] font-semibold">
@@ -107,7 +104,7 @@ function FeaturedShowcase({ items }: { items: ProductSummary[] }) {
           )}
           <p className="mt-3 line-clamp-1 font-display text-xl font-bold">{current.title}</p>
           <div className="mt-4 flex items-center justify-between gap-3">
-            <p className="font-display text-2xl font-bold text-orange">{summary ? formatVnd(summary.minPrice) : '—'}</p>
+            <p className="font-display text-2xl font-bold text-orange">{current.price != null ? formatVnd(current.price) : '—'}</p>
             <Link
               to={`/${current.id}`}
               className="inline-flex items-center gap-1 rounded-full bg-ink px-4 py-2 font-label text-xs font-semibold text-white hover:bg-violet"

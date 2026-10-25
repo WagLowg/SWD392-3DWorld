@@ -4,14 +4,11 @@ import { inputClass } from '../../../shared/ui/form'
 import { Btn, Pill } from '../../../shared/ui/kit'
 import { useConfirmReceived } from '../hooks/useBuyer'
 
-/**
- * MP 032 · Hộp thoại xác nhận nhận hàng.
- * Chưa có API cho người mua chuyển đơn sang RECEIVED → thao tác là dữ liệu mẫu.
- */
+/** MP 032 · Hộp thoại xác nhận nhận hàng — POST /api/orders/{id}/confirm-received. */
 export function ConfirmReceivedButton({ orderId, label = 'Xác nhận đã nhận hàng' }: { orderId: number; label?: string }) {
   const [open, setOpen] = useState(false)
   const [done, setDone] = useState(false)
-  if (done) return <Pill tone="green">Đã xác nhận (mô phỏng)</Pill>
+  if (done) return <Pill tone="green">Đã xác nhận nhận hàng</Pill>
   return (
     <>
       <Btn variant="orange" icon={PackageCheck} onClick={() => setOpen(true)}>
@@ -73,7 +70,6 @@ function Dialog({ orderId, onClose, onDone }: { orderId: number; onClose: () => 
             Xác nhận nhận hàng & bắt đầu 72h bảo vệ
           </Btn>
         </div>
-        <p className="mt-3 text-[11px] text-violet">Dữ liệu mẫu — chờ API người mua xác nhận RECEIVED.</p>
       </div>
     </div>
   )

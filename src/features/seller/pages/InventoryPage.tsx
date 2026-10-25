@@ -28,7 +28,7 @@ export function InventoryPage() {
 
   return (
     <>
-      <MockNotice api="PATCH /api/seller/variants/{id}/stock" />
+      <MockNotice partial="Nhật ký biến động tồn kho (chỉ hiện thay đổi trong phiên này)" api="GET /api/seller/inventory-logs" />
       <Hero code="MP 046" eyebrow="Tồn kho biến thể" title="Quản Lý Tồn Kho Phôi Đúc" accent="Kho Sẵn, Giữ Chỗ & Audit Log." />
       <Toolbar>
         <FilterTabs

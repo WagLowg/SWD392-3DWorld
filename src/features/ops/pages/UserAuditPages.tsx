@@ -1,7 +1,7 @@
 import { Download, Fingerprint, ShieldCheck, UserPlus } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { formatDateTime, formatVnd } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/format'
 import { inputClass } from '../../../shared/ui/form'
 import {
   Btn,
@@ -18,7 +18,9 @@ import {
 import { QueryState } from '../../../shared/ui/QueryState'
 import { useToast } from '../../../shared/ui/toast'
 import { OpsQueue, OpsReview, statusColumn, val } from '../components/OpsScaffold'
-import { useAuditEntry, useAuditLogs } from '../hooks/useOps'
+import { opsKeys, useAuditEntry, useAuditLogs } from '../hooks/useOps'
+import { ACCOUNT_ROLES, type AccountRole, adminUsersApi } from '../services/ops.api'
+import { useMockAction } from '../../../shared/mock/useMockAction'
 
 /** MP 074 · Quản Trị Người Dùng & Phân Quyền */
 export function UsersAdminPage() {
@@ -55,12 +57,11 @@ export function UsersAdminPage() {
             ),
           },
           { key: 'k', header: 'eKYC', render: (c) => val(c, 'kyc') },
-          { key: 'c', header: 'Tín dụng AI', render: (c) => val(c, 'credits') },
           statusColumn('user'),
           {
             key: 't',
             header: 'Gia nhập',
-            render: (c) => <span className="text-xs">{formatDateTime(c.createdAt)}</span>,
+            render: (c) => <span className="text-xs">{c.createdAt ? formatDateTime(c.createdAt) : '—'}</span>,
           },
           {
             key: 'x',
@@ -87,9 +88,13 @@ export function UsersAdminPage() {
 }
 function CreateStaffForm({ onClose }: { onClose: () => void }) {
   const uid = useId()
-  const toast = useToast()
-  const [f, setF] = useState({ name: '', email: '', role: 'STAFF_MODERATOR', reason: '' })
-  const ok = f.name.trim().length >= 3 && /@3dworld\.(swd\.)?vn$/.test(f.email) && f.reason.trim().length >= 20
+  const create = useMockAction(
+    (input: Parameters<typeof adminUsersApi.create>[0]) => adminUsersApi.create(input),
+    [opsKeys.all],
+    (a: { email: string }) => `Đã tạo tài khoản ${a.email} — email xác thực đã được gửi.`,
+  )
+  const [f, setF] = useState({ name: '', email: '', role: 'PRINT_STAFF' as AccountRole, password: '', phone: '' })
+  const ok = f.name.trim().length >= 3 && /^\S+@\S+\.\S+$/.test(f.email) && f.password.length >= 8
   return (
     <Section title="Tạo tài khoản chuyên viên nội bộ">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -103,7 +108,7 @@ function CreateStaffForm({ onClose }: { onClose: () => void }) {
           />
         </label>
         <label htmlFor={`${uid}-e`} className="block">
-          <span className="mb-1 block font-label text-xs font-semibold text-ink-soft">Email cơ quan (@3dworld.vn)</span>
+          <span className="mb-1 block font-label text-xs font-semibold text-ink-soft">Email</span>
           <input
             id={`${uid}-e`}
             value={f.email}
@@ -116,22 +121,32 @@ function CreateStaffForm({ onClose }: { onClose: () => void }) {
           <select
             id={`${uid}-r`}
             value={f.role}
-            onChange={(e) => setF({ ...f, role: e.target.value })}
+            onChange={(e) => setF({ ...f, role: e.target.value as AccountRole })}
             className={inputClass}
           >
-            {['STAFF_MODERATOR', 'STAFF_FINANCE', 'STAFF_OPERATIONS', 'ADMIN'].map((r) => (
+            {(['PRINT_STAFF', 'DESIGNER'] as const).map((r) => (
               <option key={r}>{r}</option>
             ))}
           </select>
         </label>
-        <label htmlFor={`${uid}-why`} className="block">
-          <span className="mb-1 block font-label text-xs font-semibold text-ink-soft">
-            Lý do tạo (audit_logs.reason, ≥ 20 ký tự)
-          </span>
+        <label htmlFor={`${uid}-pw`} className="block">
+          <span className="mb-1 block font-label text-xs font-semibold text-ink-soft">Mật khẩu tạm (≥ 8 ký tự)</span>
           <input
-            id={`${uid}-why`}
-            value={f.reason}
-            onChange={(e) => setF({ ...f, reason: e.target.value })}
+            id={`${uid}-pw`}
+            type="password"
+            autoComplete="new-password"
+            value={f.password}
+            onChange={(e) => setF({ ...f, password: e.target.value })}
+            className={inputClass}
+          />
+        </label>
+        <label htmlFor={`${uid}-ph`} className="block">
+          <span className="mb-1 block font-label text-xs font-semibold text-ink-soft">Số điện thoại (tuỳ chọn)</span>
+          <input
+            id={`${uid}-ph`}
+            inputMode="tel"
+            value={f.phone}
+            onChange={(e) => setF({ ...f, phone: e.target.value })}
             className={inputClass}
           />
         </label>
@@ -140,13 +155,108 @@ function CreateStaffForm({ onClose }: { onClose: () => void }) {
         <Btn onClick={onClose}>Huỷ</Btn>
         <Btn
           variant="primary"
-          disabled={!ok}
-          onClick={() => {
-            toast(`Đã tạo tài khoản ${f.email} (mô phỏng).`)
-            onClose()
-          }}
+          disabled={!ok || create.isPending}
+          onClick={() =>
+            create.mutate(
+              {
+                email: f.email.trim(),
+                fullName: f.name.trim(),
+                password: f.password,
+                phone: f.phone.trim() || undefined,
+                role: f.role,
+              },
+              { onSuccess: onClose },
+            )
+          }
         >
           Kích hoạt & cấp mã nhân sự
+        </Btn>
+      </div>
+    </Section>
+  )
+}
+
+/** Cấp / thu hồi vai trò — PUT /api/admin/users/{id}/roles/{role}. */
+function RolePanel({ userId, roles }: { userId: number; roles: string[] }) {
+  const [reason, setReason] = useState('')
+  const setRole = useMockAction(
+    ({ role, active }: { role: AccountRole; active: boolean }) => adminUsersApi.setRole(userId, role, active, reason.trim()),
+    [opsKeys.all],
+    'Đã cập nhật vai trò — phiên đăng nhập của người dùng bị thu hồi.',
+  )
+  return (
+    <Section n={3} title="Cấp / thu hồi vai trò">
+      <input
+        aria-label="Lý do thay đổi vai trò"
+        placeholder="Lý do (bắt buộc)"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        className={inputClass}
+      />
+      <div className="mt-3 flex flex-wrap gap-2">
+        {ACCOUNT_ROLES.map((r) => {
+          const has = roles.includes(r)
+          return (
+            <Btn
+              key={r}
+              size="sm"
+              variant={has ? 'soft' : 'white'}
+              disabled={!reason.trim() || setRole.isPending}
+              onClick={() => setRole.mutate({ role: r, active: !has })}
+            >
+              {has ? `Thu hồi ${r}` : `Cấp ${r}`}
+            </Btn>
+          )
+        })}
+      </div>
+      <p className="mt-2 text-xs text-ink-soft">SELLER chỉ cấp được khi gian hàng đã trả phí và đang hoạt động.</p>
+    </Section>
+  )
+}
+
+/** Xác thực SĐT thủ công (sandbox) — PATCH /api/admin/users/{id}/phone-verification. */
+function PhonePanel({ userId }: { userId: number }) {
+  const uid = useId()
+  const [f, setF] = useState({ phone: '', evidence: '', reason: '' })
+  const review = useMockAction(
+    (approved: boolean) =>
+      adminUsersApi.reviewPhone(userId, {
+        phone: f.phone.trim(),
+        approved,
+        evidenceReference: f.evidence.trim(),
+        reason: f.reason.trim(),
+      }),
+    [opsKeys.all],
+    'Đã ghi nhận kết quả xác thực số điện thoại.',
+  )
+  const ok = f.phone.trim() && f.evidence.trim() && f.reason.trim()
+  return (
+    <Section n={4} title="Xác thực số điện thoại (thủ công)">
+      <div className="grid gap-3 sm:grid-cols-3">
+        {(
+          [
+            ['phone', 'Số điện thoại hiện tại'],
+            ['evidence', 'Minh chứng (vd. ảnh chụp cuộc gọi)'],
+            ['reason', 'Lý do'],
+          ] as const
+        ).map(([k, label]) => (
+          <label key={k} htmlFor={`${uid}-${k}`} className="block">
+            <span className="mb-1 block font-label text-xs font-semibold text-ink-soft">{label}</span>
+            <input
+              id={`${uid}-${k}`}
+              value={f[k]}
+              onChange={(e) => setF({ ...f, [k]: e.target.value })}
+              className={inputClass}
+            />
+          </label>
+        ))}
+      </div>
+      <div className="mt-3 flex justify-end gap-2">
+        <Btn size="sm" disabled={!ok || review.isPending} onClick={() => review.mutate(false)}>
+          Không xác thực
+        </Btn>
+        <Btn size="sm" variant="primary" disabled={!ok || review.isPending} onClick={() => review.mutate(true)}>
+          Xác thực số điện thoại
         </Btn>
       </div>
     </Section>
@@ -163,7 +273,7 @@ export function UserAdminDetailPage() {
       code="MP 075"
       eyebrow="Hồ sơ người dùng"
       titlePrefix="Người dùng"
-      api="PATCH /api/admin/users/{id} (status, roles, credits)"
+      api="PATCH /api/admin/users/{id}/status"
       main={(c) => (
         <>
           <Section n={1} title="Định danh & trạng thái xác thực">
@@ -172,7 +282,7 @@ export function UserAdminDetailPage() {
               items={[
                 { label: 'Email', value: c.subtitle },
                 { label: 'eKYC', value: val(c, 'kyc') },
-                { label: 'Gia nhập', value: formatDateTime(c.createdAt) },
+                { label: 'Mã tài khoản', value: `#${c.id}` },
               ]}
             />
           </Section>
@@ -187,22 +297,13 @@ export function UserAdminDetailPage() {
                 ))}
             </div>
           </Section>
-          <Section n={3} title="Sổ địa chỉ, ngân hàng & ví">
-            <KeyValues
-              cols={4}
-              items={[
-                { label: 'Địa chỉ', value: val(c, 'addresses') },
-                { label: 'TK ngân hàng', value: val(c, 'banks') },
-                { label: 'Ví khả dụng', value: formatVnd(Number(c.f.wallet)) },
-                { label: 'Tín dụng AI', value: val(c, 'credits') },
-              ]}
-            />
-          </Section>
+          <RolePanel userId={Number(c.id)} roles={String(c.f.roles).split(', ')} />
+          <PhonePanel userId={Number(c.id)} />
         </>
       )}
       decisions={[
         { value: 'activate', label: 'Mở khoá / kích hoạt', status: 'ACTIVE' },
-        { value: 'suspend', label: 'Tạm khoá tài khoản', status: 'SUSPENDED', tone: 'danger' },
+        { value: 'suspend', label: 'Tạm khoá tài khoản (LOCKED)', status: 'SUSPENDED', tone: 'danger' },
         {
           value: 'ban',
           label: 'Cấm vĩnh viễn',

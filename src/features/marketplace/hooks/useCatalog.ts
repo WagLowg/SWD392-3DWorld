@@ -1,5 +1,5 @@
 import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query'
-import { catalogService } from '../services/catalog.service'
+import { catalogService, storefrontService } from '../services/catalog.service'
 import { useVariantIndexStore } from '../stores/variant-index.store'
 import type { CatalogQuery } from '../types/catalog.types'
 
@@ -8,6 +8,10 @@ export const catalogKeys = {
   search: (query: CatalogQuery) => ['catalog', 'search', query] as const,
   categories: ['catalog', 'categories'] as const,
   detail: (productId: number) => ['catalog', 'detail', productId] as const,
+  featured: (size: number) => ['catalog', 'featured', size] as const,
+  reviews: (productId: number, page: number) => ['catalog', 'reviews', productId, page] as const,
+  storefront: (id: number) => ['storefront', id] as const,
+  storefrontProducts: (id: number, query: CatalogQuery) => ['storefront', id, 'products', query] as const,
 }
 
 const DETAIL_STALE = 60_000
@@ -62,5 +66,40 @@ export function useProductDetails(productIds: number[]) {
       queryFn: ({ signal }: { signal: AbortSignal }) => fetchDetail(id, signal),
       staleTime: DETAIL_STALE,
     })),
+  })
+}
+
+export function useFeatured(size = 12) {
+  return useQuery({
+    queryKey: catalogKeys.featured(size),
+    queryFn: ({ signal }) => catalogService.featured(0, size, signal),
+    staleTime: 60_000,
+  })
+}
+
+export function useProductReviews(productId: number, page = 0) {
+  return useQuery({
+    queryKey: catalogKeys.reviews(productId, page),
+    queryFn: ({ signal }) => catalogService.reviews(productId, page, 10, signal),
+    placeholderData: keepPreviousData,
+    enabled: Number.isFinite(productId) && productId > 0,
+  })
+}
+
+export function usePublicStorefront(storefrontId: number) {
+  return useQuery({
+    queryKey: catalogKeys.storefront(storefrontId),
+    queryFn: ({ signal }) => storefrontService.get(storefrontId, signal),
+    enabled: Number.isFinite(storefrontId) && storefrontId > 0,
+    staleTime: 60_000,
+  })
+}
+
+export function useStorefrontProducts(storefrontId: number, query: CatalogQuery) {
+  return useQuery({
+    queryKey: catalogKeys.storefrontProducts(storefrontId, query),
+    queryFn: ({ signal }) => storefrontService.products(storefrontId, query, signal),
+    enabled: Number.isFinite(storefrontId) && storefrontId > 0,
+    placeholderData: keepPreviousData,
   })
 }

@@ -1,7 +1,7 @@
-import { CheckCircle2, Landmark, Mail, Phone, Upload } from 'lucide-react'
+import { CheckCircle2, Landmark, Link2, Mail, Phone, Store } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { inputClass } from '../../../shared/ui/form'
-import { AuditTimeline, Btn, DetailLayout, Hero, MockNotice, Pill, Section, StatusPill } from '../../../shared/ui/kit'
+import { AuditTimeline, Btn, DetailLayout, Hero, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import type { SellerApplication } from '../data/seller.fixtures'
 import { useApplication, useSubmitApplication } from '../hooks/useSeller'
@@ -17,7 +17,6 @@ export function SellerRegisterPage() {
   }, [])
   return (
     <>
-      <MockNotice api="/api/seller/applications" />
       <Hero
         code="MP 038"
         eyebrow="Đăng ký người bán"
@@ -40,9 +39,15 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
     description: app.description,
     address: app.address,
     technologies: app.technologies,
+    evidence: app.evidenceLink ?? '',
   })
   const locked = app.status === 'PENDING' || app.status === 'VERIFIED'
-  const valid = form.storefrontName.trim().length >= 3 && form.description.trim().length >= 20 && form.address.trim() && form.technologies.length
+  const valid =
+    form.storefrontName.trim().length >= 3 &&
+    form.address.trim() &&
+    form.technologies.length &&
+    form.evidence.trim().length >= 5 &&
+    app.verifiedBankAvailable !== false
 
   return (
     <DetailLayout
@@ -55,6 +60,27 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
               </p>
             )}
             {app.status === 'PENDING' && <p className="rounded-2xl bg-violet-soft/50 p-4 text-sm text-violet">Hồ sơ đang chờ chuyên viên xét duyệt (SLA 24–48h).</p>}
+            {app.status === 'REJECTED' && app.reviewerNote && (
+              <p className="rounded-2xl bg-[#ffdad6] p-4 text-sm text-danger">
+                <strong>Lý do từ chối:</strong> {app.reviewerNote}
+              </p>
+            )}
+            {app.status === 'VERIFIED' && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-mint p-4 text-sm text-[#0f5132]">
+                <span>Đã xác thực người bán. {app.storefrontId ? 'Gian hàng đã được tạo.' : 'Bước tiếp theo: tạo gian hàng và thanh toán gói.'}</span>
+                <Btn to="/seller/storefront" size="sm" variant="primary" icon={Store}>
+                  {app.storefrontId ? 'Quản lý gian hàng' : 'Tạo gian hàng'}
+                </Btn>
+              </div>
+            )}
+            {app.verifiedBankAvailable === false && !locked && (
+              <p className="mt-3 rounded-2xl bg-peach/60 p-4 text-sm text-orange-deep">
+                Cần ít nhất một tài khoản ngân hàng đã được quản trị viên duyệt.{' '}
+                <a href="/portal/bank-accounts" className="font-semibold underline">
+                  Quản lý tài khoản ngân hàng
+                </a>
+              </p>
+            )}
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <Check icon={Mail} label="Xác thực email" ok={app.emailVerified} />
               <Check icon={Phone} label="Xác thực số điện thoại" ok={app.phoneVerified} />
@@ -99,18 +125,23 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
             </div>
           </Section>
 
-          <Section n={2} title="Minh chứng xưởng" subtitle="Ảnh khu vực in, máy in, mẫu in thử, giấy phép kinh doanh.">
-            <div className="flex flex-wrap gap-2">
-              {app.evidence.map((e) => (
-                <Pill key={e} tone="teal">
-                  {e}
-                </Pill>
-              ))}
-            </div>
-            <div className="mt-4 grid place-items-center rounded-2xl border-2 border-dashed border-line p-8 text-sm text-ink-soft">
-              <Upload size={22} />
-              <span className="mt-2">Tải thêm ảnh minh chứng (chờ API lưu tệp)</span>
-            </div>
+          <Section n={2} title="Minh chứng xưởng" subtitle="Link thư mục ảnh khu vực in, máy in, mẫu in thử, giấy phép kinh doanh.">
+            <label className="block" htmlFor={`${uid}-ev`}>
+              <span className="mb-1.5 flex items-center gap-1.5 font-label text-xs font-semibold text-ink-soft">
+                <Link2 size={13} /> Link hoặc mã tham chiếu minh chứng *
+              </span>
+              <input
+                id={`${uid}-ev`}
+                disabled={locked}
+                value={form.evidence}
+                placeholder="vd. https://drive.google.com/…"
+                onChange={(e) => setForm({ ...form, evidence: e.target.value })}
+                className={inputClass}
+              />
+            </label>
+            <p className="mt-2 text-xs text-ink-soft">
+              Tên xưởng, địa chỉ, công nghệ và link được gửi chung trong trường evidenceReference (tối đa 500 ký tự).
+            </p>
           </Section>
 
           {!locked && (

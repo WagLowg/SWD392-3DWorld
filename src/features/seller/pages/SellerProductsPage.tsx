@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { formatDateTime, formatVnd } from '../../../shared/format'
 import { Btn, CellTitle, DataTable, FilterTabs, Hero, MockNotice, SearchInput, StatusPill, Toolbar } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
-import { categoryLabel } from '../../marketplace/lib/format'
+import { categoryLabel, resolveMediaUrl } from '../../marketplace/lib/format'
 import type { ProductStatus } from '../data/seller.fixtures'
 import { useSellerProducts, useSetProductStatus } from '../hooks/useSeller'
 import { PRODUCT_STATUS } from '../lib/status'
@@ -25,7 +25,7 @@ export function SellerProductsPage() {
 
   return (
     <>
-      <MockNotice api="/api/seller/products" />
+      <MockNotice partial="Cột “Đã bán”" api="salesCount trong ProductView" />
       <Hero
         code="MP 042"
         eyebrow="Kho hàng chế tác"
@@ -44,7 +44,7 @@ export function SellerProductsPage() {
           onChange={setTab}
           options={[
             { value: '', label: 'Tất cả', count: all.length },
-            ...(['PUBLISHED', 'PENDING_REVIEW', 'DRAFT', 'REJECTED', 'HIDDEN'] as const).map((s) => ({
+            ...(['PUBLISHED', 'PENDING_REVIEW', 'DRAFT', 'REJECTED', 'HIDDEN', 'ARCHIVED'] as const).map((s) => ({
               value: s,
               label: PRODUCT_STATUS[s].label,
               count: count(s),
@@ -63,9 +63,13 @@ export function SellerProductsPage() {
               header: 'Sản phẩm',
               render: (p) => (
                 <div className="flex items-center gap-3">
-                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-soft to-peach text-violet">
-                    <Boxes size={20} />
-                  </span>
+                  {p.mediaItems?.[0] ? (
+                    <img src={resolveMediaUrl(p.mediaItems[0].url)} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+                  ) : (
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-soft to-peach text-violet">
+                      <Boxes size={20} />
+                    </span>
+                  )}
                   <CellTitle title={p.title} sub={`prd_${p.id} · ${categoryLabel(p.category)}`} to={`/seller/products/${p.id}`} />
                 </div>
               ),
@@ -75,8 +79,8 @@ export function SellerProductsPage() {
               key: 'price',
               header: 'Giá',
               render: (p) => {
-                const prices = p.variants.map((v) => v.price)
-                return <strong>{formatVnd(Math.min(...prices))}</strong>
+                const prices = p.variants.filter((v) => v.active).map((v) => v.price)
+                return prices.length ? <strong>{formatVnd(Math.min(...prices))}</strong> : '—'
               },
             },
             { key: 'stock', header: 'Kho khả dụng', render: (p) => p.variants.reduce((s, v) => s + v.stock - v.reserved, 0) },
@@ -106,8 +110,8 @@ export function SellerProductsPage() {
                     </Btn>
                   )}
                   {p.status === 'HIDDEN' && (
-                    <Btn size="sm" variant="orange" icon={Eye} onClick={() => setStatus.mutate({ id: p.id, status: 'PUBLISHED', note: 'Mở bán lại' })}>
-                      Mở bán lại
+                    <Btn size="sm" variant="orange" icon={Eye} onClick={() => setStatus.mutate({ id: p.id, status: 'PENDING_REVIEW', note: 'Nộp duyệt để mở bán lại' })}>
+                      Nộp duyệt lại
                     </Btn>
                   )}
                 </div>

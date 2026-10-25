@@ -10,6 +10,11 @@ export function orderCode(id: number) {
   return `#ORD-${String(id).padStart(5, '0')}`
 }
 
+/** Mã đơn Backend sinh (orderCode) nếu có, không thì mã suy từ id. */
+export function displayOrderCode(order: Pick<Order, 'id' | 'orderCode'>) {
+  return order.orderCode || orderCode(order.id)
+}
+
 export function OrderStatusBadge({ status }: { status: string }) {
   const m = statusMeta(status)
   return (
@@ -33,9 +38,11 @@ export function ShipmentStatusBadge({ status }: { status: string }) {
   )
 }
 
-/** Món trong đơn: tên & ảnh lấy từ chỉ mục variant (OrderItemResponse chỉ có SKU). */
+/** Món trong đơn: tên & thuộc tính từ bản chụp OrderItemResponse; ảnh lấy từ chỉ mục variant nếu có. */
 export function OrderItemRow({ item }: { item: OrderItem }) {
   const info = useVariantIndexStore((s) => s.variants[item.variantId])
+  const title = item.productTitle || info?.title
+  const attributes = item.attributes ?? info?.attributes
   return (
     <li className="flex items-center gap-4 rounded-2xl bg-surface-low/70 p-3">
       {info ? (
@@ -51,15 +58,15 @@ export function OrderItemRow({ item }: { item: OrderItem }) {
             href={`/marketplace/${info.productId}`}
             className="block truncate font-display text-base font-bold hover:text-violet"
           >
-            {info.title}
+            {title}
           </a>
         ) : (
-          <p className="truncate font-display text-base font-bold">Vật phẩm {item.sku}</p>
+          <p className="truncate font-display text-base font-bold">{title || `Vật phẩm ${item.sku}`}</p>
         )}
         <p className="font-mono text-[11px] text-ink-soft">
           SKU: {item.sku} · SL: x{item.quantity}
         </p>
-        {info && <p className="text-xs text-violet">{formatAttributes(info.attributes)}</p>}
+        {attributes && <p className="text-xs text-violet">{formatAttributes(attributes)}</p>}
       </div>
       <div className="text-right">
         <p className="font-display text-lg font-bold">{formatVnd(item.lineTotal)}</p>

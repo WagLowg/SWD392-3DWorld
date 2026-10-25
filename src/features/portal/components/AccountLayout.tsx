@@ -24,12 +24,28 @@ const BUYER_TABS = [
   { to: '/profile', label: 'Hồ Sơ' },
   { to: '/addresses', label: 'Sổ Địa Chỉ' },
   { to: '/bank-accounts', label: 'Tài Khoản Ngân Hàng' },
+  { to: '/reports', label: 'Báo Cáo Vi Phạm' },
 ]
 
 const SELLER_TABS = [
+  { to: '/seller', label: 'Tổng Quan', end: true },
+  { to: '/seller/products', label: 'Sản Phẩm' },
+  { to: '/seller/inventory', label: 'Tồn Kho' },
   { to: '/seller/orders', label: 'Đơn Chế Tác' },
   { to: '/seller/shipments', label: 'Vận Chuyển' },
+  { to: '/seller/storefront', label: 'Gian Hàng' },
+  { to: '/seller/subscription', label: 'Gói Thuê Bao' },
+  { to: '/seller/register', label: 'Xác Thực' },
 ]
+
+const OPS_TABS = [
+  { to: '/ops/products', label: 'Duyệt Sản Phẩm' },
+  { to: '/ops/reports', label: 'Báo Cáo Vi Phạm' },
+  { to: '/ops/storefronts', label: 'Xác Thực Người Bán' },
+  { to: '/ops/users', label: 'Người Dùng' },
+]
+
+const isAdmin = (roles: string[] | undefined) => !!roles?.some((r) => /ADMIN/i.test(r))
 
 /** Khung chung cho các màn tài khoản / đơn hàng / người bán (Stitch MP 010–050). */
 export function AccountLayout() {
@@ -80,6 +96,7 @@ export function AccountTabs() {
   const { data: user } = useSession()
   const { pathname } = useLocation()
   const seller = isSeller(user) || pathname.startsWith('/seller')
+  const admin = isAdmin(user?.roles) || pathname.startsWith('/ops')
   const tab = ({ isActive }: { isActive: boolean }) =>
     `shrink-0 rounded-full px-4 py-2 font-label text-xs font-semibold transition ${
       isActive ? 'bg-orange text-white shadow-sm' : 'text-ink-soft hover:bg-white hover:text-ink'
@@ -98,6 +115,11 @@ export function AccountTabs() {
         <a href="/marketplace/cart" className={tab({ isActive: false })}>
           Giỏ Hàng
         </a>
+        {!seller && (
+          <NavLink to="/seller/register" className={tab}>
+            Bán Hàng
+          </NavLink>
+        )}
       </div>
       {seller && (
         <div className="ml-2 flex gap-1 rounded-full bg-ink/90 p-1 shadow-soft">
@@ -108,8 +130,27 @@ export function AccountTabs() {
             <NavLink
               key={t.to}
               to={t.to}
+              end={t.end}
               className={({ isActive }) =>
                 `shrink-0 rounded-full px-4 py-2 font-label text-xs font-semibold ${isActive ? 'bg-orange text-white' : 'text-white/80 hover:text-white'}`
+              }
+            >
+              {t.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
+      {admin && (
+        <div className="ml-2 flex gap-1 rounded-full bg-violet/90 p-1 shadow-soft">
+          <span className="self-center px-3 font-label text-[10px] font-semibold uppercase tracking-widest text-white/70">
+            Quản trị
+          </span>
+          {OPS_TABS.map((t) => (
+            <NavLink
+              key={t.to}
+              to={t.to}
+              className={({ isActive }) =>
+                `shrink-0 rounded-full px-4 py-2 font-label text-xs font-semibold ${isActive ? 'bg-orange text-white' : 'text-white/85 hover:text-white'}`
               }
             >
               {t.label}

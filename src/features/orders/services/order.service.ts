@@ -1,9 +1,48 @@
 import { type ApiEnvelope, http } from '../../../shared/api'
-import type { Order, Payment, RefundInput, Shipment, ShipmentEvent } from '../types/order.types'
+import type {
+  Order,
+  OrderHistoryEntry,
+  PackagingProfile,
+  Payment,
+  RefundInput,
+  SavePackagesInput,
+  Shipment,
+  ShipmentEvent,
+  ShippingPackage,
+} from '../types/order.types'
+
+/** API dùng chung cho người mua, người bán và nhân viên (Backend kiểm quyền sở hữu). */
+export const orderService = {
+  async detail(orderId: number, signal?: AbortSignal) {
+    return (await http.get<ApiEnvelope<Order>>(`/api/orders/${orderId}`, { signal })).data
+  },
+
+  /** Lịch sử chuyển trạng thái theo thứ tự thời gian. */
+  async history(orderId: number, signal?: AbortSignal) {
+    return (await http.get<ApiEnvelope<OrderHistoryEntry[]>>(`/api/orders/${orderId}/history`, { signal })).data ?? []
+  },
+
+  /** Kiện hàng đã đóng gói (bản chụp). */
+  async packages(orderId: number, signal?: AbortSignal) {
+    return (await http.get<ApiEnvelope<ShippingPackage[]>>(`/api/orders/${orderId}/packages`, { signal })).data ?? []
+  },
+}
 
 export const buyerOrderService = {
   async list(signal?: AbortSignal) {
     return (await http.get<ApiEnvelope<Order[]>>('/api/orders/mine', { signal })).data ?? []
+  },
+
+  /** Huỷ đơn chưa thanh toán — giải phóng tồn kho; đơn đã trả tiền phải đi luồng hoàn tiền. */
+  async cancel(orderId: number, reason: string) {
+    return (
+      await http.post<ApiEnvelope<Order>, { reason: string }>(`/api/orders/${orderId}/cancel`, { reason })
+    ).data
+  },
+
+  /** Xác nhận đã nhận đơn DELIVERED — bắt đầu thời hạn hoàn tiền. */
+  async confirmReceived(orderId: number) {
+    return (await http.post<ApiEnvelope<Order>>(`/api/orders/${orderId}/confirm-received`)).data
   },
 
   /** Hành trình vận chuyển mà người mua được xem. */
@@ -33,6 +72,17 @@ export const sellerOrderService = {
         carrierName,
       })
     ).data
+  },
+
+  /** Thay toàn bộ kiện hàng trước khi tạo vận đơn; mỗi đơn vị hàng phải được phân bổ đúng 1 lần. */
+  async savePackages(orderId: number, input: SavePackagesInput) {
+    return (
+      await http.post<ApiEnvelope<ShippingPackage[]>, SavePackagesInput>(`/api/orders/${orderId}/packages`, input)
+    ).data
+  },
+
+  async packagingProfiles(signal?: AbortSignal) {
+    return (await http.get<ApiEnvelope<PackagingProfile[]>>('/api/shipping/packaging-profiles', { signal })).data ?? []
   },
 
   async applyShipmentEvent(shipmentId: number, event: ShipmentEvent) {

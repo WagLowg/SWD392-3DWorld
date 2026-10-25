@@ -1,154 +1,188 @@
-import { useQuery } from '@tanstack/react-query'
-import { Boxes, Flag, MapPin, MessageSquare, ShieldCheck, Star, Store, Truck, Users } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { formatVnd } from '../../../shared/format'
-import { Btn, FilterTabs, MockNotice, Pill, Section } from '../../../shared/ui/kit'
-import { QueryState } from '../../../shared/ui/QueryState'
-import { useToast } from '../../../shared/ui/toast'
-import { sellerService } from '../../seller/services/seller.service'
-import { categoryLabel } from '../lib/format'
+import { CalendarClock, Flag, Search, ShieldCheck, Store } from 'lucide-react'
+import { type FormEvent, useEffect, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { ApiClientError } from '../../../shared/api'
+import { Pagination } from '../../../shared/ui/Pagination'
+import { StatusBlock } from '../../../shared/ui/StatusBlock'
+import { ProductCard, ProductCardSkeleton, SKELETON_KEYS } from '../components/ProductCard'
+import { usePublicStorefront, useStorefrontProducts } from '../hooks/useCatalog'
+import type { CatalogSort } from '../types/catalog.types'
 
-const REVIEWS = [
-  { name: 'Minh T.', rating: 5, text: 'Khớp robot rất chắc, sơn tay tỉ mỉ. Đóng hộp cực kỳ cẩn thận.', product: 'Bolt Mini Robot V1' },
-  { name: 'Hà P.', rating: 5, text: 'Giao nhanh, đúng màu như ảnh. Sẽ ủng hộ tiếp.', product: 'Mecha Bear Alpha' },
-  { name: 'Khoa N.', rating: 4, text: 'Sản phẩm đẹp, hộp hơi móp nhẹ nhưng bên trong an toàn.', product: 'Astro Bear Explorer' },
+const SORTS: { value: CatalogSort; label: string }[] = [
+  { value: 'newest', label: 'Mới nhất' },
+  { value: 'best_selling', label: 'Bán chạy' },
+  { value: 'rating', label: 'Đánh giá cao' },
+  { value: 'price_asc', label: 'Giá thấp → cao' },
+  { value: 'price_desc', label: 'Giá cao → thấp' },
 ]
 
-/** MP 004 · Chi Tiết Gian Hàng (dữ liệu mẫu — chưa có API storefront công khai). */
+/** MP 004 · Chi Tiết Gian Hàng — GET /api/storefronts/{id} + /products */
 export function StorefrontPage() {
   const id = Number(useParams().storefrontId)
-  const toast = useToast()
-  const [tab, setTab] = useState<'products' | 'reviews' | 'policy'>('products')
-  const store = useQuery({ queryKey: ['storefront-public', id], queryFn: sellerService.storefront })
-  const products = useQuery({ queryKey: ['storefront-public', id, 'products'], queryFn: sellerService.products })
-  const [following, setFollowing] = useState(false)
+  const [params, setParams] = useSearchParams()
+  const keyword = params.get('q') ?? ''
+  const sort = (SORTS.find((s) => s.value === params.get('sort'))?.value ?? 'newest') as CatalogSort
+  const page = Math.max(0, Number(params.get('page') ?? 1) - 1) || 0
+
+  const shop = usePublicStorefront(id)
+  const products = useStorefrontProducts(id, { keyword, sort, page, size: 12 })
+  const [q, setQ] = useState(keyword)
+  useEffect(() => setQ(keyword), [keyword])
 
   useEffect(() => {
-    document.title = 'Gian hàng · Chợ Đồ Chơi 3DWorld'
-  }, [])
+    document.title = `${shop.data?.name ?? 'Gian hàng'} · Chợ Đồ Chơi 3DWorld`
+  }, [shop.data?.name])
 
-  const s = store.data
-  const published = (products.data ?? []).filter((p) => p.status === 'PUBLISHED' || p.status === 'HIDDEN')
-  const name = s && s.id === id ? s.name : `Xưởng #${id}`
+  const update = (patch: Record<string, string>) =>
+    setParams((prev) => {
+      const next = new URLSearchParams(prev)
+      for (const [k, v] of Object.entries(patch)) {
+        if (v) next.set(k, v)
+        else next.delete(k)
+      }
+      if (!('page' in patch)) next.delete('page')
+      return next
+    })
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    update({ q: q.trim() })
+  }
+
+  const notFound =
+    !Number.isInteger(id) || id <= 0 || (shop.error instanceof ApiClientError && shop.error.status === 404)
+
+  if (notFound) {
+    return (
+      <div className="mx-auto max-w-[1320px] px-4 md:px-8">
+        <StatusBlock
+          tone="empty"
+          title="Không tìm thấy gian hàng"
+          body="Gian hàng có thể đã đóng hoặc đường dẫn không đúng."
+          action={
+            <Link to="/products" className="rounded-full bg-ink px-6 py-3 font-label text-sm font-semibold text-white">
+              Về Chợ Đồ Chơi
+            </Link>
+          }
+        />
+      </div>
+    )
+  }
+
+  const s = shop.data
+  const name = s?.name || `Xưởng #${id}`
 
   return (
     <div className="mx-auto max-w-[1320px] px-4 md:px-8">
-      <MockNotice api="GET /api/storefronts/{id}" />
-      <QueryState isLoading={store.isLoading} error={store.error}>
-        {s && (
-          <>
-            <section className="overflow-hidden rounded-[2.5rem] bg-white/95 shadow-soft">
-              <div className="h-40 bg-gradient-to-r from-violet-soft via-peach to-mint sm:h-52" />
-              <div className="-mt-12 flex flex-wrap items-end gap-5 px-6 pb-6 sm:px-8">
-                <span className="grid h-24 w-24 place-items-center rounded-[1.75rem] bg-violet text-white shadow-lift">
-                  <Store size={40} />
+      <section className="overflow-hidden rounded-[2.5rem] bg-white/95 shadow-soft">
+        <div className="h-36 bg-gradient-to-r from-violet-soft via-peach to-mint sm:h-48" />
+        <div className="-mt-12 flex flex-wrap items-end gap-5 px-6 pb-6 sm:px-8">
+          <span className="grid h-24 w-24 place-items-center rounded-[1.75rem] bg-violet text-white shadow-lift">
+            <Store size={40} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-label text-xs font-semibold uppercase tracking-widest text-ink-soft">
+              Xưởng chế tác · storefront_{id}
+            </p>
+            {shop.isLoading ? (
+              <div className="mt-2 h-9 w-64 animate-pulse rounded-full bg-surface-mid" />
+            ) : (
+              <h1 className="font-display text-3xl font-bold sm:text-4xl">{name}</h1>
+            )}
+            {s?.description && <p className="mt-1 max-w-3xl text-sm text-ink-soft">{s.description}</p>}
+            <div className="mt-2 flex flex-wrap gap-2 font-label text-[11px] font-semibold">
+              {s?.available === false ? (
+                <span className="rounded-full bg-peach px-3 py-1 text-orange-deep">Tạm ngừng nhận đơn</span>
+              ) : (
+                <span className="rounded-full bg-mint px-3 py-1 text-[#0f5132]">Đang mở bán</span>
+              )}
+              {s?.verificationStatus && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-violet-soft px-3 py-1 text-violet">
+                  <ShieldCheck size={12} /> {s.verificationStatus === 'VERIFIED' ? 'Đã xác thực' : s.verificationStatus}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-label text-xs font-semibold uppercase tracking-widest text-ink-soft">Xưởng chế tác · storefront_{id}</p>
-                  <h1 className="font-display text-3xl font-bold sm:text-4xl">{name}</h1>
-                  <p className="text-sm text-ink-soft">{s.slogan}</p>
-                  <div className="mt-2 flex flex-wrap gap-3 text-sm">
-                    <span className="inline-flex items-center gap-1">
-                      <Star size={14} className="fill-orange text-orange" /> {s.rating} ({s.reviewCount})
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-ink-soft">
-                      <MapPin size={14} /> {s.city}
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-ink-soft">
-                      <Users size={14} /> {(s.followers + (following ? 1 : 0)).toLocaleString('vi-VN')} theo dõi
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Btn variant={following ? 'soft' : 'primary'} onClick={() => setFollowing(!following)}>
-                    {following ? 'Đang theo dõi' : 'Theo dõi xưởng'}
-                  </Btn>
-                  <Btn variant="white" icon={MessageSquare} onClick={() => toast('Tính năng nhắn tin xưởng đang chờ API.')}>
-                    Liên hệ / đặt custom
-                  </Btn>
-                </div>
-              </div>
-            </section>
-
-            <div className="mt-6">
-              <FilterTabs
-                value={tab}
-                onChange={setTab}
-                dark
-                options={[
-                  { value: 'products', label: 'Sản phẩm đang mở bán', count: published.length },
-                  { value: 'reviews', label: 'Đánh giá', count: s.reviewCount },
-                  { value: 'policy', label: 'Chính sách & bảo vệ 72h' },
-                ]}
-              />
+              )}
+              {products.data && (
+                <span className="rounded-full bg-surface-low px-3 py-1 text-ink-soft">
+                  {products.data.totalElements} sản phẩm
+                </span>
+              )}
+              {s?.expiresAt && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-surface-low px-3 py-1 text-ink-soft">
+                  <CalendarClock size={12} /> Gói đến {new Date(s.expiresAt).toLocaleDateString('vi-VN')}
+                </span>
+              )}
             </div>
+          </div>
+          <a
+            href={`/portal/reports/new?type=STOREFRONT&target=${encodeURIComponent(name)}`}
+            className="inline-flex items-center gap-1.5 rounded-full bg-surface-low px-4 py-2.5 font-label text-xs font-semibold text-ink-soft hover:text-danger"
+          >
+            <Flag size={14} /> Báo cáo gian hàng
+          </a>
+        </div>
+      </section>
 
-            {tab === 'products' && (
-              <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {published.map((p) => (
-                  <article key={p.id} className="rounded-[2rem] bg-white/95 p-3 shadow-soft">
-                    <div className="grid aspect-[4/3.4] place-items-center rounded-[1.6rem] bg-gradient-to-br from-violet-soft to-peach">
-                      <span className="grid h-16 w-16 place-items-center rounded-2xl bg-white/85 text-violet">
-                        <Boxes size={28} />
-                      </span>
-                    </div>
-                    <div className="px-2 pb-2 pt-4">
-                      <Pill tone="violet">{categoryLabel(p.category)}</Pill>
-                      <p className="mt-2 font-display text-xl font-bold">{p.title}</p>
-                      <p className="mt-1 text-sm text-ink-soft">{p.variants.map((v) => v.material).join(' · ')}</p>
-                      <p className="mt-3 font-display text-2xl font-bold">{formatVnd(Math.min(...p.variants.map((v) => v.price)))}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
+      <div className="mt-6 flex flex-wrap items-center gap-3 rounded-[2rem] bg-white/90 p-3 shadow-soft">
+        <form onSubmit={submit} className="flex min-w-0 flex-1 items-center gap-2 px-2">
+          <Search size={17} className="shrink-0 text-ink-soft" />
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={`Tìm trong ${name}…`}
+            aria-label="Tìm trong gian hàng"
+            className="h-10 w-full bg-transparent text-sm outline-none"
+          />
+        </form>
+        <select
+          value={sort}
+          onChange={(e) => update({ sort: e.target.value === 'newest' ? '' : e.target.value })}
+          aria-label="Sắp xếp"
+          className="rounded-full bg-surface-low px-4 py-2 text-sm font-semibold outline-none"
+        >
+          {SORTS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
-            {tab === 'reviews' && (
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                {REVIEWS.map((r) => (
-                  <article key={r.name} className="rounded-[1.75rem] bg-white/95 p-5 shadow-soft">
-                    <div className="flex gap-0.5">
-                      {Array.from({ length: 5 }, (_, i) => `${r.name}-${i}`).map((k, i) => (
-                        <Star key={k} size={15} className={i < r.rating ? 'fill-orange text-orange' : 'text-line'} />
-                      ))}
-                    </div>
-                    <p className="mt-3 text-sm">“{r.text}”</p>
-                    <p className="mt-2 text-xs text-ink-soft">
-                      {r.name} · {r.product} · <span className="text-teal">Đã nhận hàng</span>
-                    </p>
-                  </article>
-                ))}
-              </div>
-            )}
-
-            {tab === 'policy' && (
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                {[
-                  { icon: Truck, t: 'Giao hàng', b: 'Đóng gói chống sốc, giao trong 2–4 ngày toàn quốc.' },
-                  { icon: ShieldCheck, t: 'Bảo vệ người mua 72h', b: 'Khiếu nại trong 72h sau khi nhận nếu sản phẩm lỗi.' },
-                  { icon: Boxes, t: 'Quy trình chế tác', b: 'In resin SLA 8K, sấy UV, sơn tay và kiểm định trước khi gửi.' },
-                ].map(({ icon: Icon, t, b }) => (
-                  <div key={t} className="rounded-[1.75rem] bg-white/95 p-5 shadow-soft">
-                    <Icon size={20} className="text-violet" />
-                    <p className="mt-3 font-display text-lg font-bold">{t}</p>
-                    <p className="text-sm text-ink-soft">{b}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <Section title="Báo cáo vi phạm gian hàng" className="mt-8">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-ink-soft">Phát hiện in lậu, sai mô tả hoặc gian lận? Báo cho bộ phận thẩm định.</p>
-                <Btn href={`/portal/reports/new?type=STOREFRONT&target=${encodeURIComponent(name)}`} icon={Flag}>
-                  Báo cáo vi phạm
-                </Btn>
-              </div>
-            </Section>
-          </>
+      <div className="mt-6">
+        {products.isLoading ? (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {SKELETON_KEYS.map((k) => (
+              <ProductCardSkeleton key={k} />
+            ))}
+          </div>
+        ) : products.isError ? (
+          <StatusBlock
+            tone="error"
+            title="Không tải được sản phẩm của xưởng"
+            body={products.error instanceof ApiClientError ? products.error.message : 'Vui lòng thử lại.'}
+          />
+        ) : !products.data?.items.length ? (
+          <StatusBlock tone="empty" title="Chưa có sản phẩm" body="Xưởng chưa có sản phẩm nào được duyệt mở bán." />
+        ) : (
+          <div
+            className={`grid gap-5 sm:grid-cols-2 lg:grid-cols-3 ${products.isPlaceholderData ? 'opacity-60' : ''}`}
+          >
+            {products.data.items.map((p, i) => (
+              <ProductCard key={p.id} product={p} index={i} />
+            ))}
+          </div>
         )}
-      </QueryState>
+      </div>
+
+      {products.data && products.data.totalPages > 1 && (
+        <div className="mt-8 flex justify-end">
+          <Pagination
+            page={products.data.page}
+            totalPages={products.data.totalPages}
+            onChange={(p) => update({ page: p > 0 ? String(p + 1) : '' })}
+          />
+        </div>
+      )}
     </div>
   )
 }

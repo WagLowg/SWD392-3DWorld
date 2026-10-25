@@ -14,7 +14,7 @@ export function StorefrontQueuePage() {
       eyebrow="Xác thực xưởng"
       title="Hàng Chờ Xác Thực Xưởng"
       accent="Năng Lực Chế Tác, Danh Tính & Ngân Hàng."
-      api="GET /api/admin/storefront-verifications"
+      api="GET /api/admin/seller-verifications"
       kpis={(r) => [
         { label: 'Chờ duyệt', value: r.filter((c) => c.status === 'PENDING').length, tone: 'orange' },
         { label: 'Cần bổ sung', value: r.filter((c) => c.status === 'NEEDS_INFO').length, tone: 'violet' },
@@ -53,7 +53,7 @@ export function StorefrontReviewPage() {
       code="MP 057"
       eyebrow="Thẩm định hồ sơ xưởng"
       titlePrefix="Hồ sơ xưởng"
-      api="POST /api/admin/storefront-verifications/{id}/decision"
+      api="PATCH /api/admin/users/{id}/seller-verification"
       closed={(c) => c.status === 'VERIFIED' || c.status === 'REJECTED'}
       main={(c) => (
         <>
@@ -64,7 +64,7 @@ export function StorefrontReviewPage() {
                 { label: 'Chủ xưởng', value: val(c, 'owner') },
                 { label: 'Mã người dùng', value: val(c, 'ownerId') },
                 { label: 'Vị trí', value: val(c, 'location') },
-                { label: 'Thiết bị', value: val(c, 'equipment') },
+                { label: 'Điều kiện', value: val(c, 'eligible') },
                 { label: 'Công nghệ', value: val(c, 'tech') },
                 { label: 'Email / SĐT', value: `${val(c, 'email')} · ${val(c, 'phone')}` },
               ]}
@@ -72,9 +72,15 @@ export function StorefrontReviewPage() {
           </Section>
           <Section n={2} title="Thư viện minh chứng đính kèm">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {(c.evidence ?? []).map((e) => (
-                <MediaTile key={e} label={e} icon={/pdf/i.test(e) ? FileText : Camera} tone="violet" />
-              ))}
+              {(c.evidence ?? []).map((e) =>
+                /^https?:/.test(e) ? (
+                  <a key={e} href={e} target="_blank" rel="noreferrer" className="break-all rounded-2xl bg-surface-low p-3 text-sm text-violet underline sm:col-span-4">
+                    {e}
+                  </a>
+                ) : (
+                  <MediaTile key={e} label={e} icon={/pdf/i.test(e) ? FileText : Camera} tone="violet" />
+                ),
+              )}
             </div>
           </Section>
           <BankVerifyPanel />
@@ -88,10 +94,8 @@ export function StorefrontReviewPage() {
         </Section>
       )}
       decisions={[
-        { value: 'approve', label: 'Phê duyệt & mở gian hàng', status: 'VERIFIED' },
-        { value: 'info', label: 'Yêu cầu bổ sung hồ sơ', status: 'NEEDS_INFO' },
-        { value: 'lock', label: 'Tạm khoá kiểm tra an ninh', status: 'LOCKED', tone: 'danger' },
-        { value: 'reject', label: 'Từ chối hồ sơ', status: 'REJECTED', tone: 'danger' },
+        { value: 'approve', label: 'Phê duyệt người bán', status: 'VERIFIED' },
+        { value: 'reject', label: 'Từ chối (ghi lý do để bổ sung)', status: 'REJECTED', tone: 'danger' },
       ]}
       checklist={['Đã đối chiếu ảnh xưởng thực tế', 'Đã kiểm tra tên chủ tài khoản ngân hàng', 'Email & SĐT đã xác thực']}
     />

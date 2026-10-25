@@ -3,25 +3,27 @@ import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { formatDateTime } from '../../../shared/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
-import { ApiNote, Breadcrumbs } from '../../../shared/ui/primitives'
+import { Breadcrumbs } from '../../../shared/ui/primitives'
+import { PackagesPanel } from '../components/PackagesPanel'
 import { QueryState } from '../../../shared/ui/QueryState'
 import {
   OrderItemRow,
   OrderMoney,
   OrderStatusBadge,
   OrderTimeline,
+  displayOrderCode,
   orderCode,
   ShipmentStatusBadge,
   StorefrontLabel,
 } from '../components/OrderParts'
 import { SellerOrderActions, ShipmentEventActions } from '../components/SellerActions'
-import { useSellerOrders, useSellerShipments } from '../hooks/useOrders'
+import { useOrder, useSellerShipments } from '../hooks/useOrders'
 
-/** MP 048 · Chi Tiết Đơn Chế Tác & Vận Chuyển (người bán). */
+/** MP 048 · Chi Tiết Đơn Chế Tác & Vận Chuyển (người bán) — GET /api/orders/{id}. */
 export function SellerOrderDetailPage() {
   const orderId = Number(useParams().orderId)
-  const orders = useSellerOrders()
-  const order = orders.data?.find((o) => o.id === orderId)
+  const orders = useOrder(orderId)
+  const order = orders.data
   const shipments = useSellerShipments(order ? orderId : undefined)
 
   useEffect(() => {
@@ -45,7 +47,7 @@ export function SellerOrderDetailPage() {
                     </Link>
                   ),
                 },
-                { label: orderCode(order.id) },
+                { label: displayOrderCode(order) },
               ]}
             />
             <Link
@@ -58,7 +60,7 @@ export function SellerOrderDetailPage() {
 
           <section className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-[2rem] bg-white/95 p-6 shadow-soft">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="font-display text-3xl font-bold">{orderCode(order.id)}</h1>
+              <h1 className="font-display text-3xl font-bold">{displayOrderCode(order)}</h1>
               <StorefrontLabel id={order.storefrontId} />
               <OrderStatusBadge status={order.status} />
             </div>
@@ -85,6 +87,8 @@ export function SellerOrderDetailPage() {
                   ))}
                 </ul>
               </section>
+
+              <PackagesPanel order={order} />
 
               <section className="rounded-[2rem] bg-white/95 p-6 shadow-soft">
                 <div className="flex items-center justify-between gap-2">
@@ -137,7 +141,14 @@ export function SellerOrderDetailPage() {
                 <h2 className="inline-flex items-center gap-2 font-display text-lg font-bold">
                   <MapPin size={17} className="text-orange" /> Người nhận
                 </h2>
-                <ApiNote className="mt-3">OrderResponse chưa trả tên / SĐT / địa chỉ người nhận cho người bán.</ApiNote>
+                <p className="mt-3 whitespace-pre-line rounded-2xl bg-surface-low p-4 text-sm">
+                  {order.shippingAddressSnapshot || 'Đơn không lưu bản chụp địa chỉ.'}
+                </p>
+                {!!order.shippingWeightGrams && (
+                  <p className="mt-2 text-xs text-ink-soft">
+                    {order.shippingPackageCount ?? 0} kiện · {order.shippingWeightGrams} g
+                  </p>
+                )}
               </section>
             </aside>
           </div>

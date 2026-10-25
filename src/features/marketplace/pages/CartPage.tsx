@@ -241,10 +241,7 @@ function CartContent({ items }: { items: CartItem[] }) {
           )
         })}
         {hasUnknown && (
-          <ApiNote>
-            CartItemResponse chưa có storefrontId/productId nên giỏ tự nhận diện xưởng từ các sản phẩm bạn đã xem. Đề
-            xuất Backend trả thêm các trường này.
-          </ApiNote>
+          <ApiNote>Một số món chưa có storefrontId trong CartItemResponse nên chưa xác định được xưởng.</ApiNote>
         )}
 
         {unavailable.length > 0 && (
@@ -365,6 +362,7 @@ function CartContent({ items }: { items: CartItem[] }) {
 
 function CartRow({ item, checked, onCheck }: { item: CartItem; checked: boolean; onCheck: (on: boolean) => void }) {
   const info = useVariantIndexStore((s) => s.variants[item.variantId])
+  const productId = item.productId ?? info?.productId
   const update = useUpdateCartItem()
   const remove = useRemoveCartItem()
   const acknowledge = useAcknowledgePrice()
@@ -376,8 +374,8 @@ function CartRow({ item, checked, onCheck }: { item: CartItem; checked: boolean;
       <Checkbox checked={checked} onChange={onCheck} label={`Chọn ${item.productTitle}`} />
       <Thumb item={item} />
       <div className="min-w-0 flex-1">
-        {info ? (
-          <Link to={`/${info.productId}`} className="font-display text-lg font-bold hover:text-violet">
+        {productId ? (
+          <Link to={`/${productId}`} className="font-display text-lg font-bold hover:text-violet">
             {item.productTitle}
           </Link>
         ) : (
@@ -438,10 +436,12 @@ function CartRow({ item, checked, onCheck }: { item: CartItem; checked: boolean;
 
 function Thumb({ item, dim = false }: { item: CartItem; dim?: boolean }) {
   const info = useVariantIndexStore((s) => s.variants[item.variantId])
+  const image = item.thumbnailUrl ?? info?.image
+  const seed = item.productId ?? info?.productId
   return (
     <div className={`relative h-20 w-20 shrink-0 ${dim ? 'grayscale' : ''}`}>
-      {info ? (
-        <ProductMedia src={info.image} alt="" seed={info.productId} className="h-full w-full rounded-2xl" />
+      {image || seed ? (
+        <ProductMedia src={image ?? undefined} alt="" seed={seed ?? item.variantId} className="h-full w-full rounded-2xl" />
       ) : (
         <div className="grid h-full w-full place-items-center rounded-2xl bg-gradient-to-br from-violet-soft to-peach text-ink-soft">
           <ShoppingBag size={22} />

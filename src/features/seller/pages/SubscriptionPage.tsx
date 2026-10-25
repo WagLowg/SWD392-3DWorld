@@ -1,7 +1,7 @@
 import { Check, CreditCard, Crown } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { formatDate, formatDateTime, formatVnd } from '../../../shared/format'
-import { Btn, DataTable, Hero, MockNotice, RuleBox, Section, StatusPill } from '../../../shared/ui/kit'
+import { Btn, DataTable, Hero, RuleBox, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { useRenew, useSubscription } from '../hooks/useSeller'
 import { PAYMENT_STATUS, STOREFRONT_STATUS } from '../lib/status'
@@ -18,7 +18,6 @@ export function SubscriptionPage() {
 
   return (
     <>
-      <MockNotice api="/api/seller/subscription" />
       <Hero
         code="MP 039"
         eyebrow="Thuê bao xưởng"
@@ -42,7 +41,8 @@ export function SubscriptionPage() {
                     </p>
                     <p className="mt-2 font-display text-3xl font-bold">{current?.name}</p>
                     <p className="mt-1 text-sm text-white/80">
-                      Hết hạn {formatDate(s.expiresAt)} · {daysLeft > 0 ? `còn ${daysLeft} ngày` : 'đã hết hạn'} · phí sàn {current?.commission}%
+                      Hết hạn {formatDate(s.expiresAt)} · {daysLeft > 0 ? `còn ${daysLeft} ngày` : 'đã hết hạn / chưa kích hoạt'}
+                      {current?.commission !== undefined && ` · phí sàn ${current.commission}%`}
                     </p>
                   </div>
                   <div className="self-center">
@@ -69,7 +69,7 @@ export function SubscriptionPage() {
                           {formatVnd(p.price)}
                           <span className="text-sm font-normal text-ink-soft"> / {p.period}</span>
                         </p>
-                        <p className="mt-1 text-sm text-violet">Phí hoa hồng {p.commission}%</p>
+                        {p.commission !== undefined && <p className="mt-1 text-sm text-violet">Phí hoa hồng {p.commission}%</p>}
                         <ul className="mt-4 space-y-1.5 text-sm">
                           {p.perks.map((perk) => (
                             <li key={perk} className="flex items-center gap-2">
@@ -85,11 +85,18 @@ export function SubscriptionPage() {
                 <Section title="Gia hạn sớm (+1 tháng)" className="mt-6">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <p className="text-sm text-ink-soft">
-                      Gia hạn <strong className="text-ink">{plan.name}</strong> — cộng thêm 30 ngày vào ngày hết hạn hiện tại. Thanh toán qua ZaloPay.
+                      Gia hạn <strong className="text-ink">{plan.name}</strong> — cộng thêm 1 tháng lịch sau khi ZaloPay xác nhận thanh toán.
                     </p>
-                    <Btn variant="primary" icon={CreditCard} disabled={renew.isPending} onClick={() => renew.mutate(plan.id)}>
-                      Thanh toán gia hạn ({formatVnd(plan.price)})
-                    </Btn>
+                    <div className="flex flex-wrap gap-2">
+                      {s.history.some((h) => h.status === 'PENDING') && (
+                        <Btn href="/marketplace/payment/result?type=subscription" variant="white">
+                          Kiểm tra thanh toán đang chờ
+                        </Btn>
+                      )}
+                      <Btn variant="primary" icon={CreditCard} disabled={renew.isPending} onClick={() => renew.mutate(plan.id)}>
+                        Thanh toán gia hạn ({formatVnd(plan.price)})
+                      </Btn>
+                    </div>
                   </div>
                 </Section>
 

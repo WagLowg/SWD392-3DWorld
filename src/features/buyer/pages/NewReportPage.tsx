@@ -1,8 +1,8 @@
-import { Upload } from 'lucide-react'
+import { Link2 } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { inputClass } from '../../../shared/ui/form'
-import { Btn, DetailLayout, Hero, MockNotice, Section } from '../../../shared/ui/kit'
+import { Btn, DetailLayout, Hero, Section } from '../../../shared/ui/kit'
 import type { ViolationReport } from '../data/buyer.fixtures'
 import { useCreateReport } from '../hooks/useBuyer'
 import { TARGET_TYPE } from '../lib/status'
@@ -20,7 +20,9 @@ export function NewReportPage() {
     target: params.get('target') ?? '',
     reason: '',
     description: '',
+    evidence: '',
   })
+  const presetId = Number(params.get('productId')) || undefined
   useEffect(() => {
     document.title = 'Báo cáo vi phạm mới · 3DWorld'
   }, [])
@@ -28,7 +30,6 @@ export function NewReportPage() {
 
   return (
     <>
-      <MockNotice api="POST /api/reports" />
       <Hero code="MP 033" eyebrow="Báo cáo vi phạm" title="Tạo Báo Cáo Vi Phạm" accent="Bảo Vệ Cộng Đồng & Bản Quyền 3D." />
       <DetailLayout
         main={
@@ -48,7 +49,9 @@ export function NewReportPage() {
                 ))}
               </div>
               <label htmlFor={`${uid}-t`} className="mt-4 block">
-                <span className="mb-1 block font-label text-xs font-semibold text-ink-soft">Tên / mã đối tượng * (vd. prd_9941, tên xưởng)</span>
+                <span className="mb-1 block font-label text-xs font-semibold text-ink-soft">
+                  {form.targetType === 'USER' ? 'Mã người dùng * (vd. 15)' : 'Mã sản phẩm * (vd. prd_9941 hoặc 9941)'}
+                </span>
                 <input id={`${uid}-t`} value={form.target} onChange={(e) => setForm({ ...form, target: e.target.value })} className={inputClass} />
               </label>
             </Section>
@@ -66,10 +69,23 @@ export function NewReportPage() {
                 <span className="mb-1 block font-label text-xs font-semibold text-ink-soft">Mô tả (≥ 30 ký tự) — nêu nguồn gốc bản quyền nếu có</span>
                 <textarea id={`${uid}-d`} rows={5} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputClass} />
               </label>
-              <div className="mt-4 grid place-items-center rounded-2xl border-2 border-dashed border-line p-6 text-sm text-ink-soft">
-                <Upload size={20} />
-                <span className="mt-1">Đính kèm bằng chứng (chờ API lưu tệp)</span>
-              </div>
+              <label htmlFor={`${uid}-e`} className="mt-4 block">
+                <span className="mb-1 flex items-center gap-1.5 font-label text-xs font-semibold text-ink-soft">
+                  <Link2 size={13} /> Link bằng chứng (tuỳ chọn)
+                </span>
+                <input
+                  id={`${uid}-e`}
+                  value={form.evidence}
+                  placeholder="https://…"
+                  onChange={(e) => setForm({ ...form, evidence: e.target.value })}
+                  className={inputClass}
+                />
+              </label>
+              {form.targetType === 'STOREFRONT' && (
+                <p className="mt-3 rounded-2xl bg-peach/60 p-3 text-xs text-orange-deep">
+                  API hiện chỉ nhận báo cáo theo sản phẩm hoặc người dùng — hãy báo cáo sản phẩm cụ thể của gian hàng.
+                </p>
+              )}
             </Section>
           </>
         }
@@ -81,7 +97,12 @@ export function NewReportPage() {
               <li>3. Bạn nhận thông báo kết quả xử lý.</li>
             </ol>
             <div className="mt-4">
-              <Btn variant="primary" disabled={!ok || create.isPending} onClick={() => create.mutate(form, { onSuccess: (r) => navigate(`/reports/${r.id}`) })}>
+              <Btn variant="primary" disabled={!ok || create.isPending} onClick={() =>
+                  create.mutate(
+                    { ...form, targetId: form.targetType === 'PRODUCT' ? presetId : undefined },
+                    { onSuccess: (r) => navigate(`/reports/${r.id}`) },
+                  )
+                }>
                 Gửi báo cáo cho bộ phận thẩm định
               </Btn>
             </div>

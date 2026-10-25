@@ -43,12 +43,16 @@ export function StatusPill({ status, map }: { status: string; map: Record<string
 /* ------------------------------------------------------------- mock note */
 
 /** Nhãn bắt buộc trên mọi màn dùng dữ liệu mẫu (chưa có API). */
-export function MockNotice({ api }: { api?: string }) {
+export function MockNotice({ api, partial }: { api?: string; partial?: string }) {
   return (
     <div className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border border-dashed border-violet/40 bg-violet-soft/40 px-4 py-2.5 font-label text-xs text-violet">
       <FlaskConical size={14} />
-      <strong>Dữ liệu mẫu</strong>
-      <span className="text-ink-soft">— màn này chưa có API trong OpenAPI; thao tác chỉ thay đổi dữ liệu mẫu trên trình duyệt.</span>
+      <strong>{partial ? 'Một phần dữ liệu mẫu' : 'Dữ liệu mẫu'}</strong>
+      <span className="text-ink-soft">
+        {partial
+          ? `— ${partial} chưa có API trong OpenAPI nên đang là dữ liệu mẫu; phần còn lại dùng API thật.`
+          : '— màn này chưa có API trong OpenAPI; thao tác chỉ thay đổi dữ liệu mẫu trên trình duyệt.'}
+      </span>
       {api && <code className="rounded bg-white/70 px-1.5 py-0.5 text-[11px] text-ink">Cần API: {api}</code>}
     </div>
   )

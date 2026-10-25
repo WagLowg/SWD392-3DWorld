@@ -28,7 +28,7 @@ export function SellerDashboardPage() {
 
   return (
     <>
-      <MockNotice api="/api/seller/dashboard" />
+      <MockNotice partial="Doanh thu, ví và tranh chấp" api="/api/seller/earnings, /api/seller/disputes" />
       <Hero
         code="MP 041"
         eyebrow="Kênh người bán"
@@ -97,7 +97,9 @@ export function SellerDashboardPage() {
                   <div className="min-w-0 flex-1">
                     <p className="font-display font-bold">{storefront.data.name}</p>
                     <p className="text-xs text-ink-soft">
-                      ★ {storefront.data.rating} · {storefront.data.reviewCount} đánh giá
+                      {storefront.data.expiresAt
+                        ? `Gói đến ${new Date(storefront.data.expiresAt).toLocaleDateString('vi-VN')}`
+                        : 'Chưa kích hoạt gói'}
                     </p>
                   </div>
                   <StatusPill status={sub.data.subscription.status} map={STOREFRONT_STATUS} />

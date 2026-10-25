@@ -1,13 +1,14 @@
-import { Eye, EyeOff, Star, Store, Users } from 'lucide-react'
+import { CalendarClock, CreditCard, Eye, ShieldCheck, Store } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
+import { formatDate } from '../../../shared/format'
 import { inputClass } from '../../../shared/ui/form'
-import { Btn, DetailLayout, Hero, KeyValues, MockNotice, Section, StatusPill } from '../../../shared/ui/kit'
+import { Btn, DetailLayout, Hero, KeyValues, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import type { Storefront } from '../data/seller.fixtures'
-import { useStorefront, useUpdateStorefront } from '../hooks/useSeller'
+import { useCreateStorefront, useStorefront, useUpdateStorefront } from '../hooks/useSeller'
 import { STOREFRONT_STATUS } from '../lib/status'
 
-/** MP 040 · Hồ Sơ Gian Hàng */
+/** MP 040 · Hồ Sơ Gian Hàng — GET/PATCH /api/storefronts/me, POST /api/storefronts */
 export function StorefrontProfilePage() {
   const q = useStorefront()
   useEffect(() => {
@@ -15,20 +16,67 @@ export function StorefrontProfilePage() {
   }, [])
   return (
     <>
-      <MockNotice api="/api/seller/storefront" />
       <Hero code="MP 040" eyebrow="Gian hàng" title="Hồ Sơ Gian Hàng" accent="Nhận Diện Xưởng Trên Chợ Đồ Chơi." />
       <QueryState isLoading={q.isLoading} error={q.error}>
-        {q.data && <Editor store={q.data} />}
+        {q.data ? <Editor store={q.data} /> : q.isSuccess && <CreateForm />}
       </QueryState>
     </>
+  )
+}
+
+function CreateForm() {
+  const uid = useId()
+  const create = useCreateStorefront()
+  const [form, setForm] = useState({ name: '', description: '' })
+  return (
+    <Section title="Tạo gian hàng" className="mt-6">
+      <p className="text-sm text-ink-soft">
+        Tài khoản chưa có gian hàng. Bạn cần được duyệt xác thực người bán trước; gian hàng mới tạo ở trạng thái chưa kích
+        hoạt cho tới khi thanh toán gói thuê bao.
+      </p>
+      <div className="mt-4 grid gap-4">
+        <label htmlFor={`${uid}-n`} className="block">
+          <span className="mb-1.5 block font-label text-xs font-semibold text-ink-soft">Tên gian hàng *</span>
+          <input
+            id={`${uid}-n`}
+            value={form.name}
+            maxLength={255}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className={inputClass}
+          />
+        </label>
+        <label htmlFor={`${uid}-d`} className="block">
+          <span className="mb-1.5 block font-label text-xs font-semibold text-ink-soft">Giới thiệu xưởng</span>
+          <textarea
+            id={`${uid}-d`}
+            rows={4}
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            className={inputClass}
+          />
+        </label>
+      </div>
+      <div className="mt-5 flex flex-wrap justify-end gap-2">
+        <Btn to="/seller/register" variant="white">
+          Xem hồ sơ xác thực
+        </Btn>
+        <Btn
+          variant="primary"
+          disabled={form.name.trim().length < 3 || create.isPending}
+          onClick={() => create.mutate({ name: form.name.trim(), description: form.description.trim() || undefined })}
+        >
+          Tạo gian hàng
+        </Btn>
+      </div>
+    </Section>
   )
 }
 
 function Editor({ store }: { store: Storefront }) {
   const uid = useId()
   const update = useUpdateStorefront()
-  const [form, setForm] = useState({ name: store.name, slogan: store.slogan, description: store.description })
-  const dirty = form.name !== store.name || form.slogan !== store.slogan || form.description !== store.description
+  const [form, setForm] = useState({ name: store.name, description: store.description })
+  const dirty = form.name !== store.name || form.description !== store.description
 
   return (
     <DetailLayout
@@ -42,7 +90,7 @@ function Editor({ store }: { store: Storefront }) {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="font-display text-2xl font-bold">{form.name}</p>
-                <p className="text-sm text-ink-soft">{form.slogan}</p>
+                <p className="line-clamp-1 text-sm text-ink-soft">{form.description}</p>
               </div>
               <StatusPill status={store.status} map={STOREFRONT_STATUS} />
             </div>
@@ -51,54 +99,69 @@ function Editor({ store }: { store: Storefront }) {
             <div className="grid gap-4">
               <label htmlFor={`${uid}-n`} className="block">
                 <span className="mb-1.5 block font-label text-xs font-semibold text-ink-soft">Tên gian hàng công khai *</span>
-                <input id={`${uid}-n`} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass} />
-              </label>
-              <label htmlFor={`${uid}-s`} className="block">
-                <span className="mb-1.5 block font-label text-xs font-semibold text-ink-soft">Khẩu hiệu / slogan</span>
-                <input id={`${uid}-s`} value={form.slogan} onChange={(e) => setForm({ ...form, slogan: e.target.value })} className={inputClass} />
+                <input
+                  id={`${uid}-n`}
+                  value={form.name}
+                  maxLength={255}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className={inputClass}
+                />
               </label>
               <label htmlFor={`${uid}-d`} className="block">
                 <span className="mb-1.5 block font-label text-xs font-semibold text-ink-soft">Giới thiệu chi tiết xưởng</span>
-                <textarea id={`${uid}-d`} rows={5} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputClass} />
+                <textarea
+                  id={`${uid}-d`}
+                  rows={5}
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  className={inputClass}
+                />
               </label>
             </div>
             <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <Btn href={`/marketplace/store/${store.id}`} variant="white" icon={Eye}>
+              <Btn href={`/marketplace/shop/${store.id}`} variant="white" icon={Eye}>
                 Xem gian hàng công khai
               </Btn>
-              <Btn variant="primary" disabled={!dirty || form.name.trim().length < 3 || update.isPending} onClick={() => update.mutate(form)}>
+              <Btn
+                variant="primary"
+                disabled={!dirty || form.name.trim().length < 3 || update.isPending}
+                onClick={() => update.mutate(form)}
+              >
                 Lưu hồ sơ gian hàng
               </Btn>
             </div>
           </Section>
         </>
       }
-      aside={
-        <>
-          <Section title="Chỉ số gian hàng">
+      aside={<Section title="Trạng thái gian hàng">
             <KeyValues
               items={[
-                { label: 'Đánh giá', value: <span className="inline-flex items-center gap-1"><Star size={14} className="text-orange" /> {store.rating}</span> },
-                { label: 'Lượt đánh giá', value: store.reviewCount },
-                { label: 'Người theo dõi', value: <span className="inline-flex items-center gap-1"><Users size={14} /> {store.followers.toLocaleString('vi-VN')}</span> },
-                { label: 'Sản phẩm', value: store.productCount },
+                { label: 'Mã gian hàng', value: `storefront_${store.id}` },
+                {
+                  label: 'Xác thực',
+                  value: (
+                    <span className="inline-flex items-center gap-1">
+                      <ShieldCheck size={14} className="text-violet" /> {store.verificationStatus ?? '—'}
+                    </span>
+                  ),
+                },
+                {
+                  label: 'Gói đến',
+                  value: (
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarClock size={14} /> {store.expiresAt ? formatDate(store.expiresAt) : 'Chưa kích hoạt'}
+                    </span>
+                  ),
+                },
+                { label: 'Nhận đơn', value: store.available ? 'Đang mở' : 'Tạm ngừng' },
               ]}
             />
-          </Section>
-          <Section title="Hiển thị trên chợ">
-            <p className="text-sm text-ink-soft">Tạm ẩn khi bảo trì xưởng — đơn đang xử lý không bị ảnh hưởng.</p>
-            <div className="mt-3">
-              <Btn
-                variant={store.hidden ? 'orange' : 'soft'}
-                icon={store.hidden ? Eye : EyeOff}
-                onClick={() => update.mutate({ hidden: !store.hidden })}
-              >
-                {store.hidden ? 'Mở lại gian hàng' : 'Tạm ẩn khỏi chợ'}
+            <div className="mt-4">
+              <Btn to="/seller/subscription" icon={CreditCard} variant={store.available ? 'soft' : 'primary'}>
+                {store.expiresAt ? 'Gia hạn gói' : 'Thanh toán để kích hoạt'}
               </Btn>
             </div>
-          </Section>
-        </>
-      }
+          </Section>}
     />
   )
 }

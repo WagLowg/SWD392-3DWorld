@@ -1,14 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ImagePlus, Plus, Trash2 } from 'lucide-react'
-import { useEffect, useId } from 'react'
+import { ImagePlus, Plus, Trash2, X } from 'lucide-react'
+import { useEffect, useId, useRef } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { useNavigate, useParams } from 'react-router-dom'
 import { z } from 'zod'
 import { Field, FormError, inputClass } from '../../../shared/ui/form'
-import { Btn, DetailLayout, Hero, MockNotice, Section, StatusPill } from '../../../shared/ui/kit'
+import { Btn, DetailLayout, Hero, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import type { SellerProduct } from '../data/seller.fixtures'
-import { useSaveProduct, useSellerProduct } from '../hooks/useSeller'
+import { resolveMediaUrl } from '../../marketplace/lib/format'
+import { useRemoveProductMedia, useSaveProduct, useSellerProduct, useUploadProductMedia } from '../hooks/useSeller'
 import { PRODUCT_STATUS } from '../lib/status'
 
 const CATEGORIES = [
@@ -52,7 +53,6 @@ export function ProductEditorPage() {
 
   return (
     <>
-      <MockNotice api={id ? 'PUT /api/seller/products/{id}' : 'POST /api/seller/products'} />
       <Hero
         code={id ? 'MP 044' : 'MP 043'}
         eyebrow={id ? 'Chỉnh sửa mẫu phôi' : 'Khởi tạo mẫu mới'}
@@ -67,6 +67,61 @@ export function ProductEditorPage() {
         <EditorForm />
       )}
     </>
+  )
+}
+
+function MediaManager({ product }: { product: SellerProduct }) {
+  const input = useRef<HTMLInputElement>(null)
+  const upload = useUploadProductMedia()
+  const remove = useRemoveProductMedia()
+  const items = product.mediaItems ?? []
+  const busy = upload.isPending || remove.isPending
+
+  const onFiles = async (files: FileList | null) => {
+    if (!files) return
+    let order = items.length
+    for (const file of Array.from(files)) {
+      if (!/^image\/(jpeg|png)$/.test(file.type) || file.size > 5 * 1024 * 1024) continue
+      await upload.mutateAsync({ productId: product.id, file, sortOrder: order++ }).catch(() => undefined)
+    }
+    if (input.current) input.current.value = ''
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {items.map((m, i) => (
+        <div key={m.id} className="relative aspect-square overflow-hidden rounded-2xl bg-surface-low">
+          <img src={resolveMediaUrl(m.url)} alt={`Ảnh ${i + 1}`} className="h-full w-full object-cover" />
+          <button
+            type="button"
+            aria-label={`Gỡ ảnh ${i + 1}`}
+            disabled={busy}
+            onClick={() => remove.mutate({ productId: product.id, mediaId: m.id })}
+            className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-white/90 text-danger shadow disabled:opacity-40"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => input.current?.click()}
+        className="grid aspect-square place-items-center rounded-2xl border-2 border-dashed border-line text-center text-xs text-ink-soft hover:border-violet disabled:opacity-50"
+      >
+        <span className="flex flex-col items-center gap-1">
+          <ImagePlus size={20} /> {upload.isPending ? 'Đang tải…' : 'Thêm ảnh'}
+        </span>
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept="image/jpeg,image/png"
+        multiple
+        hidden
+        onChange={(e) => onFiles(e.target.files)}
+      />
+    </div>
   )
 }
 
@@ -116,7 +171,7 @@ function EditorForm({ product }: { product?: SellerProduct }) {
             })),
           },
         },
-        { onSuccess: (p) => p && navigate(`/seller/products/${p.id}`) },
+        { onSuccess: (p) => p && navigate(send ? `/seller/products/${p.id}` : `/seller/products/${p.id}/edit`) },
       )
     })
 
@@ -157,21 +212,14 @@ function EditorForm({ product }: { product?: SellerProduct }) {
               </div>
             </Section>
 
-            <Section n={2} title="Hình ảnh chế tác" subtitle="Ảnh chụp mẫu in thực tế (không dùng ảnh render).">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {Array.from({ length: product?.media ?? 0 }, (_, i) => `media-${i}`).map((k, i) => (
-                  <div key={k} className="grid aspect-square place-items-center rounded-2xl bg-gradient-to-br from-violet-soft to-peach font-label text-xs text-ink-soft">
-                    Ảnh {i + 1}
-                  </div>
-                ))}
-                <div className="grid aspect-square place-items-center rounded-2xl border-2 border-dashed border-line text-center text-xs text-ink-soft">
-                  <span className="flex flex-col items-center gap-1">
-                    <ImagePlus size={20} /> Thêm ảnh
-                    <br />
-                    (chờ API tải ảnh)
-                  </span>
-                </div>
-              </div>
+            <Section n={2} title="Hình ảnh chế tác" subtitle="Ảnh chụp mẫu in thực tế (JPEG/PNG ≤ 5 MB, không dùng ảnh render).">
+              {product ? (
+                <MediaManager product={product} />
+              ) : (
+                <p className="rounded-2xl bg-surface-low p-4 text-sm text-ink-soft">
+                  Lưu bản nháp trước, sau đó tải ảnh lên. Cần ít nhất 1 ảnh để gửi duyệt.
+                </p>
+              )}
             </Section>
 
             <Section n={3} title="Biến thể & tồn kho" subtitle="Mỗi biến thể là một SKU với giá và kho riêng.">

@@ -1,17 +1,28 @@
 import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
 import { auditLogs, cases, commissionRows, type OpsDomain, platformEarnings, platformLedger } from '../data/ops.fixtures'
+import { adminOpsApi, REAL_OPS_DOMAINS } from './ops.api'
 
 /**
- * Service vận hành / quản trị — DỮ LIỆU MẪU.
- * TODO(API): /api/admin/** (hàng chờ xác thực xưởng, kiểm duyệt, báo cáo, trọng tài, đối soát, chi trả, người dùng, audit logs).
- * Riêng duyệt tài khoản ngân hàng đã có API thật: PATCH /api/admin/bank-accounts/{id}/verification.
+ * Service vận hành / quản trị.
+ * - API THẬT: kiểm duyệt sản phẩm, báo cáo vi phạm, xác thực người bán (xem ops.api.ts),
+ *   duyệt tài khoản ngân hàng (BankVerifyPanel).
+ * - DỮ LIỆU MẪU: đơn/vận đơn vận hành, COD, hoàn tiền, tài chính, trọng tài, audit logs.
  */
 export const opsService = {
-  list: (domain: OpsDomain) => mockResponse(cases.filter((c) => c.domain === domain)),
+  list: (domain: OpsDomain) =>
+    REAL_OPS_DOMAINS.has(domain) ? adminOpsApi.list(domain) : mockResponse(cases.filter((c) => c.domain === domain)),
   all: () => mockResponse(cases),
-  get: (domain: OpsDomain, id: string) => mockFind(cases, (c) => c.domain === domain && c.id === id, 'Hồ sơ'),
+  get: (domain: OpsDomain, id: string) =>
+    REAL_OPS_DOMAINS.has(domain)
+      ? adminOpsApi.get(domain, id)
+      : mockFind(cases, (c) => c.domain === domain && c.id === id, 'Hồ sơ'),
 
-  decide(domain: OpsDomain, id: string, decision: string, status: string, reason: string) {
+  async decide(domain: OpsDomain, id: string, decision: string, status: string, reason: string) {
+    if (REAL_OPS_DOMAINS.has(domain)) {
+      const c = await adminOpsApi.get(domain, id)
+      await adminOpsApi.decide(c, status, reason)
+      return adminOpsApi.get(domain, id).catch(() => ({ ...c, status }))
+    }
     const c = cases.find((x) => x.domain === domain && x.id === id)
     if (c) {
       c.status = status

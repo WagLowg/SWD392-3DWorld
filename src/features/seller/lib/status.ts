@@ -8,6 +8,7 @@ export const PRODUCT_STATUS: Map = {
   DRAFT: { label: 'Bản nháp', tone: 'neutral' },
   REJECTED: { label: 'Bị từ chối', tone: 'danger' },
   HIDDEN: { label: 'Tạm ẩn', tone: 'orange' },
+  ARCHIVED: { label: 'Đã lưu trữ', tone: 'neutral' },
 }
 
 export const APPLICATION_STATUS: Map = {
@@ -23,6 +24,7 @@ export const STOREFRONT_STATUS: Map = {
   EXPIRING: { label: 'Sắp hết hạn', tone: 'orange' },
   EXPIRED: { label: 'Hết hạn gói', tone: 'danger' },
   SUSPENDED: { label: 'Tạm đình chỉ', tone: 'danger' },
+  INACTIVE: { label: 'Chưa kích hoạt', tone: 'neutral' },
 }
 
 export const DISPUTE_STATUS: Map = {

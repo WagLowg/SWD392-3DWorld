@@ -4,10 +4,10 @@ import { useParams } from 'react-router-dom'
 import { formatVnd } from '../../../shared/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { inputClass } from '../../../shared/ui/form'
-import { Btn, DetailLayout, Hero, MockNotice, MoneyRows, Section } from '../../../shared/ui/kit'
+import { Btn, DetailLayout, Hero, MoneyRows, Section } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { OrderItemRow, OrderStatusBadge, orderCode } from '../../orders/components/OrderParts'
-import { useMyOrders } from '../../orders/hooks/useOrders'
+import { useOrder } from '../../orders/hooks/useOrders'
 import { useCancelRequest } from '../hooks/useBuyer'
 
 const REASONS = ['Đặt nhầm phiên bản / số lượng', 'Muốn đổi địa chỉ giao hàng', 'Thời gian chế tác quá lâu', 'Tìm được sản phẩm khác', 'Lý do khác']
@@ -18,25 +18,23 @@ const MATRIX = [
   { stage: 'Đã bàn giao ship', when: 'Đã có vận đơn', result: 'Không huỷ được — dùng yêu cầu hoàn tiền', tone: 'bg-[#ffdad6] text-danger' },
 ]
 
-/** MP 026 · Huỷ Đơn Hàng Con (đơn thật, yêu cầu huỷ là dữ liệu mẫu). */
+/** MP 026 · Huỷ Đơn Hàng Con — POST /api/orders/{id}/cancel (chỉ đơn chưa thanh toán). */
 export function CancelOrderPage() {
   const orderId = Number(useParams().orderId)
-  const orders = useMyOrders()
+  const orders = useOrder(orderId)
   const cancel = useCancelRequest()
   const uid = useId()
   const [reason, setReason] = useState('')
   const [detail, setDetail] = useState('')
   const [sent, setSent] = useState<string | null>(null)
-  const order = orders.data?.find((o) => o.id === orderId)
+  const order = orders.data
 
   useEffect(() => {
     document.title = `Huỷ đơn ${orderCode(orderId)} · 3DWorld`
   }, [orderId])
 
   return (
-    <>
-      <MockNotice api="POST /api/orders/{id}/cancel-request (người mua)" />
-      <QueryState isLoading={orders.isLoading} error={orders.error}>
+    <QueryState isLoading={orders.isLoading} error={orders.error}>
         {!order ? (
           <ErrorScreen kind="404" detail={`Không tìm thấy đơn ${orderCode(orderId)}.`} />
         ) : (
@@ -56,7 +54,7 @@ export function CancelOrderPage() {
                 sent ? (
                   <Section title="Đã gửi yêu cầu huỷ">
                     <p className="flex items-center gap-2 rounded-2xl bg-mint p-4 text-sm text-[#0f5132]">
-                      <CheckCircle2 size={18} /> Yêu cầu {sent} đã gửi tới xưởng. Bạn sẽ nhận thông báo khi xưởng phản hồi.
+                      <CheckCircle2 size={18} /> Đơn {sent} đã được huỷ, tồn kho giữ chỗ đã được giải phóng.
                     </p>
                     <div className="mt-4">
                       <Btn to={`/orders/${order.id}`}>Về chi tiết đơn</Btn>
@@ -69,9 +67,16 @@ export function CancelOrderPage() {
                         <OrderItemRow key={i.id} item={i} />
                       ))}
                     </ul>
-                    {['SHIPPED', 'DELIVERED', 'RECEIVED'].includes(order.status) ? (
+                    {order.status === 'CANCELLED' ? (
+                      <p className="mt-4 rounded-2xl bg-surface-low p-4 text-sm text-ink-soft">
+                        Đơn đã huỷ{order.cancellationReason ? ` — lý do: ${order.cancellationReason}` : ''}.
+                      </p>
+                    ) : !['CREATED', 'PENDING_PAYMENT'].includes(order.status) ? (
                       <p className="mt-4 flex gap-2 rounded-2xl bg-[#ffdad6] p-4 text-sm text-danger">
-                        <AlertTriangle size={16} className="shrink-0" /> Đơn đã bàn giao vận chuyển — không thể huỷ. Hãy dùng yêu cầu hoàn tiền sau khi nhận.
+                        <AlertTriangle size={16} className="shrink-0" /> Đơn đã thanh toán nên không huỷ trực tiếp được. Hãy dùng yêu cầu hoàn tiền.
+                        <Btn to={`/refunds/new?orderId=${order.id}`} size="sm">
+                          Yêu cầu hoàn tiền
+                        </Btn>
                       </p>
                     ) : (
                       <>
@@ -96,7 +101,7 @@ export function CancelOrderPage() {
                             disabled={!reason || cancel.isPending}
                             onClick={() => cancel.mutate({ orderId: order.id, reason: [reason, detail].filter(Boolean).join(' — ') }, { onSuccess: (r) => setSent(r.requestId) })}
                           >
-                            Gửi yêu cầu huỷ ({formatVnd(order.totalAmount)})
+                            {cancel.isPending ? 'Đang huỷ…' : `Huỷ đơn (${formatVnd(order.totalAmount)})`}
                           </Btn>
                         </div>
                       </>
@@ -120,6 +125,5 @@ export function CancelOrderPage() {
           </>
         )}
       </QueryState>
-    </>
   )
 }

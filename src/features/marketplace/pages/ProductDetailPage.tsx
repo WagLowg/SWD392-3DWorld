@@ -9,6 +9,7 @@ import {
   Package,
   ShieldCheck,
   ShoppingCart,
+  Star,
   Store,
   Truck,
 } from 'lucide-react'
@@ -18,11 +19,19 @@ import { ApiClientError } from '../../../shared/api'
 import { ProductCard } from '../components/ProductCard'
 import { ProductMedia } from '../components/ProductMedia'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
-import { ApiNote, Breadcrumbs, QuantityStepper, StockBar } from '../../../shared/ui/primitives'
+import { Breadcrumbs, QuantityStepper, StockBar } from '../../../shared/ui/primitives'
 import { VariantPicker } from '../components/VariantPicker'
 import { useAddToCart } from '../hooks/useCart'
-import { useCatalog, useProductDetail } from '../hooks/useCatalog'
-import { activeVariants, categoryLabel, formatAttributes, formatVnd, resolveMediaUrl } from '../lib/format'
+import { useCatalog, useProductDetail, useProductReviews } from '../hooks/useCatalog'
+import {
+  activeVariants,
+  badgeLabel,
+  categoryLabel,
+  formatAttributes,
+  formatRating,
+  formatVnd,
+  resolveMediaUrl,
+} from '../lib/format'
 import { useMarketplaceUiStore } from '../stores/marketplace-ui.store'
 import type { ProductDetail, ProductVariant } from '../types/catalog.types'
 
@@ -94,6 +103,11 @@ function ProductView({ detail }: { detail: ProductDetail }) {
 
   const available = Math.max(0, selected?.available ?? 0)
   const soldOut = !selected || available <= 0
+  const shop = detail.storefront
+  const shopName = shop?.name || `Xưởng #${product.storefrontId}`
+  const shopClosed = shop?.available === false
+  const buyNowBlocked = detail.buyNowEligible === false || shopClosed
+  const reportHref = `/portal/reports/new?type=PRODUCT&productId=${product.id}&target=${encodeURIComponent(product.title)}`
 
   useEffect(() => setQuantity((q) => Math.min(Math.max(1, q), Math.max(1, available))), [available])
 
@@ -267,6 +281,11 @@ function ProductView({ detail }: { detail: ProductDetail }) {
                     {variants.length} phiên bản
                   </span>
                 )}
+                {product.badgeType && (
+                  <span className="rounded-full bg-butter px-3 py-1 font-label text-xs font-semibold text-[#6b4e00]">
+                    {badgeLabel(product.badgeType)}
+                  </span>
+                )}
               </div>
               <button
                 type="button"
@@ -286,6 +305,15 @@ function ProductView({ detail }: { detail: ProductDetail }) {
                 {formatAttributes(selected.attributes)}
               </p>
             )}
+            <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-label text-xs text-ink-soft">
+              <span className="inline-flex items-center gap-1">
+                <Star size={13} className={product.reviewCount ? 'fill-orange text-orange' : 'text-line'} />
+                {product.reviewCount
+                  ? `${formatRating(product.averageRating)} · ${product.reviewCount} đánh giá`
+                  : 'Chưa có đánh giá'}
+              </span>
+              {!!product.salesCount && <span>Đã bán {product.salesCount.toLocaleString('vi-VN')}</span>}
+            </p>
 
             {/* Xưởng */}
             <div className="mt-5 flex items-center gap-3 rounded-2xl bg-surface-low p-3">
@@ -293,14 +321,18 @@ function ProductView({ detail }: { detail: ProductDetail }) {
                 <Store size={20} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold">Xưởng #{product.storefrontId}</p>
-                <p className="font-label text-[11px] text-ink-soft">Xưởng chế tác trên 3DWorld</p>
+                <p className="font-semibold">{shopName}</p>
+                <p className="line-clamp-1 font-label text-[11px] text-ink-soft">
+                  {shopClosed ? 'Xưởng đang tạm ngừng nhận đơn' : shop?.description || 'Xưởng chế tác trên 3DWorld'}
+                </p>
               </div>
-              <span className="rounded-full bg-white px-3 py-1.5 font-label text-xs font-semibold text-violet opacity-50">
+              <Link
+                to={`/shop/${product.storefrontId}`}
+                className="rounded-full bg-white px-3 py-1.5 font-label text-xs font-semibold text-violet hover:bg-violet-soft"
+              >
                 Xem xưởng
-              </span>
+              </Link>
             </div>
-            <ApiNote className="mt-2">Tên, đánh giá và trang gian hàng (MP 004) chưa có trong API catalog.</ApiNote>
 
             {/* Giá */}
             <div className="mt-5 rounded-2xl bg-gradient-to-br from-peach/70 to-butter/60 p-5">
@@ -360,7 +392,8 @@ function ProductView({ detail }: { detail: ProductDetail }) {
               <button
                 type="button"
                 onClick={buyNow}
-                disabled={soldOut || isPending}
+                disabled={soldOut || isPending || buyNowBlocked}
+                title={buyNowBlocked ? 'Sản phẩm hiện chưa hỗ trợ mua ngay' : undefined}
                 className="inline-flex items-center justify-between gap-2 rounded-full bg-ink py-2 pl-6 pr-2 font-label text-sm font-semibold text-white hover:bg-violet disabled:opacity-40"
               >
                 Mua Ngay Vật Lý
@@ -373,9 +406,9 @@ function ProductView({ detail }: { detail: ProductDetail }) {
               <span className="inline-flex items-center gap-1.5 font-semibold text-teal">
                 <ShieldCheck size={14} /> Bảo vệ người mua 3DWorld
               </span>
-              <span className="inline-flex items-center gap-1.5 text-ink-soft" title="Chờ API báo cáo vi phạm">
-                <Flag size={13} /> Báo cáo sản phẩm vi phạm (sắp có)
-              </span>
+              <a href={reportHref} className="inline-flex items-center gap-1.5 text-ink-soft hover:text-danger">
+                <Flag size={13} /> Báo cáo sản phẩm vi phạm
+              </a>
             </div>
           </div>
         </div>
@@ -390,6 +423,7 @@ function ProductView({ detail }: { detail: ProductDetail }) {
 const TABS = [
   { id: 'story', label: 'Mô Tả & Nghệ Thuật Chế Tác' },
   { id: 'specs', label: 'Đặc Tả Kỹ Thuật' },
+  { id: 'reviews', label: 'Đánh Giá' },
   { id: 'shipping', label: 'Vận Chuyển & Quy Tắc' },
 ] as const
 
@@ -421,16 +455,18 @@ function DetailTabs({ detail, variants }: { detail: ProductDetail; variants: Pro
           <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
             <div>
               <h2 className="font-display text-2xl font-bold">{product.title}</h2>
-              <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">
-                <strong className="text-ink">{product.title}</strong> thuộc danh mục{' '}
-                <strong className="text-ink">{categoryLabel(product.category)}</strong>, được chế tác và đóng gói bởi
-                Xưởng #{product.storefrontId}. Hiện có {variants.length} phiên bản đang mở bán:{' '}
-                {variants.map((v) => formatAttributes(v.attributes) || v.sku).join('; ')}.
-              </p>
-              <ApiNote className="mt-4">
-                Mô tả chi tiết và câu chuyện chế tác của xưởng chưa có trong ProductDetail — sẽ hiển thị khi Backend bổ
-                sung trường mô tả.
-              </ApiNote>
+              {detail.description ? (
+                <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-ink-soft">
+                  {detail.description}
+                </p>
+              ) : (
+                <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">
+                  <strong className="text-ink">{product.title}</strong> thuộc danh mục{' '}
+                  <strong className="text-ink">{categoryLabel(product.category)}</strong>, được chế tác và đóng gói bởi{' '}
+                  {detail.storefront?.name || `Xưởng #${product.storefrontId}`}. Hiện có {variants.length} phiên bản
+                  đang mở bán: {variants.map((v) => formatAttributes(v.attributes) || v.sku).join('; ')}.
+                </p>
+              )}
             </div>
             <div className="rounded-[1.75rem] bg-surface-low p-6">
               <span className="rounded-full bg-peach px-3 py-1 font-label text-[11px] font-semibold text-orange-deep">
@@ -453,6 +489,11 @@ function DetailTabs({ detail, variants }: { detail: ProductDetail; variants: Pro
 
         {tab === 'specs' && (
           <div className="overflow-x-auto">
+            {detail.specifications && (
+              <p className="mb-6 whitespace-pre-line rounded-2xl bg-surface-low p-5 text-sm leading-relaxed">
+                {detail.specifications}
+              </p>
+            )}
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead className="font-label text-xs uppercase tracking-wider text-ink-soft">
                 <tr className="border-b border-line">
@@ -498,8 +539,15 @@ function DetailTabs({ detail, variants }: { detail: ProductDetail; variants: Pro
           </div>
         )}
 
+        {tab === 'reviews' && <ReviewList productId={product.id} />}
+
         {tab === 'shipping' && (
           <div className="grid gap-5 md:grid-cols-3">
+            {detail.shippingClass && (
+              <p className="rounded-2xl bg-teal-soft/60 p-4 text-sm text-teal md:col-span-3">
+                Hạng vận chuyển: <strong>{categoryLabel(detail.shippingClass)}</strong>
+              </p>
+            )}
             {[
               {
                 icon: Store,
@@ -527,6 +575,84 @@ function DetailTabs({ detail, variants }: { detail: ProductDetail; variants: Pro
         )}
       </div>
     </section>
+  )
+}
+
+function reviewImages(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (Array.isArray(parsed)) return parsed.filter((x): x is string => typeof x === 'string')
+  } catch {
+    // không phải JSON → danh sách cách nhau bởi dấu phẩy
+  }
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+function ReviewList({ productId }: { productId: number }) {
+  const [page, setPage] = useState(0)
+  const { data, isLoading, isError } = useProductReviews(productId, page)
+
+  if (isLoading) return <div className="h-40 animate-pulse rounded-2xl bg-surface-low" />
+  if (isError) return <p className="text-sm text-danger">Không tải được đánh giá.</p>
+  if (!data?.items.length) return <p className="text-sm text-ink-soft">Sản phẩm chưa có đánh giá công khai.</p>
+
+  return (
+    <div className="space-y-4">
+      {data.items.map((r) => (
+        <article key={r.id} className="rounded-[1.5rem] bg-surface-low p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex gap-0.5" role="img" aria-label={`${r.rating} trên 5 sao`}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <Star key={n} size={15} className={n <= r.rating ? 'fill-orange text-orange' : 'text-line'} />
+              ))}
+            </div>
+            <time className="font-label text-[11px] text-ink-soft">
+              {new Date(r.createdAt).toLocaleDateString('vi-VN')}
+            </time>
+          </div>
+          {r.comment && <p className="mt-3 text-sm leading-relaxed">{r.comment}</p>}
+          {reviewImages(r.images).length > 0 && (
+            <div className="mt-3 flex gap-2 overflow-x-auto">
+              {reviewImages(r.images).map((src) => (
+                <img
+                  key={src}
+                  src={resolveMediaUrl(src)}
+                  alt=""
+                  className="h-20 w-20 shrink-0 rounded-xl object-cover"
+                />
+              ))}
+            </div>
+          )}
+        </article>
+      ))}
+      {data.totalPages > 1 && (
+        <div className="flex items-center justify-end gap-2 font-label text-xs font-semibold">
+          <button
+            type="button"
+            disabled={page === 0}
+            onClick={() => setPage((p) => p - 1)}
+            className="rounded-full bg-surface-low px-4 py-2 disabled:opacity-40"
+          >
+            Trước
+          </button>
+          <span>
+            {page + 1} / {data.totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={page + 1 >= data.totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            className="rounded-full bg-surface-low px-4 py-2 disabled:opacity-40"
+          >
+            Sau
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 

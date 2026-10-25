@@ -1,4 +1,7 @@
 import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
+import { type ApiEnvelope, http } from '../../../shared/api'
+import { buyerOrderService } from '../../orders/services/order.service'
+import type { ApiReport } from '../../ops/services/ops.api'
 import {
   faqs,
   helpTopics,
@@ -49,18 +52,43 @@ export const buyerService = {
 
   reports: () => mockResponse(reports),
   report: (id: string) => mockFind(reports, (r) => r.id === id, 'Báo cáo'),
-  createReport(input: Pick<ViolationReport, 'targetType' | 'target' | 'reason' | 'description'>) {
+  /**
+   * API thật: POST /api/reports (productId hoặc reportedUserId + reason + bằng chứng).
+   * Chưa có API "báo cáo của tôi" nên bản ghi vừa gửi được lưu tạm vào danh sách mẫu để xem lại.
+   */
+  async createReport(
+    input: Pick<ViolationReport, 'targetType' | 'target' | 'reason' | 'description'> & {
+      targetId?: number
+      evidence?: string
+    },
+  ) {
+    if (input.targetType === 'STOREFRONT')
+      throw new Error('API báo cáo chưa hỗ trợ báo cáo gian hàng — hãy báo cáo sản phẩm hoặc người dùng cụ thể.')
+    const id = input.targetId ?? Number(input.target.match(/\d+/)?.[0])
+    if (!Number.isInteger(id) || id <= 0) throw new Error('Nhập mã số của sản phẩm / người dùng (vd. prd_12 hoặc 12).')
+    const res = (
+      await http.post<ApiEnvelope<ApiReport>>('/api/reports', {
+        productId: input.targetType === 'PRODUCT' ? id : undefined,
+        reportedUserId: input.targetType === 'USER' ? id : undefined,
+        reason: input.reason,
+        description: input.description,
+        evidenceReference: input.evidence?.trim() || undefined,
+      })
+    ).data
     const created: ViolationReport = {
-      ...input,
-      id: `REP-2026-${String(82 + reports.length).padStart(3, '0')}`,
+      id: String(res.id),
+      targetType: input.targetType,
+      target: input.target,
       targetOwner: '—',
+      reason: res.reason ?? input.reason,
+      description: res.description ?? input.description,
       status: 'PENDING',
-      createdAt: nowIso(),
-      evidence: [],
-      audit: [{ at: nowIso(), actor: 'Bạn', action: 'Gửi báo cáo vi phạm', tone: 'violet' }],
+      createdAt: res.createdAt ?? nowIso(),
+      evidence: res.evidenceKey ? [res.evidenceKey] : [],
+      audit: [{ at: res.createdAt ?? nowIso(), actor: 'Bạn', action: 'Gửi báo cáo vi phạm', tone: 'violet' }],
     }
     reports.unshift(created)
-    return mockResponse(created)
+    return created
   },
 
   reviews: () => mockResponse(reviews),
@@ -71,8 +99,13 @@ export const buyerService = {
     return mockResponse(true)
   },
 
-  cancelRequest: (_orderId: number, _reason: string) => mockResponse({ requestId: `CXL-${Date.now().toString().slice(-5)}` }, 500),
-  confirmReceived: (_orderId: number, _note: string) => mockResponse(true, 500),
+  /** API thật: POST /api/orders/{id}/cancel (chỉ đơn chưa thanh toán). */
+  async cancelRequest(orderId: number, reason: string) {
+    const order = await buyerOrderService.cancel(orderId, reason)
+    return { requestId: order.orderCode || `#${order.id}`, order }
+  },
+  /** API thật: POST /api/orders/{id}/confirm-received (ghi chú chưa được Backend lưu). */
+  confirmReceived: (orderId: number, _note: string) => buyerOrderService.confirmReceived(orderId),
 
   transactions: () => mockResponse(transactions),
   transaction: (id: string) => mockFind(transactions, (t) => t.id === id, 'Giao dịch'),

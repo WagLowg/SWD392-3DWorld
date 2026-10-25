@@ -11,6 +11,16 @@ export type ProductSummary = {
   storefrontId: number
   title: string
   category: string
+  thumbnailUrl?: string | null
+  /** Giá thấp nhất trong các variant đang bán. */
+  price?: number | null
+  maxPrice?: number | null
+  averageRating?: number | null
+  reviewCount?: number | null
+  salesCount?: number | null
+  /** Huy hiệu nổi bật (vd. BEST_SELLER, NEW) — sản phẩm có badge xuất hiện ở /api/catalog/featured. */
+  badgeType?: string | null
+  available?: boolean | null
 }
 
 export type CatalogPage = {
@@ -33,18 +43,65 @@ export type ProductVariant = {
   active: boolean
 }
 
+export type StorefrontSummary = {
+  id: number
+  name: string
+  description?: string | null
+  status?: string | null
+  available?: boolean | null
+}
+
 export type ProductDetail = {
   product: ProductSummary
   media: string[]
   variants: ProductVariant[]
+  description?: string | null
+  specifications?: string | null
+  shippingClass?: string | null
+  storefront?: StorefrontSummary | null
+  /** false → không cho "Mua ngay" (vd. xưởng hết hạn gói). */
+  buyNowEligible?: boolean | null
 }
+
+export type CatalogSort = 'newest' | 'price_asc' | 'price_desc' | 'rating' | 'best_selling'
 
 export type CatalogQuery = {
   keyword?: string
   category?: string
+  minPrice?: number
+  maxPrice?: number
+  sort?: CatalogSort
   /** 0-based theo Backend. */
   page?: number
   size?: number
+}
+
+export type PagedItems<T> = {
+  items: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+export type ProductReview = {
+  id: number
+  rating: number
+  comment?: string | null
+  /** Chuỗi ảnh (JSON array hoặc danh sách cách nhau bởi dấu phẩy). */
+  images?: string | null
+  createdAt: string
+}
+
+/** ShopResponse — gian hàng công khai. */
+export type Shop = {
+  id: number
+  name: string
+  description?: string | null
+  status?: string | null
+  verificationStatus?: string | null
+  expiresAt?: string | null
+  available?: boolean | null
 }
 
 export type CartItem = {
@@ -60,12 +117,23 @@ export type CartItem = {
   previousUnitPrice?: number | null
   /** true → người mua phải chấp nhận giá mới (POST /api/cart/items/{id}/acknowledge-price) trước khi đặt. */
   priceChanged?: boolean
+  productId?: number | null
+  storefrontId?: number | null
+  thumbnailUrl?: string | null
+}
+
+export type CartShopGroup = {
+  storefrontId: number
+  items: CartItem[]
+  subtotal: number
 }
 
 export type Cart = {
   cartId: number
   items: CartItem[]
   total: number
+  /** Backend đã nhóm sẵn theo xưởng. */
+  groups?: CartShopGroup[]
 }
 
 export type AddCartItemInput = {

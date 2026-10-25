@@ -45,7 +45,12 @@ export const useAddRefundEvidence = () =>
   useMockAction(({ id, note }: { id: string; note: string }) => buyerService.addRefundEvidence(id, note), [buyerKeys.refunds], 'Đã nộp thêm bằng chứng.')
 export const useCreateReport = () =>
   useMockAction(
-    (input: Pick<ViolationReport, 'targetType' | 'target' | 'reason' | 'description'>) => buyerService.createReport(input),
+    (
+      input: Pick<ViolationReport, 'targetType' | 'target' | 'reason' | 'description'> & {
+        targetId?: number
+        evidence?: string
+      },
+    ) => buyerService.createReport(input),
     [buyerKeys.reports],
     'Đã gửi báo cáo cho bộ phận thẩm định.',
   )
@@ -58,8 +63,12 @@ export const useSaveReview = () =>
 export const useCancelRequest = () =>
   useMockAction(
     ({ orderId, reason }: { orderId: number; reason: string }) => buyerService.cancelRequest(orderId, reason),
-    [],
-    (r: { requestId: string }) => `Đã gửi yêu cầu huỷ ${r.requestId}.`,
+    [['orders']],
+    (r: { requestId: string }) => `Đã huỷ đơn ${r.requestId}.`,
   )
 export const useConfirmReceived = () =>
-  useMockAction(({ orderId, note }: { orderId: number; note: string }) => buyerService.confirmReceived(orderId, note), [], 'Đã xác nhận nhận hàng — bắt đầu 72h bảo vệ.')
+  useMockAction(
+    ({ orderId, note }: { orderId: number; note: string }) => buyerService.confirmReceived(orderId, note),
+    [['orders']],
+    'Đã xác nhận nhận hàng — bắt đầu thời hạn hoàn tiền.',
+  )
