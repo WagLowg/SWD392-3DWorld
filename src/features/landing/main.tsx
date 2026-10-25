@@ -3,8 +3,13 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// ZALOPAY_REDIRECT_URL của Backend trỏ về /payment-result → chuyển sang trang kết quả, giữ tham số ZaloPay.
+if (/^\/payment-result\/?$/.test(location.pathname)) {
+  location.replace(`/marketplace/payment/result${location.search}`)
+} else {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+}

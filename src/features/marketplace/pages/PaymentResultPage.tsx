@@ -20,6 +20,7 @@ import {
   parsePaymentParams,
   POLL_INTERVAL_MS,
   POLL_TIMEOUT_MS,
+  resolvePaymentParams,
   subscriptionPaymentState,
 } from '../lib/payment'
 import { formatVnd } from '../lib/format'
@@ -30,7 +31,7 @@ import { formatVnd } from '../lib/format'
  */
 export function PaymentResultPage() {
   const [search] = useSearchParams()
-  const params = useMemo(() => parsePaymentParams(search), [search])
+  const params = useMemo(() => resolvePaymentParams(parsePaymentParams(search)), [search])
   const session = useSession()
 
   useEffect(() => {
@@ -57,15 +58,27 @@ export function PaymentResultPage() {
       ) : (
         <StatusBlock
           tone="empty"
-          title="Thiếu thông tin giao dịch"
-          body="Đường dẫn kết quả thanh toán không có mã đơn hoặc mã gói thuê bao."
+          title={params.gatewaySuccess ? 'ZaloPay báo đã thanh toán' : 'Chưa xác định được giao dịch'}
+          body={
+            params.appTransId
+              ? `Không tìm thấy đơn tương ứng với giao dịch ${params.appTransId} trên trình duyệt này (có thể bạn thanh toán từ thiết bị khác). Hãy kiểm tra trạng thái trong danh sách đơn hoặc gói thuê bao.`
+              : 'Đường dẫn kết quả thanh toán không có mã đơn hoặc mã gói thuê bao.'
+          }
           action={
-            <a
-              href="/portal/orders"
-              className="rounded-full bg-ink px-6 py-3 font-label text-sm font-semibold text-white"
-            >
-              Xem đơn hàng của tôi
-            </a>
+            <div className="flex flex-wrap justify-center gap-2">
+              <a
+                href="/portal/orders"
+                className="rounded-full bg-ink px-6 py-3 font-label text-sm font-semibold text-white"
+              >
+                Xem đơn hàng của tôi
+              </a>
+              <a
+                href="/portal/seller/subscription"
+                className="rounded-full bg-surface-low px-6 py-3 font-label text-sm font-semibold"
+              >
+                Gói thuê bao
+              </a>
+            </div>
           }
         />
       )}

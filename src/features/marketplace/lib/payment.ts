@@ -91,5 +91,48 @@ export function gatewayMessage(code: string | null) {
   return `ZaloPay báo giao dịch không thành công (mã ${code}).`
 }
 
+/* -------------------------------------------------- appTransId → nghiệp vụ */
+
+/**
+ * Backend dùng một redirect URL cố định (ZALOPAY_REDIRECT_URL=/payment-result) không kèm mã đơn,
+ * nên khi tạo liên kết ZaloPay frontend ghi lại appTransId → đơn / gói để trang kết quả tra ngược.
+ * Chỉ có tác dụng trên trình duyệt đã bấm thanh toán.
+ */
+type PaymentAttempt = { kind: PaymentKind; id: number; at: number }
+
+const ATTEMPTS_KEY = '3dworld.payment-attempts'
+const ATTEMPT_TTL_MS = 7 * 86_400_000
+
+function readAttempts(): Record<string, PaymentAttempt> {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(ATTEMPTS_KEY) ?? '{}')
+    return raw && typeof raw === 'object' ? (raw as Record<string, PaymentAttempt>) : {}
+  } catch {
+    return {}
+  }
+}
+
+export function rememberPaymentAttempt(appTransId: string | null | undefined, kind: PaymentKind, id: number) {
+  if (!appTransId) return
+  try {
+    const now = Date.now()
+    const kept = Object.fromEntries(Object.entries(readAttempts()).filter(([, a]) => now - a.at < ATTEMPT_TTL_MS))
+    localStorage.setItem(ATTEMPTS_KEY, JSON.stringify({ ...kept, [appTransId]: { kind, id, at: now } }))
+  } catch {
+    // trình duyệt chặn localStorage → trang kết quả sẽ hỏi người dùng chọn đơn
+  }
+}
+
+export function lookupPaymentAttempt(appTransId: string | null | undefined): PaymentAttempt | undefined {
+  return appTransId ? readAttempts()[appTransId] : undefined
+}
+
+/** Điền kind/ids từ appTransId khi URL không có type/id (redirect cố định của Backend). */
+export function resolvePaymentParams(p: PaymentResultParams): PaymentResultParams {
+  if (p.kind && (p.ids.length || p.kind === 'subscription')) return p
+  const hit = lookupPaymentAttempt(p.appTransId)
+  return hit ? { ...p, kind: hit.kind, ids: [hit.id] } : p
+}
+
 export const POLL_INTERVAL_MS = 3_000
 export const POLL_TIMEOUT_MS = 90_000

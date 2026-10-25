@@ -1,6 +1,7 @@
 import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
 import type { AuditEntry } from '../../../shared/ui/kit'
 import { bankAccountService } from '../../account/services/account.service'
+import { rememberPaymentAttempt } from '../../marketplace/lib/payment'
 import {
   disputes,
   earnings,
@@ -356,6 +357,7 @@ export const sellerService = {
     const overview = await storefrontOwnerApi.subscription()
     const sub = overview.pending ?? (await storefrontOwnerApi.subscribe(!!overview.storefrontExpiresAt))
     const payment = await storefrontOwnerApi.paySubscription(sub.id)
+    rememberPaymentAttempt(payment.appTransId, 'subscription', sub.id)
     if (payment.orderUrl) window.location.assign(payment.orderUrl)
     return payment
   },

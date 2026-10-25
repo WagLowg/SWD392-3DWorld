@@ -5,6 +5,8 @@ import {
   orderPaymentState,
   parsePaymentParams,
   paymentResultUrl,
+  rememberPaymentAttempt,
+  resolvePaymentParams,
   subscriptionPaymentState,
 } from './payment'
 
@@ -53,6 +55,22 @@ describe('combineStates', () => {
     expect(combineStates(['success', 'confirming'])).toBe('confirming')
     expect(combineStates(['success', 'success'])).toBe('success')
     expect(combineStates(['success', 'failed'])).toBe('failed')
+  })
+})
+
+describe('resolvePaymentParams (redirect cố định /payment-result)', () => {
+  it('finds the order from a remembered appTransId', () => {
+    rememberPaymentAttempt('261025_81', 'order', 77)
+    const p = resolvePaymentParams(parsePaymentParams(new URLSearchParams('apptransid=261025_81&status=1')))
+    expect(p).toMatchObject({ kind: 'order', ids: [77], gatewaySuccess: true })
+  })
+
+  it('keeps explicit type/id and leaves unknown appTransId unresolved', () => {
+    rememberPaymentAttempt('261025_82', 'subscription', 5)
+    expect(
+      resolvePaymentParams(parsePaymentParams(new URLSearchParams('type=order&id=9&apptransid=261025_82'))).ids,
+    ).toEqual([9])
+    expect(resolvePaymentParams(parsePaymentParams(new URLSearchParams('apptransid=nope'))).kind).toBeNull()
   })
 })
 

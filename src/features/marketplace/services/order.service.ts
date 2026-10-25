@@ -1,4 +1,5 @@
 import { http } from '../../../shared/api'
+import { rememberPaymentAttempt } from '../lib/payment'
 import type { Address, AddressInput, ApiEnvelope, CheckoutInput, Order, Payment } from '../types/catalog.types'
 
 export const addressService = {
@@ -30,12 +31,14 @@ export const orderService = {
 /** Backend chấp nhận sourceType PHYSICAL_ORDER + stage FULL cho đơn hàng vật lý (sourceId = id đơn con). */
 export const paymentService = {
   async payOrderWithZaloPay(orderId: number) {
-    return (
+    const payment = (
       await http.post<ApiEnvelope<Payment>>('/api/payments/zalopay', {
         sourceType: 'PHYSICAL_ORDER',
         sourceId: orderId,
         stage: 'FULL',
       })
     ).data
+    rememberPaymentAttempt(payment.appTransId, 'order', orderId)
+    return payment
   },
 }

@@ -1,4 +1,5 @@
 import { type ApiEnvelope, http } from '../../../shared/api'
+import { rememberPaymentAttempt } from '../../marketplace/lib/payment'
 import type {
   Order,
   OrderHistoryEntry,
@@ -94,13 +95,15 @@ export const sellerOrderService = {
 export const paymentService = {
   /** sourceType PHYSICAL_ORDER + stage FULL, sourceId = id đơn con. */
   async payOrder(orderId: number) {
-    return (
+    const payment = (
       await http.post<ApiEnvelope<Payment>>('/api/payments/zalopay', {
         sourceType: 'PHYSICAL_ORDER',
         sourceId: orderId,
         stage: 'FULL',
       })
     ).data
+    rememberPaymentAttempt(payment.appTransId, 'order', orderId)
+    return payment
   },
 
   /** Yêu cầu hoàn tiền cho một giao dịch đã thanh toán thành công. */
