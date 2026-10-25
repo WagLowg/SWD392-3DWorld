@@ -3,20 +3,29 @@ import { ArrowLeft } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useSearchParams } from 'react-router-dom'
-import { authService } from '../services/auth.service'
 import { ApiClientError } from '../../../shared/api'
-import { fetchMe } from '../../auth/services/session'
 import { safeNext } from '../../../shared/modules'
+import { tokenStore } from '../../../shared/session/token'
 import { Field, FormError, inputClass, SubmitButton } from '../../../shared/ui/form'
+import { fetchMe } from '../../auth/services/session'
 import { AuthLayout } from '../components/AuthLayout'
 import { PasswordInput } from '../components/PasswordInput'
 import { type LoginValues, loginSchema } from '../schemas/auth.schemas'
+import { authService } from '../services/auth.service'
+
+function getReferrerPath() {
+  if (!document.referrer) return null
+
+  const referrer = new URL(document.referrer)
+  if (referrer.origin !== location.origin) return null
+  return `${referrer.pathname}${referrer.search}${referrer.hash}`
+}
 
 /** MP 007 · Đăng nhập */
 export function LoginPage() {
   const uid = useId()
   const [params] = useSearchParams()
-  const next = safeNext(params.get('next'))
+  const next = safeNext(params.get('next') ?? getReferrerPath())
   const [checking, setChecking] = useState(true)
   const {
     register,
@@ -32,8 +41,21 @@ export function LoginPage() {
 
   useEffect(() => {
     document.title = 'Đăng nhập · 3DWorld'
-    // Đã đăng nhập rồi thì quay lại luôn
-    fetchMe().then((u) => (u ? location.replace(next) : setChecking(false)))
+    // Không có JWT thì hiển thị form ngay; không để cookie phiên cũ làm treo trang đăng nhập.
+    if (!tokenStore.get()) {
+      setChecking(false)
+      return
+    }
+
+    let active = true
+    fetchMe().then((u) => {
+      if (!active) return
+      if (u) location.replace(next)
+      else setChecking(false)
+    })
+    return () => {
+      active = false
+    }
   }, [next])
 
   const submit = handleSubmit(async (values) => {
@@ -44,7 +66,18 @@ export function LoginPage() {
     } catch (e) {
       const message = e instanceof ApiClientError ? e.message : 'Không đăng nhập được. Vui lòng thử lại.'
       if (/verif|xác (thực|minh)/i.test(message)) setUnverified(true)
-      setError('root', { message })
+      if (e instanceof ApiClientError && e.body.fieldErrors?.length) {
+        let hasFieldError = false
+        for (const error of e.body.fieldErrors) {
+          if (error.field === 'email' || error.field === 'password') {
+            setError(error.field, { message: error.message })
+            hasFieldError = true
+          }
+        }
+        if (!hasFieldError) setError('root', { message })
+      } else {
+        setError('root', { message })
+      }
     }
   })
 

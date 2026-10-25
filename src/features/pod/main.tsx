@@ -1,24 +1,19 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { ComingSoon } from '../../shared/ComingSoon'
+import { BrowserRouter } from 'react-router-dom'
+import { AppProviders } from '../../app/providers/AppProviders'
+import { PodApp } from './routes'
+import './pod.css'
 
-// TODO(POD): thay trang tạm bằng ứng dụng In 3D theo yêu cầu.
 const rootElement = document.getElementById('root')
-
-if (!rootElement) throw new Error('Missing #root element for POD.')
+if (!rootElement) throw new Error('Không tìm thấy #root để khởi tạo POD.')
 
 createRoot(rootElement).render(
   <StrictMode>
-    <ComingSoon
-      module="pod"
-      title="In 3D theo yêu cầu"
-      body="Tải mô hình, cấu hình, nhận báo giá và đặt in. Module đang được phát triển."
-      accent="#98DFFF"
-      todo={[
-        'Frontend: code trong frontend/src/features/pod (entry: frontend/pod/index.html).',
-        'Yêu cầu in từ AI Studio và 3D Studio đã được lưu chung ở bảng print_requests (cột source = AI | STUDIO).',
-        'Backend: thêm báo giá / thanh toán dưới /api/pod trong package com.threedworld.pod.',
-      ]}
-    />
+    <AppProviders>
+      <BrowserRouter basename="/pod">
+        <PodApp />
+      </BrowserRouter>
+    </AppProviders>
   </StrictMode>,
 )

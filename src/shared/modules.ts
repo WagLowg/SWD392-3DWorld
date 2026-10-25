@@ -21,7 +21,7 @@ export function loginHref(next: string = location.pathname + location.search + l
 }
 
 /** Chỉ cho phép quay về đường dẫn nội bộ (chống open-redirect). */
-export function safeNext(next: string | null | undefined, fallback = '/ai/') {
+export function safeNext(next: string | null | undefined, fallback = '/marketplace/') {
   if (!next?.startsWith('/') || next.startsWith('//') || next.startsWith('/login')) return fallback
   return next
 }

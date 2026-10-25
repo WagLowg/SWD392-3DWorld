@@ -1,8 +1,8 @@
-import { Box, ShoppingBag } from 'lucide-react'
+import { Box, LogOut, ShoppingBag } from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
-import { goLogin } from '../../auth/services/session'
-import { useCart } from '../hooks/useCart'
 import { useSession } from '../../../shared/session/useSession'
+import { goLogin, logout } from '../../auth/services/session'
+import { useCart } from '../hooks/useCart'
 
 const NAV = [
   { label: 'AI Studio', href: '/ai/' },
@@ -68,15 +68,26 @@ export function MarketplaceHeader() {
           </Link>
 
           {user ? (
-            <a href="/portal/profile" className="flex items-center gap-2" title={user.email}>
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-orange to-orange-deep font-display text-sm font-bold text-white">
-                {user.name.charAt(0).toUpperCase()}
-              </span>
-              <span className="hidden max-w-[9rem] flex-col leading-tight sm:flex">
-                <span className="truncate font-label text-sm font-semibold">{user.name}</span>
-                <span className="truncate font-label text-[11px] text-ink-soft">{user.email}</span>
-              </span>
-            </a>
+            <>
+              <a href="/portal/profile" className="flex items-center gap-2" title={user.email}>
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-orange to-orange-deep font-display text-sm font-bold text-white">
+                  {user.name.charAt(0).toUpperCase()}
+                </span>
+                <span className="hidden max-w-[9rem] flex-col leading-tight sm:flex">
+                  <span className="truncate font-label text-sm font-semibold">{user.name}</span>
+                  <span className="truncate font-label text-[11px] text-ink-soft">{user.email}</span>
+                </span>
+              </a>
+              <button
+                type="button"
+                onClick={() => void logout('/marketplace/')}
+                aria-label="Đăng xuất"
+                title="Đăng xuất"
+                className="grid h-10 w-10 place-items-center rounded-full bg-surface-low text-ink-soft transition-colors hover:bg-red-50 hover:text-red-600"
+              >
+                <LogOut size={17} />
+              </button>
+            </>
           ) : (
             <button
               type="button"
