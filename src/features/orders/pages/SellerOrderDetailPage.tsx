@@ -5,6 +5,7 @@ import { formatDateTime } from '../../../shared/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { Breadcrumbs } from '../../../shared/ui/primitives'
 import { PackagesPanel } from '../components/PackagesPanel'
+import { ShippingAddressSnapshot } from '../components/ShippingAddressSnapshot'
 import { QueryState } from '../../../shared/ui/QueryState'
 import {
   OrderItemRow,
@@ -141,9 +142,7 @@ export function SellerOrderDetailPage() {
                 <h2 className="inline-flex items-center gap-2 font-display text-lg font-bold">
                   <MapPin size={17} className="text-orange" /> Người nhận
                 </h2>
-                <p className="mt-3 whitespace-pre-line rounded-2xl bg-surface-low p-4 text-sm">
-                  {order.shippingAddressSnapshot || 'Đơn không lưu bản chụp địa chỉ.'}
-                </p>
+                <ShippingAddressSnapshot snapshot={order.shippingAddressSnapshot} />
                 {!!order.shippingWeightGrams && (
                   <p className="mt-2 text-xs text-ink-soft">
                     {order.shippingPackageCount ?? 0} kiện · {order.shippingWeightGrams} g

@@ -25,8 +25,6 @@ export function PayOrderButton({
       <>
         <a
           href={url}
-          target="_blank"
-          rel="noreferrer"
           className={`inline-flex items-center gap-2 rounded-full bg-[#0068ff] px-5 py-2.5 font-label text-sm font-semibold text-white hover:opacity-90 ${className}`}
         >
           Mở ZaloPay <ExternalLink size={14} />
@@ -49,7 +47,8 @@ export function PayOrderButton({
           .mutateAsync(orderId)
           .then((p) => {
             setUrl(p.orderUrl)
-            window.open(p.orderUrl, '_blank', 'noopener')
+            // Giữ cùng browsing context để access token trong sessionStorage còn nguyên khi ZaloPay trả về.
+            window.location.assign(p.orderUrl)
           })
           .catch((e) => toast(e instanceof ApiClientError ? e.message : 'Không tạo được thanh toán.', 'error'))
       }

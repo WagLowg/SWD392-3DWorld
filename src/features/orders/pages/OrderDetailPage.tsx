@@ -18,6 +18,7 @@ import {
   StorefrontLabel,
 } from '../components/OrderParts'
 import { PayOrderButton } from '../components/PayOrderButton'
+import { ShippingAddressSnapshot } from '../components/ShippingAddressSnapshot'
 import { useBuyerShipments, useOrder, useOrderHistory, useOrderPackages } from '../hooks/useOrders'
 import { statusMeta } from '../lib/status'
 import { useOrderPaymentsStore } from '../stores/order-payments.store'
@@ -131,9 +132,7 @@ export function OrderDetailPage() {
                 <h2 className="inline-flex items-center gap-2 font-display text-xl font-bold">
                   <MapPin size={19} className="text-orange" /> Địa chỉ nhận hàng
                 </h2>
-                <p className="mt-3 whitespace-pre-line rounded-2xl bg-surface-low p-4 text-sm">
-                  {order.shippingAddressSnapshot || 'Đơn không lưu bản chụp địa chỉ.'}
-                </p>
+                <ShippingAddressSnapshot snapshot={order.shippingAddressSnapshot} />
               </section>
 
               {!!packages.data?.length && (
