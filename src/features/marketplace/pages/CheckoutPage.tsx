@@ -588,8 +588,6 @@ function OrderResult({
                   {p?.payment?.orderUrl ? (
                     <a
                       href={p.payment.orderUrl}
-                      target="_blank"
-                      rel="noreferrer"
                       className="flex w-full items-center justify-center gap-2 rounded-full bg-[#0068ff] px-5 py-3 font-label text-sm font-semibold text-white hover:opacity-90"
                     >
                       Thanh toán {formatVnd(p.payment.amount)} qua ZaloPay <ExternalLink size={15} />
