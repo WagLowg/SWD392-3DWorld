@@ -88,8 +88,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       toast('warning', 'Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại.');
     };
+    // Báo một lần mỗi lần mở trang, không đăng xuất người dùng.
+    let warned = false;
+    const onAiUnauthorized = () => {
+      if (warned) return;
+      warned = true;
+      toast(
+        'warning',
+        'AI Studio chưa kết nối được máy chủ AI',
+        'Bạn vẫn đăng nhập bình thường. Dịch vụ AI chưa chạy hoặc chưa nhận token chung của 3DWorld.',
+      );
+    };
     authEvents.addEventListener('expired', onExpired);
-    return () => authEvents.removeEventListener('expired', onExpired);
+    authEvents.addEventListener('ai-unauthorized', onAiUnauthorized);
+    return () => {
+      authEvents.removeEventListener('expired', onExpired);
+      authEvents.removeEventListener('ai-unauthorized', onAiUnauthorized);
+    };
   }, [toast]);
 
   const refreshWallet = useCallback(async () => {

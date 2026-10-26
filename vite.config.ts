@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, type Plugin, type ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'node:path'
@@ -33,21 +33,34 @@ function moduleFallback(): Plugin {
   }
 }
 
+/** Proxy tới một backend; bỏ Origin của :5173 để Spring không xử lý nhầm như request CORS trực tiếp. */
+const backend = (port: string | number): ProxyOptions => ({
+  target: `http://localhost:${port}`,
+  changeOrigin: true,
+  configure(proxy) {
+    proxy.on('proxyReq', (proxyRequest) => proxyRequest.removeHeader('origin'))
+  },
+})
+
+/**
+ * AI Studio và 3D Studio có thể chạy ở dịch vụ riêng (vd. backend/ Spring trong repo, chạy port khác 8080):
+ *   AI_API_PORT      → /api/ai-studio, /api/health, /api/webhooks
+ *   STUDIO_API_PORT  → /api/studio (mặc định dùng AI_API_PORT)
+ * Không đặt → mọi /api đi về backend chính như trước.
+ */
+const aiPort = process.env.AI_API_PORT?.trim()
+const studioPort = process.env.STUDIO_API_PORT?.trim() || aiPort
+const aiProxy = {
+  ...(aiPort ? Object.fromEntries(['/api/ai-studio', '/api/health', '/api/webhooks'].map((p) => [p, backend(aiPort)])) : {}),
+  ...(studioPort ? { '/api/studio': backend(studioPort) } : {}),
+}
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), moduleFallback()],
   server: {
     port: 5173,
-    proxy: {
-      '/api': {
-        target: `http://localhost:${process.env.API_PORT || 8080}`,
-        changeOrigin: true,
-        configure(proxy) {
-          // Browser gọi cùng origin Vite; request từ dev proxy sang BE là server-to-server.
-          // Bỏ Origin của :5173 để Spring không xử lý nhầm như một request CORS trực tiếp.
-          proxy.on('proxyReq', (proxyRequest) => proxyRequest.removeHeader('origin'))
-        },
-      },
-    },
+    // Đường dẫn AI khai báo trước '/api' để được ưu tiên.
+    proxy: { ...aiProxy, '/api': backend(process.env.API_PORT || 8080) },
   },
   build: {
     chunkSizeWarningLimit: 2000,

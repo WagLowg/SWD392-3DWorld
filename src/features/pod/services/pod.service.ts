@@ -22,11 +22,12 @@ function listOf<T>(response: ApiEnvelope<PageLike<T> | T[]> | PageLike<T> | T[])
   return data.content ?? data.items ?? []
 }
 
+/** Backend giới hạn size 1–50 cho các API phân trang của POD. */
 export const podService = {
   async listMaterials(technologyCode?: string, signal?: AbortSignal) {
     const response = await http.get<ApiEnvelope<PageLike<PrintMaterial> | PrintMaterial[]>>(
       '/api/print/materials/getAll',
-      { params: { technologyCode: technologyCode || undefined, page: 0, size: 100 }, signal },
+      { params: { technologyCode: technologyCode || undefined, page: 0, size: 50 }, signal },
     )
     return listOf(response)
   },
@@ -50,7 +51,7 @@ export const podService = {
   async listRequests(signal?: AbortSignal) {
     const response = await http.get<ApiEnvelope<PageLike<PrintRequest> | PrintRequest[]>>(
       '/api/print/requests/getAll',
-      { params: { page: 0, size: 100 }, signal },
+      { params: { page: 0, size: 50 }, signal },
     )
     return listOf(response)
   },

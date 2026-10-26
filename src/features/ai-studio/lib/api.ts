@@ -1,4 +1,5 @@
 import { tokenStore } from '../../../shared/session/token';
+import { resetSessionCheck, sessionStillValid } from '../../../shared/session/verify';
 
 export type User = { id: string; email: string; name: string; role: string };
 
@@ -80,8 +81,14 @@ export class ApiError extends Error {
 
 type Opts = { method?: string; body?: unknown; headers?: Record<string, string>; signal?: AbortSignal };
 
-/** Phát sự kiện khi phiên hết hạn để AuthProvider chuyển về trang đăng nhập. */
+/**
+ * Sự kiện cho AuthProvider:
+ * - 'expired': phiên 3DWorld thật sự hết hạn (/api/auth/me cũng bị từ chối) → về trang đăng nhập.
+ * - 'ai-unauthorized': phiên vẫn hợp lệ nhưng dịch vụ AI từ chối token (chưa chạy / chưa dùng chung JWT).
+ */
 export const authEvents = new EventTarget();
+
+export const AI_UNAUTHORIZED = 'AI_SERVICE_UNAUTHORIZED';
 
 export async function api<T>(path: string, opts: Opts = {}): Promise<T> {
   const isForm = opts.body instanceof FormData;
@@ -106,7 +113,20 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T> {
   const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
   if (!res.ok) {
     const err = data?.error || data || {};
-    if (res.status === 401 && !path.startsWith('/api/auth/')) authEvents.dispatchEvent(new Event('expired'));
+    if (res.status === 401 && !path.startsWith('/api/auth/')) {
+      // 401 từ API AI chưa chắc là hết phiên: backend chính không có /api/ai-studio/* cũng trả 401.
+      if (await sessionStillValid()) {
+        authEvents.dispatchEvent(new Event('ai-unauthorized'));
+        throw new ApiError(
+          401,
+          AI_UNAUTHORIZED,
+          'Dịch vụ AI Studio chưa nhận phiên đăng nhập 3DWorld (máy chủ AI chưa chạy hoặc chưa dùng chung JWT với backend chính).',
+          err,
+        );
+      }
+      resetSessionCheck();
+      authEvents.dispatchEvent(new Event('expired'));
+    }
     throw new ApiError(res.status, err.code || 'HTTP_' + res.status, err.message || `Lỗi ${res.status}`, err);
   }
   return data as T;

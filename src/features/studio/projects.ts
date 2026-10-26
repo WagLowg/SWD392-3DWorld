@@ -3,6 +3,8 @@ import { TEMPLATES } from './scene';
 import { CAPABILITIES } from './config';
 import { renderThumbnail } from './thumbnail';
 import { goLogin } from '../auth/services/session';
+import { tokenStore } from '../../shared/session/token';
+import { sessionStillValid } from '../../shared/session/verify';
 
 /**
  * API dự án 3D Studio (backend Spring Boot: /api/studio/**).
@@ -35,11 +37,17 @@ export class StudioApiError extends Error {
 
 async function call<T>(path: string, opts: { method?: string; body?: unknown; headers?: Record<string, string> } = {}): Promise<T> {
   const isForm = opts.body instanceof FormData;
+  const token = tokenStore.get();
   let res: Response;
   try {
     res = await fetch(`/api/studio${path}`, {
       method: opts.method || (opts.body ? 'POST' : 'GET'),
-      headers: { ...(opts.body && !isForm ? { 'Content-Type': 'application/json' } : {}), ...opts.headers },
+      headers: {
+        ...(opts.body && !isForm ? { 'Content-Type': 'application/json' } : {}),
+        // Cùng JWT với các module khác (đăng nhập một lần cho cả web).
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...opts.headers,
+      },
       body: opts.body ? (isForm ? (opts.body as FormData) : JSON.stringify(opts.body)) : undefined,
       credentials: 'same-origin',
     });
@@ -49,7 +57,19 @@ async function call<T>(path: string, opts: { method?: string; body?: unknown; he
   const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
   if (!res.ok) {
     const err = data?.error || {};
-    if (res.status === 401) goLogin();
+    if (res.status === 401) {
+      // Phiên chung còn hợp lệ → dịch vụ 3D Studio chưa chạy / chưa nhận JWT chung; không đẩy về trang đăng nhập
+      // (trước đây gây vòng lặp Studio ⇄ Đăng nhập).
+      if (await sessionStillValid()) {
+        throw new StudioApiError(
+          401,
+          'STUDIO_SERVICE_UNAUTHORIZED',
+          'Máy chủ 3D Studio chưa nhận phiên đăng nhập 3DWorld (dịch vụ chưa chạy hoặc chưa dùng chung JWT với backend chính).',
+          err,
+        );
+      }
+      goLogin();
+    }
     throw new StudioApiError(res.status, err.code || `HTTP_${res.status}`, err.message || `Lỗi ${res.status}`, err);
   }
   return data as T;
