@@ -13,6 +13,9 @@ export const MODULES: { id: ModuleId; label: string; short: string; href: string
   { id: 'pod', label: 'In 3D (POD)', short: 'POD', href: '/pod/', ready: false },
 ]
 
+/** Cờ duy nhất để bật lại điều hướng POD khi tới buổi demo của module. */
+export const POD_NAVIGATION_ENABLED = MODULES.some((module) => module.id === 'pod' && module.ready)
+
 export const HOME_HREF = '/'
 
 /** Trang đăng nhập dùng chung; `next` là URL quay lại sau khi đăng nhập. */
