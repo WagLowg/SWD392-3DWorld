@@ -14,7 +14,7 @@ const NAV = [
 const navItem = 'rounded-full px-4 py-2 font-label text-sm font-semibold transition-colors'
 
 export function MarketplaceHeader() {
-  const { data: user } = useSession()
+  const { data: user, isLoading: sessionLoading } = useSession()
   const { data: cart } = useCart()
   const count = cart?.items.reduce((sum, i) => sum + i.quantity, 0) ?? 0
 
@@ -67,7 +67,9 @@ export function MarketplaceHeader() {
             )}
           </Link>
 
-          {user ? (
+          {sessionLoading ? (
+            <span role="status" className="h-9 w-28 animate-pulse rounded-full bg-surface-low" aria-label="Đang khôi phục phiên đăng nhập" />
+          ) : user ? (
             <>
               <a href="/portal/profile" className="flex items-center gap-2" title={user.email}>
                 <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-orange to-orange-deep font-display text-sm font-bold text-white">

@@ -1,15 +1,28 @@
 import { loginHref } from '../../../shared/modules'
+import { ApiClientError } from '../../../shared/api'
 import { tokenStore } from '../../../shared/session/token'
-import { authService, type AuthUser } from './auth.service'
+import type { SessionUser as SharedSessionUser } from '../../../shared/session/types'
+import { authService } from './auth.service'
 
-export type SessionUser = AuthUser
+export type SessionUser = SharedSessionUser
+
+/** Snapshot đồng bộ để header không nháy trạng thái guest giữa các Vite entry. */
+export function getCachedSessionUser(): SessionUser | null {
+  return tokenStore.getUser()
+}
 
 /** Người dùng hiện tại theo ApiResponse<UserResponse> của Spring Boot, null nếu chưa đăng nhập. */
 export async function fetchMe(signal?: AbortSignal): Promise<SessionUser | null> {
+  if (!tokenStore.get()) return null
   try {
     return await authService.getCurrentUser(signal)
-  } catch {
-    return null
+  } catch (error) {
+    if (error instanceof ApiClientError && (error.status === 401 || error.status === 403)) {
+      tokenStore.expire()
+      return null
+    }
+    // Mạng/API tạm thời lỗi: giữ snapshot đã xác minh gần nhất thay vì làm header logout giả.
+    return tokenStore.getUser()
   }
 }
 

@@ -43,7 +43,7 @@ export function Logo({ className = '' }: { className?: string }) {
 export function LandingNavigation() {
   const active = useUI((s) => s.activeWorld)
   const [open, setOpen] = useState(false)
-  const { user } = useSession()
+  const { user, isLoading: sessionLoading } = useSession()
 
   const go = (i: number) => {
     setOpen(false)
@@ -56,16 +56,14 @@ export function LandingNavigation() {
         aria-label="Primary"
         className="glass mx-auto flex max-w-6xl items-center justify-between gap-3 rounded-full py-2 pl-4 pr-2 font-nav"
       >
-        <a
-          href="#top"
-          onClick={(e) => {
-            e.preventDefault()
-            scrollToTime(0)
-          }}
+        <button
+          type="button"
+          className="border-0 bg-transparent p-0"
+          onClick={() => scrollToTime(0)}
           aria-label="3DWorld — về đầu trang"
         >
           <Logo />
-        </a>
+        </button>
 
         <ul className="hidden items-center gap-1 lg:flex">
           {WORLDS.map((w, i) => (
@@ -88,12 +86,16 @@ export function LandingNavigation() {
         </ul>
 
         <div className="flex items-center gap-1.5">
-          <Link
-            to={user ? ROUTES.aiStudio : ROUTES.signIn}
-            className="hidden rounded-full px-4 py-2 text-sm font-semibold text-ink/80 hover:bg-white sm:inline-block"
-          >
-            {user ? user.name : 'Sign In'}
-          </Link>
+          {sessionLoading ? (
+            <span role="status" className="hidden h-9 w-24 animate-pulse rounded-full bg-white/70 sm:inline-block" aria-label="Đang khôi phục phiên đăng nhập" />
+          ) : (
+            <Link
+              to={user ? ROUTES.aiStudio : ROUTES.signIn}
+              className="hidden rounded-full px-4 py-2 text-sm font-semibold text-ink/80 hover:bg-white sm:inline-block"
+            >
+              {user ? user.name : 'Sign In'}
+            </Link>
+          )}
           {user && (
             <button
               type="button"
@@ -150,7 +152,9 @@ export function LandingNavigation() {
             ))}
           </ul>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            {user ? (
+            {sessionLoading ? (
+              <span role="status" className="h-11 animate-pulse rounded-2xl bg-white/70" aria-label="Đang khôi phục phiên đăng nhập" />
+            ) : user ? (
               <button
                 type="button"
                 onClick={() => void logout('/')}
@@ -217,7 +221,9 @@ export function WorldProgress() {
               </span>
               <span className="relative block h-9 w-[5px] overflow-hidden rounded-full bg-ink/12 sm:h-11">
                 <span
-                  ref={(el) => void (fills.current[i] = el)}
+                  ref={(el) => {
+                    fills.current[i] = el
+                  }}
                   className="absolute inset-0 origin-top rounded-full"
                   style={{ background: 'var(--accent)', transform: 'scaleY(0)' }}
                 />

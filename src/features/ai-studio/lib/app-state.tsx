@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-react';
 import { api, authEvents, type User, type Wallet } from './api';
-import { fetchMe, logout as logoutSession } from '../../auth/services/session';
+import { fetchMe, getCachedSessionUser, logout as logoutSession } from '../../auth/services/session';
 
 // ---------------- Toasts ----------------
 type ToastKind = 'success' | 'error' | 'warning' | 'info';
@@ -51,8 +51,9 @@ const AuthCtx = createContext<AuthState>(null as unknown as AuthState);
 export const useAuth = () => useContext(AuthCtx);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedUser = getCachedSessionUser();
+  const [user, setUser] = useState<User | null>(cachedUser);
+  const [loading, setLoading] = useState(!cachedUser);
   const [provider, setProvider] = useState<'meshy' | 'mock' | null>(null);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const toast = useToast();
