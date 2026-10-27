@@ -41,14 +41,16 @@ export function RequestDetailPage() {
 export function RequestRevisePage() {
   const { requestId = '' } = useParams()
   const [file, setFile] = useState<File | null>(null)
-  const [version, setVersion] = useState(1)
   const navigate = useNavigate()
   const client = useQueryClient()
+  const request = useQuery({ queryKey: ['pod', 'requests', requestId], queryFn: ({ signal }) => podService.getRequest(requestId, signal), enabled: !!requestId })
   const mutation = useMutation({ mutationFn: () => {
     if (!file) throw new Error('Vui lòng chọn tệp thay thế.')
+    const version = request.data?.workflow?.currentFileVersion
+    if (!version) throw new Error('Không xác định được phiên bản file hiện tại.')
     return podService.replaceRequestFile(requestId, version, file)
-  }, onSuccess: async () => { await client.invalidateQueries({ queryKey: ['pod', 'requests'] }); navigate(`/requests/${requestId}`) } })
+  }, onSuccess: async () => { await client.invalidateQueries({ queryKey: ['pod', 'requests'] }); navigate(`/print/preview?id=${requestId}`) } })
   return <div className="pod-page"><PageHero screen={screenById(18)} />
-    <div className="pod-content-grid"><Panel title="Tệp 3D thay thế" hint="Backend kiểm tra version để tránh ghi đè đồng thời"><form className="pod-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate() }}><label className="pod-dropzone"><FileUp /><strong>{file?.name ?? 'Chọn tệp STL, GLB hoặc OBJ mới'}</strong><span>Tệp cũ vẫn được giữ trong lịch sử phiên bản</span><input required type="file" accept=".stl,.glb,.obj" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label><label><span>Phiên bản tệp hiện tại</span><input min={1} type="number" value={version} onChange={(event) => setVersion(Number(event.target.value))} /></label>{mutation.isError && <StateBlock state="error" title="Không thể cập nhật tệp" body={mutation.error.message} />}<button type="submit" className="pod-primary" disabled={!file || mutation.isPending}>{mutation.isPending ? 'Đang tải phiên bản mới...' : 'Tải Lên & Gửi Thẩm Định Lại'}</button></form></Panel><Panel title="Ý kiến kỹ thuật từ xưởng"><div className="pod-warning"><strong>Độ dày thành chưa đạt</strong><p>Hãy cập nhật bản vẽ theo ghi chú của kỹ thuật viên trước khi tải phiên bản mới.</p></div></Panel></div>
+    <div className="pod-content-grid"><Panel title="Tệp 3D thay thế" hint="Backend kiểm tra version để tránh ghi đè đồng thời"><form className="pod-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate() }}><label className="pod-dropzone"><FileUp /><strong>{file?.name ?? 'Chọn tệp STL, GLB, OBJ hoặc 3MF mới'}</strong><span>Tệp cũ vẫn được giữ trong lịch sử phiên bản</span><input required type="file" accept=".stl,.glb,.obj,.3mf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label><div className="pod-context">Phiên bản hiện tại: <strong>v{request.data?.workflow?.currentFileVersion ?? '...'}</strong></div>{mutation.isError && <StateBlock state="error" title="Không thể cập nhật tệp" body={mutation.error.message} />}<button type="submit" className="pod-primary" disabled={!file || mutation.isPending || !request.data?.workflow?.allowedActions.editFile}>{mutation.isPending ? 'Đang tải phiên bản mới...' : 'Tải lên & xem trước lại'}</button></form></Panel><Panel title="Ý kiến kỹ thuật từ xưởng"><div className="pod-warning"><strong>Revision giữ nguyên request ID</strong><p>File mới tạo một version mới. Sau đó Customer phải preview, cấu hình và resubmit theo cùng workflow.</p></div></Panel></div>
   </div>
 }
