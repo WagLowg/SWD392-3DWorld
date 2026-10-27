@@ -11,6 +11,8 @@ import Inspector from './components/Inspector';
 import Viewport from './components/Viewport';
 import Modals from './components/Modals';
 import { StatusBar, Toasts } from './components/StatusBar';
+import StudioSidebar from './components/StudioSidebar';
+import StudioGlobalHeader from './components/StudioGlobalHeader';
 
 function isTyping(e: KeyboardEvent) {
   const t = e.target as HTMLElement | null;
@@ -107,13 +109,17 @@ function StudioPage({ projectId }: { projectId: string }) {
   if (found === null) return <div style={{ display: 'grid', placeItems: 'center', height: '100vh', color: '#a6adbc' }}>Đang mở dự án…</div>;
   return (
     <>
-      <div className="app">
-        <TopBar />
-        <Toolbar />
-        <LeftPanel />
-        <main className="viewport" aria-label="Viewport 3D"><Viewport /></main>
-        <Inspector />
-        <StatusBar />
+      <div className="studio-editor-shell">
+        <StudioGlobalHeader />
+        <StudioSidebar active="projects" compact />
+        <div className="app">
+          <TopBar />
+          <Toolbar />
+          <LeftPanel />
+          <main className="viewport" aria-label="Viewport 3D"><Viewport /></main>
+          <Inspector />
+          <StatusBar />
+        </div>
       </div>
       <div className="mobile-block">
         <div>

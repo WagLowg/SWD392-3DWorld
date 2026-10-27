@@ -48,7 +48,7 @@ export const useCreateStorefront = () =>
     'Đã tạo gian hàng — thanh toán gói để kích hoạt.',
   )
 export const useRenew = () =>
-  useMockAction((planId: string) => sellerService.renew(planId), ALL, 'Đang chuyển sang ZaloPay để thanh toán gói…')
+  useMockAction(() => sellerService.renew(), ALL, 'Đang chuyển sang ZaloPay để thanh toán gói…')
 export const useUploadProductMedia = () =>
   useMockAction(
     ({ productId, file, sortOrder }: { productId: number; file: File; sortOrder?: number }) =>

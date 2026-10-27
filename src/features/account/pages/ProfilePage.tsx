@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { BadgeCheck, History, Mail, Phone, ShieldCheck, ShoppingBag, Store, User } from 'lucide-react'
-import { useEffect, useId } from 'react'
+import { BadgeCheck, History, Mail, PencilLine, Phone, ShieldCheck, ShoppingBag, Store, User } from 'lucide-react'
+import { useEffect, useId, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { ApiClientError } from '../../../shared/api'
 import { Field, FormError, inputClass, SubmitButton } from '../../../shared/ui/form'
@@ -60,6 +60,7 @@ export function ProfilePage() {
 
 function ProfileContent({ profile }: { profile: Profile }) {
   const uid = useId()
+  const [isEditing, setIsEditing] = useState(false)
   const update = useUpdateProfile()
   const toast = useToast()
   const {
@@ -74,9 +75,11 @@ function ProfileContent({ profile }: { profile: Profile }) {
   })
 
   const submit = handleSubmit(async (v) => {
+    if (!isEditing) return
     try {
       const saved = await update.mutateAsync({ fullName: v.fullName, phone: v.phone || undefined })
       reset({ fullName: saved.fullName ?? '', phone: saved.phone ?? '' })
+      setIsEditing(false)
       toast('Đã lưu hồ sơ.')
     } catch (e) {
       setError('root', { message: e instanceof ApiClientError ? e.message : 'Không lưu được hồ sơ.' })
@@ -84,6 +87,11 @@ function ProfileContent({ profile }: { profile: Profile }) {
   })
 
   const roles = profile.roles?.length ? profile.roles : ['CUSTOMER']
+  const canEdit = profile.capabilities?.includes('PROFILE_UPDATE') ?? false
+  const cancelEditing = () => {
+    reset({ fullName: profile.fullName ?? '', phone: profile.phone ?? '' })
+    setIsEditing(false)
+  }
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[360px_1fr]">
@@ -138,6 +146,24 @@ function ProfileContent({ profile }: { profile: Profile }) {
               <span className="block text-xs text-ink-soft">Thông tin liên hệ và định tuyến đơn hàng vật lý</span>
             </span>
           </span>
+          {isEditing ? (
+            <span className="rounded-full bg-violet-soft px-3 py-1.5 font-label text-xs font-semibold text-violet">
+              Đang chỉnh sửa
+            </span>
+          ) : canEdit ? (
+            <button
+              type="button"
+              onClick={() => {
+                reset({ fullName: profile.fullName ?? '', phone: profile.phone ?? '' })
+                setIsEditing(true)
+              }}
+              className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 font-label text-xs font-semibold text-white transition hover:bg-violet"
+            >
+              <PencilLine size={14} /> Chỉnh sửa hồ sơ
+            </button>
+          ) : (
+            <span className="rounded-full bg-white px-3 py-1.5 font-label text-xs font-semibold text-ink-soft">Chỉ xem</span>
+          )}
         </div>
 
         <form onSubmit={submit} noValidate className="mt-6 space-y-5">
@@ -151,7 +177,10 @@ function ProfileContent({ profile }: { profile: Profile }) {
               id={`${uid}-name`}
               autoComplete="name"
               aria-invalid={!!errors.fullName}
-              className={inputClass}
+              aria-readonly={!isEditing}
+              readOnly={!isEditing}
+              tabIndex={isEditing ? 0 : -1}
+              className={`${inputClass} ${!isEditing ? 'cursor-default text-ink' : ''}`}
               {...register('fullName')}
             />
           </Field>
@@ -184,7 +213,10 @@ function ProfileContent({ profile }: { profile: Profile }) {
               inputMode="tel"
               autoComplete="tel"
               aria-invalid={!!errors.phone}
-              className={inputClass}
+              aria-readonly={!isEditing}
+              readOnly={!isEditing}
+              tabIndex={isEditing ? 0 : -1}
+              className={`${inputClass} ${!isEditing ? 'cursor-default text-ink' : ''}`}
               {...register('phone')}
             />
           </Field>
@@ -211,18 +243,22 @@ function ProfileContent({ profile }: { profile: Profile }) {
             <ApiNote className="mt-2">Vai trò do quản trị viên cấp, người dùng không tự đổi được.</ApiNote>
           </div>
 
-          <FormError message={errors.root?.message} />
-          <div className="flex flex-wrap items-center gap-3">
-            <SubmitButton busy={update.isPending}>Lưu thay đổi hồ sơ</SubmitButton>
-            <button
-              type="button"
-              disabled={!isDirty}
-              onClick={() => reset()}
-              className="rounded-full px-5 py-3 font-label text-sm font-semibold text-ink-soft hover:bg-surface-low disabled:opacity-40"
-            >
-              Huỷ thao tác
-            </button>
-          </div>
+          {isEditing && (
+            <>
+              <FormError message={errors.root?.message} />
+              <div className="flex flex-wrap items-center gap-3">
+                <SubmitButton busy={update.isPending}>Xác nhận thay đổi</SubmitButton>
+                <button
+                  type="button"
+                  onClick={cancelEditing}
+                  className="rounded-full px-5 py-3 font-label text-sm font-semibold text-ink-soft hover:bg-surface-low"
+                >
+                  Huỷ chỉnh sửa
+                </button>
+                {!isDirty && <span className="font-label text-xs text-ink-soft">Chưa có thay đổi mới</span>}
+              </div>
+            </>
+          )}
         </form>
 
         <p className="mt-6 flex items-center gap-2 rounded-2xl bg-surface-low px-4 py-3 text-xs text-ink-soft">

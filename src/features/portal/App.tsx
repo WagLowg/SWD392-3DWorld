@@ -93,8 +93,10 @@ function Redirect({ to }: { to: string }) {
 function AccountPage({ children }: { children: ReactNode }) {
   return (
     <RequireUser>
-      <AccountTabs />
-      <div className="mx-auto max-w-[1320px] px-4 md:px-8">{children}</div>
+      <div className="mx-auto grid max-w-[1440px] gap-6 px-4 md:px-8 lg:grid-cols-[250px_minmax(0,1fr)] lg:items-start">
+        <AccountTabs />
+        <div className="min-w-0">{children}</div>
+      </div>
     </RequireUser>
   )
 }

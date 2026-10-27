@@ -6,7 +6,6 @@ import {
   disputes,
   earnings,
   inventoryLogs,
-  type Plan,
   type ProductStatus,
   type SellerApplication,
   type SellerProduct,
@@ -183,31 +182,21 @@ function subRow(s: ApiSubscription): Subscription['history'][number] {
   }
 }
 
-const MONTHLY_PLAN_ID = 'monthly'
-
-function toSubscription(o: ApiSubscriptionOverview): { subscription: Subscription; plans: Plan[] } {
+function toSubscription(o: ApiSubscriptionOverview): { subscription: Subscription; monthlyFee: number; hasPendingPayment: boolean } {
   const expiresAt = o.storefrontExpiresAt ?? o.latest?.endAt ?? null
   const left = expiresAt ? Date.parse(expiresAt) - Date.now() : -1
   const rows = [o.pending, o.latest].filter((s): s is ApiSubscription => !!s)
   return {
     subscription: {
-      planId: MONTHLY_PLAN_ID,
+      planId: 'monthly',
       status: left < 0 ? 'EXPIRED' : left < 7 * 86_400_000 ? 'EXPIRING' : 'ACTIVE',
       startedAt: o.latest?.startAt ?? nowIso(),
       expiresAt: expiresAt ?? nowIso(),
       autoRenew: false,
       history: rows.filter((s, i) => rows.findIndex((x) => x.id === s.id) === i).map(subRow),
     },
-    plans: [
-      {
-        id: MONTHLY_PLAN_ID,
-        name: 'Gói xưởng tháng',
-        price: Number(o.monthlyFee) || 0,
-        period: 'tháng',
-        perks: ['Mở bán sản phẩm trên Chợ Đồ Chơi', 'Kích hoạt 1 tháng lịch (UTC) sau khi thanh toán thành công'],
-        highlight: true,
-      },
-    ],
+    monthlyFee: Number(o.monthlyFee) || 0,
+    hasPendingPayment: !!o.pending,
   }
 }
 
@@ -353,7 +342,7 @@ export const sellerService = {
   },
 
   /** Tạo/dùng lại kỳ chờ thanh toán rồi chuyển sang ZaloPay. */
-  async renew(_planId: string) {
+  async renew() {
     const overview = await storefrontOwnerApi.subscription()
     const sub = overview.pending ?? (await storefrontOwnerApi.subscribe(!!overview.storefrontExpiresAt))
     const payment = await storefrontOwnerApi.paySubscription(sub.id)

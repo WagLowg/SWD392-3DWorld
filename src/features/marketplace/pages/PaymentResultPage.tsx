@@ -252,7 +252,7 @@ function SubscriptionResult({ id, gatewaySuccess, gatewayCode }: { id?: number }
     setRetryError('')
     setRetrying(true)
     try {
-      await sellerService.renew('monthly')
+      await sellerService.renew()
     } catch (e) {
       setRetryError(e instanceof Error ? e.message : 'Không tạo được liên kết ZaloPay.')
       setRetrying(false)
