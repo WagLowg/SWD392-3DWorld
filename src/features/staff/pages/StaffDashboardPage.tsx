@@ -22,7 +22,7 @@ import { formatDateTime } from '../../../shared/format'
 import { Hero, Pill, Section, StatCard, StatGrid } from '../../../shared/ui/kit'
 import { StaffHeader } from '../components/StaffHeader'
 import { StaffRefundBadge, StaffShipmentBadge } from '../components/StaffStatusBadge'
-import { INITIAL_STAFF_REFUNDS, INITIAL_STAFF_SHIPMENTS } from '../mocks/staffMockData'
+import { useStaffRefunds, useStaffShipments } from '../mocks/staffMockData'
 import type { ShipmentStatus, RefundStatus } from '../types/staff.types'
 
 interface ActivityItem {
@@ -37,6 +37,9 @@ interface ActivityItem {
 }
 
 export function StaffDashboardPage() {
+  const { refunds: staffRefunds } = useStaffRefunds()
+  const { shipments: staffShipments } = useStaffShipments()
+
   useEffect(() => {
     document.title = 'Tổng quan vận hành (Staff) · 3DWorld'
   }, [])
@@ -44,31 +47,32 @@ export function StaffDashboardPage() {
   // KPI counts dynamically calculated from existing mock records
   const shippingKpi = useMemo(() => {
     return {
-      total: INITIAL_STAFF_SHIPMENTS.length,
-      shipped: INITIAL_STAFF_SHIPMENTS.filter((s) => s.status === 'SHIPPED').length,
-      delivered: INITIAL_STAFF_SHIPMENTS.filter((s) => s.status === 'DELIVERED').length,
-      failed: INITIAL_STAFF_SHIPMENTS.filter((s) => s.status === 'FAILED').length,
-      returned: INITIAL_STAFF_SHIPMENTS.filter((s) => s.status === 'RETURNED').length,
+      total: staffShipments.length,
+      pending: staffShipments.filter((s) => s.status === 'PENDING').length,
+      shipped: staffShipments.filter((s) => s.status === 'SHIPPED').length,
+      delivered: staffShipments.filter((s) => s.status === 'DELIVERED').length,
+      failed: staffShipments.filter((s) => s.status === 'FAILED').length,
+      returned: staffShipments.filter((s) => s.status === 'RETURNED').length,
     }
-  }, [])
+  }, [staffShipments])
 
   const refundKpi = useMemo(() => {
     return {
-      total: INITIAL_STAFF_REFUNDS.length,
-      submitted: INITIAL_STAFF_REFUNDS.filter((r) => r.status === 'SUBMITTED').length,
-      underReview: INITIAL_STAFF_REFUNDS.filter((r) => r.status === 'UNDER_REVIEW').length,
-      needsInfo: INITIAL_STAFF_REFUNDS.filter((r) => r.status === 'NEEDS_INFO').length,
-      approved: INITIAL_STAFF_REFUNDS.filter((r) => r.status === 'APPROVED').length,
-      rejected: INITIAL_STAFF_REFUNDS.filter((r) => r.status === 'REJECTED').length,
+      total: staffRefunds.length,
+      submitted: staffRefunds.filter((r) => r.status === 'SUBMITTED').length,
+      underReview: staffRefunds.filter((r) => r.status === 'UNDER_REVIEW').length,
+      needsInfo: staffRefunds.filter((r) => r.status === 'NEEDS_INFO').length,
+      approved: staffRefunds.filter((r) => r.status === 'APPROVED').length,
+      rejected: staffRefunds.filter((r) => r.status === 'REJECTED').length,
     }
-  }, [])
+  }, [staffRefunds])
 
   // Recent activity compiled from shipment events & refund history
   const recentActivities: ActivityItem[] = useMemo(() => {
     const list: ActivityItem[] = []
 
     // Shipment events
-    for (const s of INITIAL_STAFF_SHIPMENTS) {
+    for (const s of staffShipments) {
       for (const ev of s.events) {
         list.push({
           id: `ship-${s.id}-${ev.id}`,
@@ -77,14 +81,14 @@ export function StaffDashboardPage() {
           description: `${s.storefrontName} → ${s.recipientName} (${s.recipientProvince})`,
           code: s.trackingNumber,
           timestamp: ev.timestamp,
-          link: `/portal/staff/shipments/${s.id}`,
+          link: `/staff/shipments/${s.id}`,
           statusElement: <StaffShipmentBadge status={s.status} />,
         })
       }
     }
 
     // Refund history
-    for (const r of INITIAL_STAFF_REFUNDS) {
+    for (const r of staffRefunds) {
       for (const h of r.history) {
         list.push({
           id: `ref-${r.id}-${h.id}`,
@@ -93,7 +97,7 @@ export function StaffDashboardPage() {
           description: h.note ? `${h.actor} — ${h.note}` : `${h.actor} — Đơn ${r.orderCode}`,
           code: r.code,
           timestamp: h.timestamp,
-          link: `/portal/staff/refunds/${r.id}`,
+          link: `/staff/refunds/${r.id}`,
           statusElement: <StaffRefundBadge status={r.status} />,
         })
       }
@@ -103,7 +107,7 @@ export function StaffDashboardPage() {
     return list
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 6)
-  }, [])
+  }, [staffRefunds, staffShipments])
 
   return (
     <div className="space-y-8">
@@ -121,7 +125,7 @@ export function StaffDashboardPage() {
       {/* 4.5 Quick Navigation Actions */}
       <div className="grid gap-4 sm:grid-cols-2">
         <Link
-          to="/portal/staff/shipments"
+          to="/staff/shipments"
           className="group flex items-center justify-between rounded-[2rem] border border-teal/20 bg-gradient-to-r from-teal-soft/40 to-white p-6 shadow-soft transition hover:-translate-y-0.5 hover:shadow-lift"
         >
           <div className="flex items-center gap-4">
@@ -144,7 +148,7 @@ export function StaffDashboardPage() {
         </Link>
 
         <Link
-          to="/portal/staff/refunds"
+          to="/staff/refunds"
           className="group flex items-center justify-between rounded-[2rem] border border-orange/20 bg-gradient-to-r from-peach/40 to-white p-6 shadow-soft transition hover:-translate-y-0.5 hover:shadow-lift"
         >
           <div className="flex items-center gap-4">
@@ -179,7 +183,7 @@ export function StaffDashboardPage() {
             </p>
           </div>
           <Link
-            to="/portal/staff/shipments"
+            to="/staff/shipments"
             className="inline-flex items-center gap-2 rounded-full bg-surface-low px-4 py-2 font-label text-xs font-semibold text-ink transition hover:bg-ink hover:text-white"
           >
             <span>Quản lý vận chuyển</span>
@@ -189,12 +193,12 @@ export function StaffDashboardPage() {
 
         <StatGrid>
           <StatCard
-            label="Tổng số vận đơn"
-            value={shippingKpi.total}
-            hint="Toàn bộ đơn đang quản lý"
-            icon={PackageCheck}
+            label="Chờ vận chuyển"
+            value={shippingKpi.pending}
+            hint="Chờ bàn giao bưu tá"
+            icon={Clock}
             tone="neutral"
-            to="/portal/staff/shipments"
+            to="/staff/shipments"
           />
           <StatCard
             label="Đang vận chuyển"
@@ -202,7 +206,7 @@ export function StaffDashboardPage() {
             hint="Kiện hàng đang luân chuyển"
             icon={Truck}
             tone="teal"
-            to="/portal/staff/shipments"
+            to="/staff/shipments"
           />
           <StatCard
             label="Giao thành công"
@@ -210,7 +214,7 @@ export function StaffDashboardPage() {
             hint="Đã phát tới người mua"
             icon={CheckCircle2}
             tone="green"
-            to="/portal/staff/shipments"
+            to="/staff/shipments"
           />
           <StatCard
             label="Giao thất bại"
@@ -218,15 +222,15 @@ export function StaffDashboardPage() {
             hint="Cần theo dõi phát lại"
             icon={AlertTriangle}
             tone="orange"
-            to="/portal/staff/shipments"
+            to="/staff/shipments"
           />
           <StatCard
-            label="Chuyển hoàn"
+            label="Đã chuyển hoàn"
             value={shippingKpi.returned}
             hint="Trả lại xưởng sản xuất"
-            icon={XCircle}
+            icon={RotateCcw}
             tone="danger"
-            to="/portal/staff/shipments"
+            to="/staff/shipments"
           />
         </StatGrid>
       </div>
@@ -243,7 +247,7 @@ export function StaffDashboardPage() {
             </p>
           </div>
           <Link
-            to="/portal/staff/refunds"
+            to="/staff/refunds"
             className="inline-flex items-center gap-2 rounded-full bg-surface-low px-4 py-2 font-label text-xs font-semibold text-ink transition hover:bg-ink hover:text-white"
           >
             <span>Quản lý hoàn tiền</span>
@@ -258,7 +262,7 @@ export function StaffDashboardPage() {
             hint="Hồ sơ khiếu nại đã tiếp nhận"
             icon={FileText}
             tone="neutral"
-            to="/portal/staff/refunds"
+            to="/staff/refunds"
           />
           <StatCard
             label="Chờ tiếp nhận"
@@ -266,7 +270,7 @@ export function StaffDashboardPage() {
             hint="Hồ sơ mới gửi"
             icon={Clock}
             tone="orange"
-            to="/portal/staff/refunds"
+            to="/staff/refunds"
           />
           <StatCard
             label="Đang thẩm định"
@@ -274,7 +278,7 @@ export function StaffDashboardPage() {
             hint="Đang đối chiếu chứng cứ"
             icon={AlertCircle}
             tone="violet"
-            to="/portal/staff/refunds"
+            to="/staff/refunds"
           />
           <StatCard
             label="Cần bổ sung bằng chứng"
@@ -282,15 +286,15 @@ export function StaffDashboardPage() {
             hint="Chờ khách bổ sung ảnh/video"
             icon={RotateCcw}
             tone="orange"
-            to="/portal/staff/refunds"
+            to="/staff/refunds"
           />
           <StatCard
-            label="Đã chấp thuận"
+            label="Đã duyệt (Chờ Admin)"
             value={refundKpi.approved}
-            hint="Phán quyết hoàn tiền"
+            hint="Chờ Admin giải ngân"
             icon={CheckCircle2}
             tone="green"
-            to="/portal/staff/refunds"
+            to="/staff/refunds"
           />
           <StatCard
             label="Đã từ chối"
@@ -298,7 +302,7 @@ export function StaffDashboardPage() {
             hint="Không đủ điều kiện"
             icon={XCircle}
             tone="danger"
-            to="/portal/staff/refunds"
+            to="/staff/refunds"
           />
         </StatGrid>
       </div>

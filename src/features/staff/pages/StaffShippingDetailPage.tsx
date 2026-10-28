@@ -1,14 +1,19 @@
 import {
+  AlertCircle,
   AlertTriangle,
-  ArrowLeft,
+  ArrowRight,
   Box,
   Building2,
   CheckCircle2,
   Clock,
+  CornerDownRight,
   FileText,
+  History,
+  Lock,
   MapPin,
   Package,
   Phone,
+  RotateCcw,
   ShieldAlert,
   Truck,
   User,
@@ -18,7 +23,6 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { formatDateTime, formatVnd } from '../../../shared/format'
 import {
-  AuditTimeline,
   Btn,
   DetailLayout,
   KeyValues,
@@ -28,21 +32,39 @@ import {
 } from '../../../shared/ui/kit'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { StaffHeader } from '../components/StaffHeader'
+import { StaffHorizontalShippingTracker } from '../components/StaffHorizontalShippingTracker'
 import { StaffShipmentBadge } from '../components/StaffStatusBadge'
-import { INITIAL_STAFF_SHIPMENTS } from '../mocks/staffMockData'
-import type { ShipmentStatus, StaffShipment, StaffShipmentEvent } from '../types/staff.types'
+import {
+  isReasonRequiredForTransition,
+  isValidShipmentTransition,
+  SHIPMENT_STATUS_LABELS,
+  VALID_SHIPMENT_TRANSITIONS,
+} from '../lib/shippingTransitions'
+import {
+  getStaffShipmentById,
+  updateStaffShipment,
+  useStaffShipments,
+} from '../mocks/staffMockData'
+import type {
+  ShipmentStatus,
+  StaffShipment,
+  StaffShipmentAuditEntry,
+  StaffShipmentEvent,
+} from '../types/staff.types'
 
 export function StaffShippingDetailPage() {
   const { shipmentId } = useParams<{ shipmentId: string }>()
   const idNum = Number(shipmentId)
 
-  const initial = INITIAL_STAFF_SHIPMENTS.find((s) => s.id === idNum)
-  const [shipment, setShipment] = useState<StaffShipment | null>(initial ?? null)
+  // Kết nối reactive demo store để đồng bộ trạng thái toàn cục
+  const { shipments } = useStaffShipments()
+  const shipment = shipments.find((s) => s.id === idNum) || null
 
-  // Prototype action modal state
-  const [activeModal, setActiveModal] = useState<ShipmentStatus | null>(null)
-  const [actionReason, setActionReason] = useState<string>('')
+  // Trạng thái modal xác nhận chuyển trạng thái thủ công
+  const [targetStatus, setTargetStatus] = useState<ShipmentStatus | null>(null)
+  const [updateReason, setUpdateReason] = useState<string>('')
   const [actionFeedback, setActionFeedback] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
 
   useEffect(() => {
     if (shipment) {
@@ -53,14 +75,14 @@ export function StaffShippingDetailPage() {
   if (!shipment) {
     return (
       <div>
-        <StaffHeader backTo="/portal/staff/shipments" backLabel="Về danh sách vận đơn" />
+        <StaffHeader backTo="/staff/shipments" backLabel="Về danh sách vận đơn" />
         <StatusBlock
           tone="empty"
           title="Không tìm thấy vận đơn"
           body={`Vận đơn có mã số #${shipmentId} không tồn tại trong danh mục theo dõi.`}
           action={
             <Link
-              to="/portal/staff/shipments"
+              to="/staff/shipments"
               className="rounded-full bg-ink px-6 py-2.5 font-label text-xs font-semibold text-white"
             >
               Xem tất cả vận đơn
@@ -71,53 +93,107 @@ export function StaffShippingDetailPage() {
     )
   }
 
-  // Handle local simulated action
-  const handleApplySimulatedEvent = (status: ShipmentStatus) => {
-    const reasonText = actionReason.trim() || 'Cập nhật từ bảng điều khiển Staff (Mô phỏng UI)'
-    const nowIso = new Date().toISOString()
+  const allowedTransitions = VALID_SHIPMENT_TRANSITIONS[shipment.status] || []
+  const isTerminalState = allowedTransitions.length === 0
 
-    const newEvent: StaffShipmentEvent = {
-      id: `ev-sim-${Date.now()}`,
-      timestamp: nowIso,
-      status: status,
-      title:
-        status === 'DELIVERED'
-          ? 'Xác nhận giao hàng thành công (Mô phỏng)'
-          : status === 'FAILED'
-            ? 'Báo giao hàng thất bại (Mô phỏng)'
-            : 'Xác nhận chuyển hoàn về xưởng (Mô phỏng)',
-      description: reasonText,
-      location: 'Hệ thống Staff 3DWorld (Demo)',
-      actor: 'Nhân viên vận hành (Phiên làm việc hiện tại)',
+  // Mở modal xác nhận cập nhật trạng thái
+  const handleOpenModal = (target: ShipmentStatus) => {
+    setTargetStatus(target)
+    setUpdateReason('')
+    setFormError(null)
+  }
+
+  // Đóng modal
+  const handleCloseModal = () => {
+    setTargetStatus(null)
+    setUpdateReason('')
+    setFormError(null)
+  }
+
+  // Xác nhận cập nhật trạng thái thủ công (Staff Manual Status Update)
+  const handleConfirmTransition = () => {
+    if (!targetStatus) return
+
+    // Kiểm tra tính hợp lệ của luồng chuyển đổi trạng thái
+    if (!isValidShipmentTransition(shipment.status, targetStatus)) {
+      setFormError(
+        `Chuyển đổi từ ${SHIPMENT_STATUS_LABELS[shipment.status]} sang ${SHIPMENT_STATUS_LABELS[targetStatus]} không hợp lệ theo quy trình vận hành.`,
+      )
+      return
     }
 
-    setShipment((prev) => {
-      if (!prev) return null
+    // Kiểm tra lý do bắt buộc với FAILED hoặc RETURNED
+    const isReasonMandatory = isReasonRequiredForTransition(targetStatus)
+    const trimmedReason = updateReason.trim()
+    if (isReasonMandatory && !trimmedReason) {
+      setFormError(
+        `Bắt buộc nhập lý do khi chuyển trạng thái sang "${SHIPMENT_STATUS_LABELS[targetStatus]}" để lưu vào biên bản đối soát.`,
+      )
+      return
+    }
+
+    const nowIso = new Date().toISOString()
+    const reasonText = trimmedReason || `Cập nhật thủ công bởi Staff sang ${SHIPMENT_STATUS_LABELS[targetStatus]}`
+
+    // 1. Tạo bản ghi Audit Log chuẩn Staff Manual Update
+    const newAuditEntry: StaffShipmentAuditEntry = {
+      id: `audit-${Date.now()}`,
+      timestamp: nowIso,
+      previousStatus: shipment.status,
+      newStatus: targetStatus,
+      updatedBy: 'Staff Vận Hành (PRINT_STAFF)',
+      reason: trimmedReason || undefined,
+      source: 'STAFF_MANUAL',
+    }
+
+    // 2. Tạo bản ghi sự kiện Timeline tương thích
+    const newTimelineEvent: StaffShipmentEvent = {
+      id: `ev-manual-${Date.now()}`,
+      timestamp: nowIso,
+      status: targetStatus,
+      title:
+        targetStatus === 'SHIPPED'
+          ? 'Xác nhận bàn giao đơn vị vận chuyển (Thủ công)'
+          : targetStatus === 'DELIVERED'
+            ? 'Xác nhận phát hàng thành công (Thủ công)'
+            : targetStatus === 'FAILED'
+              ? 'Ghi nhận giao hàng thất bại (Thủ công)'
+              : 'Xác nhận chuyển hoàn về xưởng (Thủ công)',
+      description: reasonText,
+      location: 'Hệ thống Staff 3DWorld',
+      actor: 'Nhân viên vận hành (PRINT_STAFF)',
+    }
+
+    // 3. Cập nhật vào reactive store
+    updateStaffShipment(shipment.id, (prev) => {
+      const existingAudit = prev.auditHistory || []
       return {
         ...prev,
-        status: status,
-        deliveredAt: status === 'DELIVERED' ? nowIso : prev.deliveredAt,
+        status: targetStatus,
+        deliveredAt: targetStatus === 'DELIVERED' ? nowIso : prev.deliveredAt,
         lastUpdatedAt: nowIso,
-        deliveryAttempts: status === 'FAILED' ? prev.deliveryAttempts + 1 : prev.deliveryAttempts,
-        failureReason: status === 'FAILED' ? reasonText : prev.failureReason,
-        events: [newEvent, ...prev.events],
+        deliveryAttempts:
+          targetStatus === 'FAILED' ? prev.deliveryAttempts + 1 : prev.deliveryAttempts,
+        failureReason: targetStatus === 'FAILED' ? reasonText : prev.failureReason,
+        auditHistory: [newAuditEntry, ...existingAudit],
+        events: [newTimelineEvent, ...prev.events],
       }
     })
 
     setActionFeedback(
-      `Đã cập nhật trạng thái vận đơn sang "${
-        status === 'DELIVERED' ? 'Giao thành công' : status === 'FAILED' ? 'Giao thất bại' : 'Chuyển hoàn'
-      }" (Dữ liệu mô phỏng local).`,
+      `Đã chuyển trạng thái vận đơn sang "${SHIPMENT_STATUS_LABELS[targetStatus]}" thành công. Bản ghi đối soát đã được lưu.`,
     )
-    setActiveModal(null)
-    setActionReason('')
+    handleCloseModal()
   }
+
+  // Danh sách lịch sử cập nhật trạng thái thủ công (Manual Audit History)
+  const auditEntries = shipment.auditHistory || []
 
   return (
     <div className="space-y-6">
-      <StaffHeader backTo="/portal/staff/shipments" backLabel="Quay lại danh sách vận chuyển" />
+      <StaffHeader backTo="/staff/shipments" backLabel="Quay lại danh sách vận chuyển" />
 
-      {/* Top Banner Card */}
+      {/* Top Banner Card: Thông tin cơ bản và mã vận đơn */}
       <div className="rounded-[2rem] bg-white/95 p-6 shadow-soft sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -134,19 +210,20 @@ export function StaffShippingDetailPage() {
               {shipment.trackingNumber}
             </h1>
             <p className="mt-1 font-label text-sm text-ink-soft">
-              Đơn vị vận chuyển:{' '}
-              <strong className="text-ink">{shipment.carrierName}</strong>
+              Đơn vị vận chuyển: <strong className="text-ink">{shipment.carrierName}</strong>
+              <span className="ml-2 font-mono text-xs opacity-75">({shipment.carrierCode})</span>
             </p>
           </div>
 
           <div className="flex flex-col items-end gap-2">
             <StaffShipmentBadge status={shipment.status} />
             <span className="font-mono text-[11px] text-ink-soft">
-              Cập nhật: {formatDateTime(shipment.lastUpdatedAt)}
+              Cập nhật lần cuối: {formatDateTime(shipment.lastUpdatedAt)}
             </span>
           </div>
         </div>
 
+        {/* Feedback Alert Banner */}
         {actionFeedback && (
           <div className="mt-4 flex items-center justify-between rounded-2xl bg-mint px-4 py-3 text-xs font-semibold text-[#0f5132]">
             <div className="flex items-center gap-2">
@@ -164,12 +241,72 @@ export function StaffShippingDetailPage() {
         )}
       </div>
 
-      {/* Main Grid: Left Details, Right Operations */}
+      {/* HORIZONTAL SHIPPING STATUS TRACKER */}
+      <StaffHorizontalShippingTracker shipment={shipment} />
+
+      {/* Main Grid: Left Details & Audit Log, Right Operations & Financial */}
       <DetailLayout
         main={
           <>
-            {/* Section 1: Thông tin lấy và giao hàng */}
-            <Section n={1} title="Thông tin giao nhận & địa chỉ">
+            {/* Primary Section: Lịch sử cập nhật trạng thái (Manual Audit Log) */}
+            <Section
+              n={1}
+              title="Lịch sử cập nhật trạng thái (Manual Audit Log)"
+              subtitle="Ghi nhận thao tác cập nhật thủ công của Staff và mốc chuyển trạng thái của vận đơn"
+            >
+              {auditEntries.length === 0 ? (
+                <div className="rounded-2xl border border-line bg-surface-low/50 p-6 text-center text-xs text-ink-soft">
+                  Chưa có lượt cập nhật trạng thái thủ công nào được ghi nhận cho vận đơn này.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {auditEntries.map((audit) => (
+                    <div
+                      key={audit.id}
+                      className="rounded-2xl border border-line bg-white/90 p-4 transition hover:bg-surface-low/30"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/60 pb-2">
+                        <div className="flex items-center gap-2">
+                          <StaffShipmentBadge status={audit.previousStatus} />
+                          <ArrowRight size={14} className="text-ink-soft" />
+                          <StaffShipmentBadge status={audit.newStatus} />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Pill
+                            tone={audit.source === 'STAFF_MANUAL' ? 'violet' : 'neutral'}
+                            code={audit.source}
+                          >
+                            {audit.source === 'STAFF_MANUAL'
+                              ? 'Staff Manual Update'
+                              : 'Khởi tạo hệ thống'}
+                          </Pill>
+                          <span className="font-mono text-[11px] text-ink-soft">
+                            {formatDateTime(audit.timestamp)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-2.5 flex flex-wrap items-baseline justify-between gap-2 text-xs">
+                        <div>
+                          <span className="font-medium text-ink-soft">Người thực hiện: </span>
+                          <strong className="text-ink">{audit.updatedBy}</strong>
+                        </div>
+                      </div>
+
+                      {audit.reason && (
+                        <div className="mt-2 rounded-xl bg-surface-low p-2.5 text-xs text-ink">
+                          <span className="font-semibold text-ink-soft">Lý do / Ghi chú: </span>
+                          {audit.reason}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Section>
+
+            {/* Secondary Section: Thông tin giao nhận & địa chỉ */}
+            <Section n={2} title="Thông tin giao nhận & địa chỉ">
               <div className="grid gap-4 sm:grid-cols-2">
                 {/* Sender */}
                 <div className="rounded-2xl bg-surface-low p-4">
@@ -214,8 +351,8 @@ export function StaffShippingDetailPage() {
               )}
             </Section>
 
-            {/* Section 2: Kiện hàng & Tác phẩm 3D */}
-            <Section n={2} title="Quy cách kiện hàng & Tác phẩm">
+            {/* Section 3: Kiện hàng & Tác phẩm 3D */}
+            <Section n={3} title="Quy cách kiện hàng & Tác phẩm 3D">
               <KeyValues
                 cols={3}
                 items={[
@@ -269,8 +406,24 @@ export function StaffShippingDetailPage() {
               </div>
             </Section>
 
-            {/* Section 3: Lộ trình vận chuyển (Timeline) */}
-            <Section n={3} title="Hành trình kiện hàng GHTK">
+            {/* Demoted Section: Dữ liệu hành trình GHTK ban đầu (Historical Demo Data) */}
+            <Section
+              n={4}
+              title="Dữ liệu hành trình GHTK ban đầu (Historical Demo Data)"
+              subtitle="Lộ trình tham khảo từ đơn vị giao vận — Không kết nối API trực tiếp"
+            >
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/60 p-3.5 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+                  <div>
+                    <strong className="font-semibold">Lưu ý tích hợp:</strong> Nền tảng hiện
+                    chưa kết nối trực tiếp với API nhà vận chuyển GHTK. Lộ trình dưới đây là dữ liệu
+                    mô phỏng minh họa hành trình tiêu chuẩn. Mọi thay đổi thực tế cần do Staff xác
+                    nhận qua bảng điều khiển vận hành bên cạnh.
+                  </div>
+                </div>
+              </div>
+
               <ol className="relative space-y-6 border-l-2 border-line/80 pl-6 text-sm">
                 {shipment.events.map((ev, idx) => (
                   <li key={ev.id} className="relative">
@@ -310,39 +463,101 @@ export function StaffShippingDetailPage() {
         }
         aside={
           <>
-            {/* Staff Action Prototype Section */}
+            {/* Staff Action Panel: Manual Status Management */}
             <Section
               title="Thao tác vận hành Staff"
-              subtitle="Chế độ mô phỏng giao diện (Demo Prototype)"
+              subtitle="Cập nhật trạng thái thủ công (Manual Status Management)"
             >
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setActiveModal('DELIVERED')}
-                  className="w-full rounded-2xl bg-mint px-4 py-3 font-label text-xs font-bold text-[#0f5132] transition hover:brightness-95"
-                >
-                  Xác nhận giao thành công
-                </button>
+              {isTerminalState ? (
+                <div className="rounded-2xl border border-line bg-surface-low p-4 text-center">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                    <Lock size={18} />
+                  </div>
+                  <h4 className="mt-2.5 font-display text-xs font-bold text-ink">
+                    Trạng thái kết thúc (Terminal State)
+                  </h4>
+                  <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
+                    Vận đơn đã đạt trạng thái{' '}
+                    <strong className="text-ink">
+                      {SHIPMENT_STATUS_LABELS[shipment.status]}
+                    </strong>
+                    . Không còn thao tác chuyển tiếp nào khả dụng.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  <p className="text-xs text-ink-soft">
+                    Trạng thái hiện tại:{' '}
+                    <strong className="text-ink">{SHIPMENT_STATUS_LABELS[shipment.status]}</strong>.
+                    Chọn trạng thái chuyển tiếp hợp lệ:
+                  </p>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveModal('FAILED')}
-                  className="w-full rounded-2xl bg-peach px-4 py-3 font-label text-xs font-bold text-orange-deep transition hover:brightness-95"
-                >
-                  Báo giao thất bại
-                </button>
+                  {/* Transition: PENDING -> SHIPPED */}
+                  {allowedTransitions.includes('SHIPPED') && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenModal('SHIPPED')}
+                      className="flex w-full items-center justify-between rounded-2xl bg-sky-500/10 px-4 py-3 font-label text-xs font-bold text-sky-700 transition hover:bg-sky-500/20 dark:text-sky-300"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Truck size={16} />
+                        <span>Bàn giao vận chuyển</span>
+                      </div>
+                      <span className="font-mono text-[10px] uppercase">SHIPPED</span>
+                    </button>
+                  )}
 
-                <button
-                  type="button"
-                  onClick={() => setActiveModal('RETURNED')}
-                  className="w-full rounded-2xl bg-[#ffdad6] px-4 py-3 font-label text-xs font-bold text-danger transition hover:brightness-95"
-                >
-                  Xác nhận chuyển hoàn
-                </button>
-              </div>
+                  {/* Transition: SHIPPED -> DELIVERED */}
+                  {allowedTransitions.includes('DELIVERED') && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenModal('DELIVERED')}
+                      className="flex w-full items-center justify-between rounded-2xl bg-mint px-4 py-3 font-label text-xs font-bold text-[#0f5132] transition hover:brightness-95"
+                    >
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 size={16} />
+                        <span>Xác nhận giao thành công</span>
+                      </div>
+                      <span className="font-mono text-[10px] uppercase">DELIVERED</span>
+                    </button>
+                  )}
+
+                  {/* Transition: SHIPPED -> FAILED */}
+                  {allowedTransitions.includes('FAILED') && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenModal('FAILED')}
+                      className="flex w-full items-center justify-between rounded-2xl bg-peach px-4 py-3 font-label text-xs font-bold text-orange-deep transition hover:brightness-95"
+                    >
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle size={16} />
+                        <span>Báo giao hàng thất bại</span>
+                      </div>
+                      <span className="font-mono text-[10px] uppercase">FAILED</span>
+                    </button>
+                  )}
+
+                  {/* Transition: SHIPPED -> RETURNED or FAILED -> RETURNED */}
+                  {allowedTransitions.includes('RETURNED') && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenModal('RETURNED')}
+                      className="flex w-full items-center justify-between rounded-2xl bg-[#ffdad6] px-4 py-3 font-label text-xs font-bold text-danger transition hover:brightness-95"
+                    >
+                      <div className="flex items-center gap-2">
+                        <RotateCcw size={16} />
+                        <span>Xác nhận chuyển hoàn</span>
+                      </div>
+                      <span className="font-mono text-[10px] uppercase">RETURNED</span>
+                    </button>
+                  )}
+                </div>
+              )}
 
               <div className="mt-4 rounded-xl bg-surface-low p-3 text-[11px] leading-relaxed text-ink-soft">
-                <span className="font-semibold text-ink">Lưu ý nghiệp vụ:</span> Thao tác cập nhật sự kiện vận chuyển mô phỏng thay đổi trạng thái kiện hàng và ghi nhận mốc giao trên trình duyệt của Staff.
+                <span className="font-semibold text-ink">Lưu ý vận hành:</span> Do hệ thống chưa có
+                tích hợp live webhook từ GHTK, Staff chịu trách nhiệm xác minh và cập nhật thủ công
+                trạng thái vận đơn khi nhận được thông báo từ shipper hoặc khách hàng.
               </div>
             </Section>
 
@@ -360,7 +575,10 @@ export function StaffShippingDetailPage() {
                   },
                   {
                     label: 'Hình thức',
-                    value: shipment.paymentMethod === 'ZALOPAY' ? 'Thanh toán ZaloPay' : 'COD (Thu hộ)',
+                    value:
+                      shipment.paymentMethod === 'ZALOPAY'
+                        ? 'Thanh toán ZaloPay'
+                        : 'COD (Thu hộ khi giao)',
                   },
                 ]}
                 total={{
@@ -389,67 +607,112 @@ export function StaffShippingDetailPage() {
         }
       />
 
-      {/* Modal Dialog for Prototype Event Action */}
-      {activeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+      {/* Confirmation Dialog Modal for Manual Status Update */}
+      {targetStatus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-lift animate-fade-up">
             <h3 className="font-display text-lg font-bold text-ink">
-              {activeModal === 'DELIVERED'
-                ? 'Xác nhận: Giao hàng thành công'
-                : activeModal === 'FAILED'
-                  ? 'Báo cáo: Giao hàng không thành công'
-                  : 'Xác nhận: Chuyển hoàn về xưởng'}
+              Xác nhận cập nhật trạng thái vận đơn
             </h3>
             <p className="mt-1 text-xs text-ink-soft">
-              Vận đơn: <strong className="text-ink">{shipment.trackingNumber}</strong>
+              Thao tác cập nhật thủ công bởi Staff trên hệ thống vận hành 3DWorld
             </p>
 
+            {/* Shipment Summary Info */}
+            <div className="mt-4 rounded-xl bg-surface-low p-3.5 text-xs space-y-2">
+              <div className="flex justify-between">
+                <span className="text-ink-soft">Mã vận đơn:</span>
+                <span className="font-mono font-semibold text-ink">
+                  {shipment.trackingNumber}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-ink-soft">Mã đơn hàng:</span>
+                <span className="font-mono font-semibold text-ink">
+                  #{shipment.orderCode}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-t border-line/60 pt-2">
+                <span className="text-ink-soft">Trạng thái hiện tại:</span>
+                <StaffShipmentBadge status={shipment.status} />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-ink">Trạng thái mới:</span>
+                <StaffShipmentBadge status={targetStatus} />
+              </div>
+            </div>
+
+            {/* Note / Reason Field */}
             <div className="mt-4">
               <label
-                htmlFor="action-reason"
-                className="block font-label text-xs font-semibold text-ink-soft"
+                htmlFor="update-reason"
+                className="flex items-center justify-between font-label text-xs font-semibold text-ink-soft"
               >
-                Ghi chú đối soát / Lý do cập nhật
+                <span>
+                  Lý do / Ghi chú đối soát{' '}
+                  {isReasonRequiredForTransition(targetStatus) && (
+                    <span className="text-danger">* (Bắt buộc)</span>
+                  )}
+                </span>
+                {isReasonRequiredForTransition(targetStatus) && (
+                  <span className="text-[11px] font-normal text-danger">Không được để trống</span>
+                )}
               </label>
               <textarea
-                id="action-reason"
+                id="update-reason"
                 rows={3}
-                value={actionReason}
-                onChange={(e) => setActionReason(e.target.value)}
+                value={updateReason}
+                onChange={(e) => {
+                  setUpdateReason(e.target.value)
+                  if (formError) setFormError(null)
+                }}
                 placeholder={
-                  activeModal === 'DELIVERED'
-                    ? 'VD: Khách hàng đã ký nhận đúng người, kiện hàng nguyên vẹn...'
-                    : activeModal === 'FAILED'
-                      ? 'VD: Thuê bao bận, shipper gọi 3 cuộc không nghe máy...'
-                      : 'VD: Khách từ chối nhận, hoàn lại xưởng Triều Khúc...'
+                  targetStatus === 'SHIPPED'
+                    ? 'VD: Đã đóng gói hoàn tất và bàn giao bưu tá bưu cục Triều Khúc...'
+                    : targetStatus === 'DELIVERED'
+                      ? 'VD: Khách hàng đã nhận nguyên vẹn theo biên bản bàn giao...'
+                      : targetStatus === 'FAILED'
+                        ? 'Bắt buộc: VD: Gọi khách 3 cuộc không nghe máy / Thuê bao không liên lạc được...'
+                        : 'Bắt buộc: VD: Khách từ chối nhận hàng, bưu tá làm thủ tục chuyển hoàn về xưởng...'
                 }
                 className="mt-1.5 w-full rounded-2xl bg-surface-low p-3 text-xs outline-none focus:ring-2 focus:ring-violet/40"
               />
             </div>
 
+            {formError && (
+              <div className="mt-3 rounded-xl bg-rose-50 p-2.5 text-xs font-medium text-danger">
+                {formError}
+              </div>
+            )}
+
+            <div className="mt-4 rounded-xl bg-amber-50/60 p-2.5 text-[11px] text-amber-800">
+              <strong>Lưu ý nghiệp vụ:</strong> Dữ liệu cập nhật sẽ được lưu vào lịch sử đối soát
+              (Audit Log) và đồng bộ tức thời trên giao diện làm việc của Staff.
+            </div>
+
             <div className="mt-6 flex items-center justify-end gap-2.5">
               <button
                 type="button"
-                onClick={() => {
-                  setActiveModal(null)
-                  setActionReason('')
-                }}
+                onClick={handleCloseModal}
                 className="rounded-full bg-surface-low px-5 py-2 font-label text-xs font-semibold text-ink-soft hover:bg-surface-high"
               >
                 Huỷ bỏ
               </button>
               <button
                 type="button"
-                onClick={() => handleApplySimulatedEvent(activeModal)}
-                className={`rounded-full px-5 py-2 font-label text-xs font-semibold text-white transition ${
-                  activeModal === 'DELIVERED'
+                onClick={handleConfirmTransition}
+                disabled={isReasonRequiredForTransition(targetStatus) && !updateReason.trim()}
+                className={`rounded-full px-5 py-2 font-label text-xs font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                  targetStatus === 'DELIVERED'
                     ? 'bg-ink hover:bg-violet'
-                    : activeModal === 'FAILED'
+                    : targetStatus === 'FAILED'
                       ? 'bg-orange hover:bg-orange-deep'
-                      : 'bg-danger hover:opacity-90'
+                      : targetStatus === 'RETURNED'
+                        ? 'bg-danger hover:opacity-90'
+                        : 'bg-sky-600 hover:bg-sky-700'
                 }`}
               >
-                Áp dụng thay đổi (Mô phỏng)
+                Xác nhận cập nhật
               </button>
             </div>
           </div>
@@ -458,4 +721,3 @@ export function StaffShippingDetailPage() {
     </div>
   )
 }
-

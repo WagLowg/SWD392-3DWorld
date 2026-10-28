@@ -18,10 +18,13 @@ export function StaffAccessGate({ children }: { children?: ReactNode }) {
   const location = useLocation()
   const { data: user, isLoading } = useSession()
 
-  // Chuyển hướng khách chưa đăng nhập sang màn login
+  // Chuyển hướng khách chưa đăng nhập sang màn login kèm đường dẫn đầy đủ (/portal/staff...)
   useEffect(() => {
     if (!isLoading && !user && !hasStoredSession()) {
-      goLogin(location.pathname + location.search)
+      const fullPath = location.pathname.startsWith('/portal')
+        ? location.pathname
+        : `/portal${location.pathname}`
+      goLogin(fullPath + location.search)
     }
   }, [isLoading, user, location])
 

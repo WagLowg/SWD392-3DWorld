@@ -1,20 +1,23 @@
 import {
-  ArrowLeft,
   ChevronRight,
   ClipboardList,
   Flame,
   LayoutDashboard,
+  LogOut,
   Package,
   RotateCcw,
   ShieldCheck,
   Truck,
   Users,
 } from 'lucide-react'
-import { Link, NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
+import { logout } from '../../auth/services/session'
+import { useSession } from '../../../shared/session/useSession'
 import { INITIAL_STAFF_REFUNDS, INITIAL_STAFF_SHIPMENTS } from '../mocks/staffMockData'
 
 export function StaffSidebar() {
   const { pathname } = useLocation()
+  const { data: user } = useSession()
 
   const pendingShipments = INITIAL_STAFF_SHIPMENTS.filter(
     (s) => s.status === 'SHIPPED' || s.status === 'FAILED',
@@ -24,7 +27,7 @@ export function StaffSidebar() {
     (r) => r.status === 'SUBMITTED' || r.status === 'UNDER_REVIEW',
   ).length
 
-  const isOverviewActive = pathname === '/portal/staff' || pathname === '/portal/staff/'
+  const isOverviewActive = pathname === '/staff' || pathname === '/staff/'
   const isShippingActive = pathname.includes('/staff/shipments')
   const isRefundActive = pathname.includes('/staff/refunds')
 
@@ -37,7 +40,7 @@ export function StaffSidebar() {
 
   return (
     <aside
-      className="space-y-4 rounded-[2rem] bg-white/80 p-4 shadow-soft backdrop-blur-xl lg:sticky lg:top-28"
+      className="space-y-4 rounded-[2rem] bg-white/80 p-4 shadow-soft backdrop-blur-xl lg:sticky lg:top-8"
       aria-label="Staff Management Navigation"
     >
       {/* Header card */}
@@ -66,10 +69,10 @@ export function StaffSidebar() {
           Phân Hệ Quản Trị
         </div>
 
-        {/* 0. Tổng quan Dashboard */}
+        {/* 1. Tổng quan Dashboard */}
         <div>
           <NavLink
-            to="/portal/staff"
+            to="/staff"
             end
             className={tabClass(isOverviewActive)}
             title="Tổng quan vận hành"
@@ -81,10 +84,10 @@ export function StaffSidebar() {
           </NavLink>
         </div>
 
-        {/* 1. Module A: Shipping */}
+        {/* 2. Module A: Shipping */}
         <div>
           <NavLink
-            to="/portal/staff/shipments"
+            to="/staff/shipments"
             className={tabClass(isShippingActive)}
             title="Quản lý vận chuyển GHTK"
           >
@@ -106,7 +109,7 @@ export function StaffSidebar() {
           {isShippingActive && (
             <div className="ml-8 mt-1 space-y-1 border-l-2 border-line pl-3 text-xs">
               <NavLink
-                to="/portal/staff/shipments"
+                to="/staff/shipments"
                 end
                 className={({ isActive }) =>
                   `block py-1.5 font-medium transition ${
@@ -125,10 +128,10 @@ export function StaffSidebar() {
           )}
         </div>
 
-        {/* 2. Module B: Refund */}
+        {/* 3. Module B: Refund */}
         <div>
           <NavLink
-            to="/portal/staff/refunds"
+            to="/staff/refunds"
             className={tabClass(isRefundActive)}
             title="Quản lý yêu cầu khiếu nại hoàn tiền"
           >
@@ -150,7 +153,7 @@ export function StaffSidebar() {
           {isRefundActive && (
             <div className="ml-8 mt-1 space-y-1 border-l-2 border-line pl-3 text-xs">
               <NavLink
-                to="/portal/staff/refunds"
+                to="/staff/refunds"
                 end
                 className={({ isActive }) =>
                   `block py-1.5 font-medium transition ${
@@ -180,15 +183,30 @@ export function StaffSidebar() {
         </p>
       </div>
 
-      {/* Return to portal */}
-      <Link
-        to="/portal"
-        className="flex items-center gap-2 rounded-2xl px-4 py-2.5 font-label text-xs font-semibold text-ink-soft transition hover:bg-white hover:text-ink"
-      >
-        <ArrowLeft size={14} />
-        <span>Về trang chủ Portal</span>
-      </Link>
+      {/* 4. Staff Identity & Logout */}
+      <div className="border-t border-line pt-3">
+        <div className="mb-2 flex items-center gap-2.5 rounded-2xl bg-surface-low p-2.5">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-orange text-xs font-bold text-white shadow-soft">
+            {user?.name?.charAt(0).toUpperCase() ?? 'S'}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-bold text-ink">{user?.name ?? 'Nhân viên vận hành'}</p>
+            <p className="truncate font-mono text-[10px] font-semibold text-teal">Role: PRINT_STAFF</p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => logout('/')}
+          className="flex w-full items-center justify-between gap-2 rounded-2xl px-4 py-2.5 font-label text-xs font-semibold text-danger transition hover:bg-[#ffdad6]/40"
+          title="Đăng xuất khỏi hệ thống"
+        >
+          <div className="flex items-center gap-2.5">
+            <LogOut size={15} />
+            <span>Đăng xuất</span>
+          </div>
+        </button>
+      </div>
     </aside>
   )
 }
-

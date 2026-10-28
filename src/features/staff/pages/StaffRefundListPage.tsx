@@ -3,9 +3,11 @@ import {
   CheckCircle2,
   Clock,
   HelpCircle,
+  History,
   RotateCcw,
   Search,
   ShieldAlert,
+  ShieldCheck,
   XCircle,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -23,21 +25,22 @@ import {
 } from '../../../shared/ui/kit'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { StaffHeader } from '../components/StaffHeader'
-import { StaffRefundBadge } from '../components/StaffStatusBadge'
-import { INITIAL_STAFF_REFUNDS } from '../mocks/staffMockData'
+import { StaffAdminExecutionBadge, StaffRefundBadge } from '../components/StaffStatusBadge'
+import { useStaffRefunds } from '../mocks/staffMockData'
 import type { RefundStatus, StaffRefundRequest } from '../types/staff.types'
 
 const REFUND_TABS: { value: string; label: string }[] = [
-  { value: '', label: 'Tất cả' },
-  { value: 'SUBMITTED', label: 'Chờ tiếp nhận' },
+  { value: '', label: 'Tất cả yêu cầu' },
+  { value: 'SUBMITTED', label: 'Chờ thẩm định' },
   { value: 'UNDER_REVIEW', label: 'Đang thẩm định' },
   { value: 'NEEDS_INFO', label: 'Cần bổ sung' },
-  { value: 'APPROVED', label: 'Đã chấp thuận' },
-  { value: 'REJECTED', label: 'Đã bác bỏ' },
+  { value: 'APPROVED', label: 'Đã duyệt — Chờ Admin hoàn tiền' },
+  { value: 'REJECTED', label: 'Đã từ chối' },
+  { value: 'HISTORY', label: 'Lịch sử xử lý' },
 ]
 
 export function StaffRefundListPage() {
-  const [refunds] = useState<StaffRefundRequest[]>(INITIAL_STAFF_REFUNDS)
+  const { refunds } = useStaffRefunds()
   const [activeTab, setActiveTab] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState<string>('')
 
@@ -45,12 +48,28 @@ export function StaffRefundListPage() {
     document.title = 'Quản lý hoàn tiền (Staff) · 3DWorld'
   }, [])
 
-  const countByStatus = (status: RefundStatus) =>
-    refunds.filter((r) => r.status === status).length
+  const countByTab = (tabVal: string) => {
+    if (!tabVal) return refunds.length
+    if (tabVal === 'HISTORY') {
+      return refunds.filter(
+        (r) => r.status === 'APPROVED' || r.status === 'REJECTED' || r.status === 'COMPLETED',
+      ).length
+    }
+    return refunds.filter((r) => r.status === tabVal).length
+  }
 
   const filteredRefunds = useMemo(() => {
     return refunds.filter((item) => {
-      const matchTab = !activeTab || item.status === activeTab
+      let matchTab = true
+      if (activeTab === 'HISTORY') {
+        matchTab =
+          item.status === 'APPROVED' ||
+          item.status === 'REJECTED' ||
+          item.status === 'COMPLETED'
+      } else if (activeTab) {
+        matchTab = item.status === activeTab
+      }
+
       const q = searchQuery.trim().toLowerCase()
       const matchSearch =
         !q ||
@@ -61,13 +80,14 @@ export function StaffRefundListPage() {
         item.storefrontName.toLowerCase().includes(q) ||
         item.sellerName.toLowerCase().includes(q) ||
         item.reason.toLowerCase().includes(q)
+
       return matchTab && matchSearch
     })
   }, [refunds, activeTab, searchQuery])
 
   const tabOptions = REFUND_TABS.map((t) => ({
     ...t,
-    count: t.value ? countByStatus(t.value as RefundStatus) : refunds.length,
+    count: countByTab(t.value),
   }))
 
   return (
@@ -79,36 +99,36 @@ export function StaffRefundListPage() {
         eyebrow="Phân hệ khiếu nại & hoàn tiền"
         title="Quản Lý Yêu Cầu Hoàn Tiền"
         accent="Thẩm Định Bằng Chứng & Phán Quyết Trọng Tài."
-        description="Tiếp nhận và xem xét các hồ sơ khiếu nại hoàn tiền do người mua gửi trong cửa sổ 72 giờ kể từ khi nhận hàng. Kiểm tra chứng cứ nứt vỡ hoặc lỗi in ấn và đưa ra phán quyết độc lập."
+        description="Tiếp nhận và xem xét các hồ sơ khiếu nại hoàn tiền do người mua gửi trong cửa sổ 72 giờ kể từ khi nhận hàng. Phán quyết Chấp thuận sẽ đưa hồ sơ vào hàng chờ chuyển tiếp cho Admin chi trả tài chính."
       />
 
       {/* KPI Cards */}
       <StatGrid>
         <StatCard
-          label="Chờ tiếp nhận"
-          value={countByStatus('SUBMITTED')}
+          label="Chờ thẩm định"
+          value={countByTab('SUBMITTED')}
           hint="Hồ sơ mới gửi"
           icon={Clock}
           tone="orange"
         />
         <StatCard
           label="Đang thẩm định"
-          value={countByStatus('UNDER_REVIEW')}
+          value={countByTab('UNDER_REVIEW')}
           hint="Đang đối chiếu chứng cứ"
           icon={AlertCircle}
           tone="violet"
         />
         <StatCard
-          label="Đã chấp thuận"
-          value={countByStatus('APPROVED')}
-          hint="Chuyển hoàn tài chính"
+          label="Đã duyệt — Chờ Admin"
+          value={countByTab('APPROVED')}
+          hint="Hàng chờ Admin chi trả"
           icon={CheckCircle2}
           tone="green"
         />
         <StatCard
-          label="Đã bác bỏ"
-          value={countByStatus('REJECTED')}
-          hint="Không đủ điều kiện"
+          label="Đã từ chối"
+          value={countByTab('REJECTED')}
+          hint="Lưu trữ lịch sử thẩm định"
           icon={XCircle}
           tone="danger"
         />
@@ -163,7 +183,7 @@ export function StaffRefundListPage() {
                 <CellTitle
                   title={r.code}
                   sub={formatDateTime(r.submittedAt)}
-                  to={`/portal/staff/refunds/${r.id}`}
+                  to={`/staff/refunds/${r.id}`}
                 />
               ),
             },
@@ -183,7 +203,7 @@ export function StaffRefundListPage() {
             },
             {
               key: 'customer',
-              header: 'Khách hàng khiếu nại',
+              header: 'Khách hàng',
               render: (r) => (
                 <div>
                   <p className="font-semibold text-ink">{r.customerName}</p>
@@ -193,7 +213,7 @@ export function StaffRefundListPage() {
             },
             {
               key: 'seller',
-              header: 'Xưởng in bị khiếu nại',
+              header: 'Xưởng in / Người bán',
               render: (r) => (
                 <div className="max-w-[180px]">
                   <p className="truncate font-semibold text-ink">
@@ -235,19 +255,28 @@ export function StaffRefundListPage() {
             },
             {
               key: 'status',
-              header: 'Trạng thái',
-              render: (r) => <StaffRefundBadge status={r.status} />,
+              header: 'Thẩm định Staff',
+              render: (r) => (
+                <StaffRefundBadge status={r.status} executionStatus={r.adminExecutionStatus} />
+              ),
+            },
+            {
+              key: 'adminExecution',
+              header: 'Tiến độ hoàn tiền Admin',
+              render: (r) => (
+                <StaffAdminExecutionBadge status={r.adminExecutionStatus ?? 'NOT_REQUESTED'} />
+              ),
             },
             {
               key: 'action',
               header: 'Thao tác',
               render: (r) => (
                 <Btn
-                  to={`/portal/staff/refunds/${r.id}`}
+                  to={`/staff/refunds/${r.id}`}
                   size="sm"
                   variant="primary"
                 >
-                  Thẩm định
+                  Xem chi tiết
                 </Btn>
               ),
             },
@@ -257,4 +286,3 @@ export function StaffRefundListPage() {
     </div>
   )
 }
-

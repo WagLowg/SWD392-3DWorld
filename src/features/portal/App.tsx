@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect } from 'react'
-import { Navigate, Route, Routes, useParams } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom'
+import { useSession } from '../../shared/session/useSession'
 import { AdminLayout } from '../admin/components/AdminLayout'
 import { AdminStorefrontPage } from '../admin/pages/AdminStorefrontPage'
 import { AddressesPage } from '../account/pages/AddressesPage'
@@ -227,56 +228,85 @@ function AccountPage({ children }: { children: ReactNode }) {
   )
 }
 
+/**
+ * Ranh giới cách ly định tuyến: Ngăn chặn tài khoản chỉ có quyền Staff (PRINT_STAFF mà không có ADMIN)
+ * truy cập vào các màn hình không thuộc phân hệ Staff bên trong ứng dụng Portal.
+ * Khi tài khoản Staff-only cố gắng truy cập các route này (/portal/, /portal/orders, /portal/seller, /portal/admin/storefronts, ...),
+ * hệ thống sẽ tự động chuyển hướng về trang Staff Dashboard (/portal/staff).
+ */
+function NonStaffRouteGuard() {
+  const { data: user, isLoading } = useSession()
+
+  // Không hiển thị chớp nhoáng nội dung trang trước khi phiên xác thực tải xong
+  if (isLoading) {
+    return null
+  }
+
+  if (user) {
+    const roles = user.roles ?? (user.role ? [user.role] : [])
+    const isStaffOnly = roles.includes('PRINT_STAFF') && !roles.includes('ADMIN')
+    if (isStaffOnly) {
+      return <Navigate to="/staff" replace />
+    }
+  }
+
+  return <Outlet />
+}
+
 export function App() {
   return (
     <Routes>
-      <Route element={<AdminLayout />}>
-        <Route path="admin/storefronts" element={<AdminStorefrontPage />} />
-        <Route path="admin/storefronts/verifications/:caseId" element={<StorefrontReviewPage />} />
+      {/* Phân hệ Quản trị Staff (UI Prototype) — Độc lập ngoài AccountLayout để không bị gắn Header Marketplace */}
+      <Route
+        path="staff"
+        element={
+          <StaffAccessGate>
+            <StaffLayout />
+          </StaffAccessGate>
+        }
+      >
+        <Route index element={<StaffDashboardPage />} />
+        <Route path="shipments" element={<StaffShippingListPage />} />
+        <Route path="shipments/:shipmentId" element={<StaffShippingDetailPage />} />
+        <Route path="refunds" element={<StaffRefundListPage />} />
+        <Route path="refunds/:refundId" element={<StaffRefundDetailPage />} />
       </Route>
 
-      <Route element={<AccountLayout />}>
-        {ACCOUNT_ROUTES.map((r) => (
-          <Route key={r.path} path={r.path} element={<AccountPage>{r.element}</AccountPage>} />
-        ))}
-        {/* Xem trước các màn lỗi chung (MP 017 / MP-103 / MP-104) */}
-        <Route path="error/403" element={<ErrorScreen kind="403" />} />
-        <Route path="error/503" element={<ErrorScreen kind="503" />} />
-        <Route path="error/session-expired" element={<ErrorScreen kind="session" />} />
-        <Route path="cart" element={<Redirect to="/marketplace/cart" />} />
-        <Route path="checkout" element={<Redirect to="/marketplace/checkout" />} />
-        <Route path="ops/storefronts" element={<Navigate to="/admin/storefronts" replace />} />
-        <Route path="ops/storefronts/:caseId" element={<LegacyStorefrontReviewRedirect />} />
-        {/* Phân hệ Quản trị Staff (UI Prototype) */}
-        <Route
-          path="staff"
-          element={
-            <StaffAccessGate>
-              <StaffLayout />
-            </StaffAccessGate>
-          }
-        >
-          <Route index element={<StaffDashboardPage />} />
-          <Route path="shipments" element={<StaffShippingListPage />} />
-          <Route path="shipments/:shipmentId" element={<StaffShippingDetailPage />} />
-          <Route path="refunds" element={<StaffRefundListPage />} />
-          <Route path="refunds/:refundId" element={<StaffRefundDetailPage />} />
+      {/* Ranh giới bảo vệ: Tự động chuyển hướng tài khoản Staff-only về /portal/staff khi truy cập các route không thuộc Staff */}
+      <Route element={<NonStaffRouteGuard />}>
+        <Route element={<AdminLayout />}>
+          <Route path="admin/storefronts" element={<AdminStorefrontPage />} />
+          <Route path="admin/storefronts/verifications/:caseId" element={<StorefrontReviewPage />} />
         </Route>
-      </Route>
 
-      {/* Bản đồ FRD cho các nghiệp vụ còn lại */}
-      <Route element={<PortalShell />}>
-        <Route index element={<OverviewPage />} />
-        {internalScreens
-          .filter((screen) => !IMPLEMENTED.has(relativePortalRoute(screen.route)))
-          .map((screen) => (
-            <Route key={screen.id} path={relativePortalRoute(screen.route)} element={<ScreenPage screen={screen} />} />
+        <Route element={<AccountLayout />}>
+          {ACCOUNT_ROUTES.map((r) => (
+            <Route key={r.path} path={r.path} element={<AccountPage>{r.element}</AccountPage>} />
           ))}
-      </Route>
+          {/* Xem trước các màn lỗi chung (MP 017 / MP-103 / MP-104) */}
+          <Route path="error/403" element={<ErrorScreen kind="403" />} />
+          <Route path="error/503" element={<ErrorScreen kind="503" />} />
+          <Route path="error/session-expired" element={<ErrorScreen kind="session" />} />
+          <Route path="cart" element={<Redirect to="/marketplace/cart" />} />
+          <Route path="checkout" element={<Redirect to="/marketplace/checkout" />} />
+          <Route path="ops/storefronts" element={<Navigate to="/admin/storefronts" replace />} />
+          <Route path="ops/storefronts/:caseId" element={<LegacyStorefrontReviewRedirect />} />
+        </Route>
 
-      {/* MP 018 · 404 */}
-      <Route element={<AccountLayout />}>
-        <Route path="*" element={<ErrorScreen kind="404" />} />
+        {/* Bản đồ FRD cho các nghiệp vụ còn lại */}
+        <Route element={<PortalShell />}>
+          <Route index element={<OverviewPage />} />
+          {internalScreens
+            .filter((screen) => !IMPLEMENTED.has(relativePortalRoute(screen.route)))
+            .map((screen) => (
+              <Route key={screen.id} path={relativePortalRoute(screen.route)} element={<ScreenPage screen={screen} />} />
+            ))}
+        </Route>
+
+        {/* MP 018 · 404 */}
+        <Route element={<AccountLayout />}>
+          <Route path="*" element={<ErrorScreen kind="404" />} />
+        </Route>
       </Route>
     </Routes>
   )

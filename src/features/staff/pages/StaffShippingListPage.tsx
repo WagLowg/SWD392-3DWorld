@@ -1,7 +1,9 @@
 import {
   AlertTriangle,
   CheckCircle2,
+  Clock,
   PackageCheck,
+  RotateCcw,
   Search,
   Timer,
   Truck,
@@ -24,19 +26,20 @@ import {
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { StaffHeader } from '../components/StaffHeader'
 import { StaffShipmentBadge } from '../components/StaffStatusBadge'
-import { INITIAL_STAFF_SHIPMENTS } from '../mocks/staffMockData'
+import { useStaffShipments } from '../mocks/staffMockData'
 import type { ShipmentStatus, StaffShipment } from '../types/staff.types'
 
 const TABS: { value: string; label: string }[] = [
   { value: '', label: 'Tất cả' },
+  { value: 'PENDING', label: 'Chờ vận chuyển' },
   { value: 'SHIPPED', label: 'Đang vận chuyển' },
   { value: 'DELIVERED', label: 'Giao thành công' },
   { value: 'FAILED', label: 'Giao thất bại' },
-  { value: 'RETURNED', label: 'Chuyển hoàn' },
+  { value: 'RETURNED', label: 'Đã chuyển hoàn' },
 ]
 
 export function StaffShippingListPage() {
-  const [shipments] = useState<StaffShipment[]>(INITIAL_STAFF_SHIPMENTS)
+  const { shipments } = useStaffShipments()
   const [activeTab, setActiveTab] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState<string>('')
 
@@ -83,6 +86,13 @@ export function StaffShippingListPage() {
       {/* KPI Cards */}
       <StatGrid>
         <StatCard
+          label="Chờ vận chuyển"
+          value={countByStatus('PENDING')}
+          hint="Chờ bàn giao bưu tá"
+          icon={Clock}
+          tone="neutral"
+        />
+        <StatCard
           label="Đang vận chuyển"
           value={countByStatus('SHIPPED')}
           hint="Kiện hàng đang trung chuyển"
@@ -104,10 +114,10 @@ export function StaffShippingListPage() {
           tone="orange"
         />
         <StatCard
-          label="Chuyển hoàn"
+          label="Đã chuyển hoàn"
           value={countByStatus('RETURNED')}
           hint="Hàng hoàn về xưởng"
-          icon={XCircle}
+          icon={RotateCcw}
           tone="danger"
         />
       </StatGrid>
@@ -161,7 +171,7 @@ export function StaffShippingListPage() {
                 <CellTitle
                   title={r.trackingNumber}
                   sub={`${r.carrierName} · ${r.carrierCode}`}
-                  to={`/portal/staff/shipments/${r.id}`}
+                  to={`/staff/shipments/${r.id}`}
                 />
               ),
             },
@@ -224,7 +234,7 @@ export function StaffShippingListPage() {
               header: 'Thao tác',
               render: (r) => (
                 <Btn
-                  to={`/portal/staff/shipments/${r.id}`}
+                  to={`/staff/shipments/${r.id}`}
                   size="sm"
                   variant="white"
                 >
@@ -238,4 +248,3 @@ export function StaffShippingListPage() {
     </div>
   )
 }
-

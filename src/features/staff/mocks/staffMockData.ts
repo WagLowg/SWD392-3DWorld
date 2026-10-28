@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { StaffRefundRequest, StaffShipment } from '../types/staff.types'
 
 export const STAFF_DEMO_NOTICE = 'Chế độ xem trước — Dữ liệu minh họa'
@@ -74,6 +75,17 @@ export const INITIAL_STAFF_SHIPMENTS: StaffShipment[] = [
         actor: 'Shipper GHTK #1089 (0934888123)',
       },
     ],
+    auditHistory: [
+      {
+        id: 'audit-101-1',
+        timestamp: '2026-10-27T09:30:00Z',
+        previousStatus: 'PENDING',
+        newStatus: 'SHIPPED',
+        updatedBy: 'Staff Nguyễn Văn A (PRINT_STAFF)',
+        reason: 'Đã đóng gói và bàn giao cho bưu tá GHTK tại bưu cục Triều Khúc',
+        source: 'STAFF_MANUAL',
+      },
+    ],
   },
   {
     id: 102,
@@ -144,6 +156,26 @@ export const INITIAL_STAFF_SHIPMENTS: StaffShipment[] = [
         description: 'Người nhận đã ký nhận kiện hàng nguyên vẹn',
         location: 'Đào Tấn, Ba Đình, Hà Nội',
         actor: 'Shipper GHTK #7712',
+      },
+    ],
+    auditHistory: [
+      {
+        id: 'audit-102-1',
+        timestamp: '2026-10-26T14:10:00Z',
+        previousStatus: 'PENDING',
+        newStatus: 'SHIPPED',
+        updatedBy: 'Staff Lê Thị B (PRINT_STAFF)',
+        reason: 'Bàn giao thành công cho vận chuyển GHTK Ba Đình',
+        source: 'STAFF_MANUAL',
+      },
+      {
+        id: 'audit-102-2',
+        timestamp: '2026-10-27T16:20:00Z',
+        previousStatus: 'SHIPPED',
+        newStatus: 'DELIVERED',
+        updatedBy: 'Staff Lê Thị B (PRINT_STAFF)',
+        reason: 'Xác nhận phát hàng thành công theo biên bản giao nhận',
+        source: 'STAFF_MANUAL',
       },
     ],
   },
@@ -219,6 +251,26 @@ export const INITIAL_STAFF_SHIPMENTS: StaffShipment[] = [
         actor: 'Shipper GHTK #5521',
       },
     ],
+    auditHistory: [
+      {
+        id: 'audit-103-1',
+        timestamp: '2026-10-25T11:00:00Z',
+        previousStatus: 'PENDING',
+        newStatus: 'SHIPPED',
+        updatedBy: 'Staff Trần C (PRINT_STAFF)',
+        reason: 'Bàn giao kiện hàng cho GHTK Ninh Kiều',
+        source: 'STAFF_MANUAL',
+      },
+      {
+        id: 'audit-103-2',
+        timestamp: '2026-10-28T09:40:00Z',
+        previousStatus: 'SHIPPED',
+        newStatus: 'FAILED',
+        updatedBy: 'Staff Trần C (PRINT_STAFF)',
+        reason: 'Thuê bao không liên lạc được sau 2 lần phát hàng',
+        source: 'STAFF_MANUAL',
+      },
+    ],
   },
   {
     id: 104,
@@ -292,6 +344,35 @@ export const INITIAL_STAFF_SHIPMENTS: StaffShipment[] = [
         actor: 'Xưởng In 3D Sáng Tạo Hà Nội',
       },
     ],
+    auditHistory: [
+      {
+        id: 'audit-104-1',
+        timestamp: '2026-10-23T16:00:00Z',
+        previousStatus: 'PENDING',
+        newStatus: 'SHIPPED',
+        updatedBy: 'Staff Nguyễn Văn A (PRINT_STAFF)',
+        reason: 'Bàn giao vận đơn cho GHTK Hà Nội',
+        source: 'STAFF_MANUAL',
+      },
+      {
+        id: 'audit-104-2',
+        timestamp: '2026-10-25T14:20:00Z',
+        previousStatus: 'SHIPPED',
+        newStatus: 'FAILED',
+        updatedBy: 'Staff Nguyễn Văn A (PRINT_STAFF)',
+        reason: 'Khách hàng từ chối nhận hàng tại Phú Lộc',
+        source: 'STAFF_MANUAL',
+      },
+      {
+        id: 'audit-104-3',
+        timestamp: '2026-10-27T11:30:00Z',
+        previousStatus: 'FAILED',
+        newStatus: 'RETURNED',
+        updatedBy: 'Staff Nguyễn Văn A (PRINT_STAFF)',
+        reason: 'Xưởng in đã ký nhận lại gói hàng hoàn về',
+        source: 'STAFF_MANUAL',
+      },
+    ],
   },
   {
     id: 105,
@@ -300,10 +381,10 @@ export const INITIAL_STAFF_SHIPMENTS: StaffShipment[] = [
     carrierCode: 'GHTK',
     orderId: 305,
     orderCode: 'ORD-2026-10298',
-    status: 'SHIPPED',
+    status: 'PENDING',
     shippedAt: '2026-10-28T08:00:00Z',
     deliveredAt: null,
-    lastUpdatedAt: '2026-10-28T14:30:00Z',
+    lastUpdatedAt: '2026-10-28T08:00:00Z',
     recipientName: 'Vũ Thị Ngọc Ánh',
     recipientPhone: '0978665544',
     recipientAddress: '78 Lạch Tray, Phường Lạch Tray',
@@ -323,7 +404,7 @@ export const INITIAL_STAFF_SHIPMENTS: StaffShipment[] = [
     paymentStatus: 'PAID',
     codAmount: 0,
     deliveryAttempts: 0,
-    notes: 'Đang vận chuyển máy bay nội địa',
+    notes: 'Đơn hàng mới in xong — Chờ Staff xác nhận bàn giao cho bên vận chuyển',
     items: [
       {
         id: 5,
@@ -339,20 +420,22 @@ export const INITIAL_STAFF_SHIPMENTS: StaffShipment[] = [
       {
         id: 'ev-41',
         timestamp: '2026-10-28T08:00:00Z',
-        status: 'PICKED_UP',
-        title: 'Đã lấy hàng',
-        description: 'Bưu cục GHTK Quận 5 nhận kiện',
-        location: 'TP.HCM',
-        actor: 'Shipper GHTK #3319',
+        status: 'PENDING',
+        title: 'Chờ bàn giao vận chuyển',
+        description: 'Đã tạo vận đơn trên hệ thống, chờ bưu tá GHTK tới kho lấy hàng',
+        location: 'Studio Chế Tác 3D Sài Gòn, Quận 5, TP.HCM',
+        actor: 'Hệ thống 3DWorld',
       },
+    ],
+    auditHistory: [
       {
-        id: 'ev-42',
-        timestamp: '2026-10-28T14:30:00Z',
-        status: 'IN_TRANSIT',
-        title: 'Vận chuyển hàng không',
-        description: 'Kiện hàng đã lên máy bay SGN → HPH',
-        location: 'Cảng hàng không Tân Sơn Nhất',
-        actor: 'GHTK Air Logistics',
+        id: 'audit-105-1',
+        timestamp: '2026-10-28T08:00:00Z',
+        previousStatus: 'PENDING',
+        newStatus: 'PENDING',
+        updatedBy: 'Hệ thống tự động',
+        reason: 'Đơn hàng hoàn tất in ấn, sẵn sàng chờ bàn giao đơn vị vận chuyển',
+        source: 'INITIAL',
       },
     ],
   },
@@ -379,6 +462,8 @@ export const INITIAL_STAFF_REFUNDS: StaffRefundRequest[] = [
     requestedAmount: 1250000,
     originalOrderTotal: 1250000,
     status: 'SUBMITTED',
+    adminExecutionStatus: 'NOT_REQUESTED',
+    adminHandoff: null,
     submittedAt: '2026-10-27T19:40:00Z',
     receivedAt: '2026-10-27T16:20:00Z',
     refundDeadlineAt: '2026-10-30T16:20:00Z',
@@ -471,6 +556,8 @@ export const INITIAL_STAFF_REFUNDS: StaffRefundRequest[] = [
     requestedAmount: 540000,
     originalOrderTotal: 540000,
     status: 'UNDER_REVIEW',
+    adminExecutionStatus: 'NOT_REQUESTED',
+    adminHandoff: null,
     submittedAt: '2026-10-26T10:15:00Z',
     receivedAt: '2026-10-25T14:00:00Z',
     refundDeadlineAt: '2026-10-28T14:00:00Z',
@@ -548,6 +635,8 @@ export const INITIAL_STAFF_REFUNDS: StaffRefundRequest[] = [
     requestedAmount: 180000,
     originalOrderTotal: 650000,
     status: 'NEEDS_INFO',
+    adminExecutionStatus: 'NOT_REQUESTED',
+    adminHandoff: null,
     submittedAt: '2026-10-25T15:20:00Z',
     receivedAt: '2026-10-24T11:00:00Z',
     refundDeadlineAt: '2026-10-27T11:00:00Z',
@@ -624,6 +713,22 @@ export const INITIAL_STAFF_REFUNDS: StaffRefundRequest[] = [
     requestedAmount: 480000,
     originalOrderTotal: 480000,
     status: 'APPROVED',
+    adminExecutionStatus: 'PENDING_ADMIN',
+    adminHandoff: {
+      refundRequestId: 204,
+      refundCode: 'REF-2026-0005',
+      sourceOrderId: 289,
+      orderCode: 'ORD-2026-10145',
+      staffDecision: 'APPROVED',
+      staffDecisionReason: 'Xưởng in xác nhận gửi nhầm lô hàng thử nghiệm sang khách. Chấp thuận hoàn tiền 100%. Khách không cần gửi trả hàng.',
+      staffReviewedAt: '2026-10-25T14:00:00Z',
+      reviewedBy: 'Staff Đặng Quang Long',
+      approvedRefundAmount: 480000,
+      adminExecutionStatus: 'PENDING_ADMIN',
+      customerName: 'Bùi Anh Tuấn',
+      sellerName: 'Võ Thành Danh',
+      evidenceCount: 1,
+    },
     submittedAt: '2026-10-24T08:00:00Z',
     receivedAt: '2026-10-23T15:30:00Z',
     refundDeadlineAt: '2026-10-26T15:30:00Z',
@@ -700,6 +805,8 @@ export const INITIAL_STAFF_REFUNDS: StaffRefundRequest[] = [
     requestedAmount: 920000,
     originalOrderTotal: 920000,
     status: 'REJECTED',
+    adminExecutionStatus: 'NOT_REQUESTED',
+    adminHandoff: null,
     submittedAt: '2026-10-23T11:00:00Z',
     receivedAt: '2026-10-18T09:00:00Z',
     refundDeadlineAt: '2026-10-21T09:00:00Z',
@@ -758,4 +865,109 @@ export const INITIAL_STAFF_REFUNDS: StaffRefundRequest[] = [
     },
   },
 ]
+
+// Quản lý trạng thái hồ sơ hoàn tiền cục bộ (In-Memory Demo Store)
+let staffRefundsStore: StaffRefundRequest[] = [...INITIAL_STAFF_REFUNDS]
+const storeListeners = new Set<() => void>()
+
+export function getStaffRefunds(): StaffRefundRequest[] {
+  return staffRefundsStore
+}
+
+export function getStaffRefundById(id: number): StaffRefundRequest | undefined {
+  return staffRefundsStore.find((r) => r.id === id)
+}
+
+export function updateStaffRefund(
+  id: number,
+  updater: (prev: StaffRefundRequest) => StaffRefundRequest,
+): StaffRefundRequest | null {
+  const index = staffRefundsStore.findIndex((r) => r.id === id)
+  if (index === -1) return null
+  const updated = updater(staffRefundsStore[index])
+  staffRefundsStore = [
+    ...staffRefundsStore.slice(0, index),
+    updated,
+    ...staffRefundsStore.slice(index + 1),
+  ]
+  storeListeners.forEach((fn) => {
+    try {
+      fn()
+    } catch {}
+  })
+  return updated
+}
+
+export function subscribeStaffRefunds(listener: () => void): () => void {
+  storeListeners.add(listener)
+  return () => {
+    storeListeners.delete(listener)
+  }
+}
+
+/** Hook đồng bộ trạng thái danh sách hồ sơ khiếu nại giữa các màn hình Staff */
+export function useStaffRefunds() {
+  const [refunds, setRefunds] = useState<StaffRefundRequest[]>(() => getStaffRefunds())
+
+  useEffect(() => {
+    return subscribeStaffRefunds(() => {
+      setRefunds([...getStaffRefunds()])
+    })
+  }, [])
+
+  return { refunds, updateStaffRefund }
+}
+
+// Quản lý trạng thái vận đơn cục bộ (In-Memory Demo Store)
+let staffShipmentsStore: StaffShipment[] = [...INITIAL_STAFF_SHIPMENTS]
+const shipmentStoreListeners = new Set<() => void>()
+
+export function getStaffShipments(): StaffShipment[] {
+  return staffShipmentsStore
+}
+
+export function getStaffShipmentById(id: number): StaffShipment | undefined {
+  return staffShipmentsStore.find((s) => s.id === id)
+}
+
+export function updateStaffShipment(
+  id: number,
+  updater: (prev: StaffShipment) => StaffShipment,
+): StaffShipment | null {
+  const index = staffShipmentsStore.findIndex((s) => s.id === id)
+  if (index === -1) return null
+  const updated = updater(staffShipmentsStore[index])
+  staffShipmentsStore = [
+    ...staffShipmentsStore.slice(0, index),
+    updated,
+    ...staffShipmentsStore.slice(index + 1),
+  ]
+  shipmentStoreListeners.forEach((fn) => {
+    try {
+      fn()
+    } catch {}
+  })
+  return updated
+}
+
+export function subscribeStaffShipments(listener: () => void): () => void {
+  shipmentStoreListeners.add(listener)
+  return () => {
+    shipmentStoreListeners.delete(listener)
+  }
+}
+
+/** Hook đồng bộ trạng thái danh sách vận đơn giữa các màn hình Staff */
+export function useStaffShipments() {
+  const [shipments, setShipments] = useState<StaffShipment[]>(() => getStaffShipments())
+
+  useEffect(() => {
+    return subscribeStaffShipments(() => {
+      setShipments([...getStaffShipments()])
+    })
+  }, [])
+
+  return { shipments, updateStaffShipment }
+}
+
 

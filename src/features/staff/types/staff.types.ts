@@ -1,6 +1,16 @@
 import type { Tone } from '../../../shared/ui/kit'
 
-export type ShipmentStatus = 'SHIPPED' | 'DELIVERED' | 'FAILED' | 'RETURNED'
+export type ShipmentStatus = 'PENDING' | 'SHIPPED' | 'DELIVERED' | 'FAILED' | 'RETURNED'
+
+export interface StaffShipmentAuditEntry {
+  id: string
+  timestamp: string
+  previousStatus: ShipmentStatus
+  newStatus: ShipmentStatus
+  updatedBy: string
+  reason?: string
+  source: 'STAFF_MANUAL' | 'INITIAL'
+}
 
 export interface StaffOrderItem {
   id: number
@@ -61,6 +71,7 @@ export interface StaffShipment {
   failureReason?: string
   notes?: string
   events: StaffShipmentEvent[]
+  auditHistory?: StaffShipmentAuditEntry[]
 }
 
 export type RefundStatus =
@@ -70,6 +81,31 @@ export type RefundStatus =
   | 'APPROVED'
   | 'REJECTED'
   | 'COMPLETED'
+
+/** Trạng thái thực chi / đối soát của Admin (tách bạch khỏi thẩm định của Staff) */
+export type AdminRefundExecutionStatus =
+  | 'NOT_REQUESTED'
+  | 'PENDING_ADMIN'
+  | 'PROCESSING'
+  | 'COMPLETED'
+  | 'FAILED'
+
+/** Bản ghi hợp đồng bàn giao giữa Staff và Admin (Admin Handoff Contract) */
+export interface StaffAdminHandoffRecord {
+  refundRequestId: number
+  refundCode: string
+  sourceOrderId: number
+  orderCode: string
+  staffDecision: 'APPROVED' | 'REJECTED'
+  staffDecisionReason: string
+  staffReviewedAt: string
+  reviewedBy: string
+  approvedRefundAmount: number
+  adminExecutionStatus: AdminRefundExecutionStatus
+  customerName: string
+  sellerName: string
+  evidenceCount: number
+}
 
 export interface StaffRefundItem {
   id: number
@@ -100,6 +136,14 @@ export interface StaffRefundHistoryEntry {
   action: string
   note?: string
   tone?: Tone
+  // Cấu trúc dữ liệu phục vụ đối soát và tra cứu của Admin trong tương lai:
+  caseId?: number
+  orderId?: number
+  previousStatus?: RefundStatus
+  newStatus?: RefundStatus
+  reviewerRole?: string
+  decisionReason?: string
+  requestedAmountSnapshot?: number
 }
 
 export interface StaffRefundRequest {
@@ -121,6 +165,10 @@ export interface StaffRefundRequest {
   requestedAmount: number
   originalOrderTotal: number
   status: RefundStatus
+  /** Trạng thái tiến trình thực chi của Admin */
+  adminExecutionStatus?: AdminRefundExecutionStatus
+  /** Bản ghi bàn giao sang hàng chờ Admin */
+  adminHandoff?: StaffAdminHandoffRecord | null
   submittedAt: string
   receivedAt: string
   refundDeadlineAt: string
@@ -142,4 +190,3 @@ export interface StaffRefundRequest {
     note: string
   }
 }
-
