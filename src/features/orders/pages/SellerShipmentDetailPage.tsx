@@ -7,7 +7,6 @@ import { ApiNote, Breadcrumbs } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { OrderStatusBadge, orderCode, ShipmentStatusBadge } from '../components/OrderParts'
-import { ShipmentEventActions } from '../components/SellerActions'
 import { ShipmentLog, ShipmentProgress } from '../components/ShipmentTimeline'
 import { useSellerOrders, useSellerShipments } from '../hooks/useOrders'
 
@@ -60,7 +59,7 @@ export function SellerShipmentDetailPage() {
                 <StatusBlock
                   tone="empty"
                   title="Đơn chưa có vận đơn"
-                  body="Tạo vận đơn ở trang chi tiết đơn chế tác."
+                  body="Hệ thống đang khởi tạo vận đơn GHTK cho đơn này."
                 />
               ) : (
                 <div className="space-y-6">
@@ -85,7 +84,9 @@ export function SellerShipmentDetailPage() {
                       <section className="rounded-[2rem] bg-white/95 p-6 shadow-soft sm:p-8">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <h2 className="font-display text-xl font-bold">Tiến trình kiện hàng</h2>
-                          <ShipmentEventActions shipment={s} orderId={order.id} />
+                          <span className="rounded-full bg-surface-low px-4 py-2 font-label text-xs font-semibold text-ink-soft">
+                            Staff phụ trách cập nhật vận chuyển
+                          </span>
                         </div>
                         <div className="mt-8">
                           <ShipmentProgress shipment={s} />

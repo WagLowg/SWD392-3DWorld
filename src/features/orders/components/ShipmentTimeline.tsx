@@ -14,12 +14,14 @@ type Step = {
 /** Dựng các mốc vận chuyển từ ShipmentResponse (Backend chưa có nhật ký sự kiện chi tiết). */
 export function shipmentSteps(s: Shipment): Step[] {
   const failed = s.status === 'FAILED' || s.status === 'RETURNED'
-  const delivered = s.status === 'DELIVERED' || !!s.deliveredAt
+  const delivered = ['DELIVERED', 'RECEIVED'].includes(s.status) || !!s.deliveredAt
+  const handedOver = ['SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'RECEIVED', 'FAILED', 'RETURNED'].includes(s.status)
+  const inTransit = ['IN_TRANSIT', 'DELIVERED', 'RECEIVED', 'FAILED', 'RETURNED'].includes(s.status)
   return [
     {
       key: 'created',
       title: 'Tạo vận đơn',
-      body: `Xưởng tạo vận đơn ${s.trackingNumber} với ${s.carrierName}.`,
+      body: `Hệ thống tự tạo vận đơn ${s.trackingNumber} với ${s.carrierName}.`,
       at: s.createdAt,
       icon: Package,
       state: 'done',
@@ -30,7 +32,7 @@ export function shipmentSteps(s: Shipment): Step[] {
       body: 'Kiện hàng đã đóng gói chống sốc và bàn giao cho bưu tá.',
       at: s.shippedAt,
       icon: Truck,
-      state: s.shippedAt ? 'done' : 'current',
+      state: handedOver ? 'done' : 'current',
     },
     {
       key: 'transit',
@@ -38,7 +40,7 @@ export function shipmentSteps(s: Shipment): Step[] {
       body: 'Kiện hàng đang trên đường đến địa chỉ nhận.',
       at: null,
       icon: PackageCheck,
-      state: delivered || failed ? 'done' : s.shippedAt ? 'current' : 'todo',
+      state: delivered || failed ? 'done' : inTransit ? 'current' : 'todo',
     },
     failed
       ? {

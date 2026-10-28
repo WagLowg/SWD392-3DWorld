@@ -94,16 +94,10 @@ export function OrderTrackingPage() {
                   <Undo2 size={15} /> Yêu cầu hoàn tiền
                 </Link>
               )}
-              <span
-                className="inline-flex cursor-not-allowed items-center gap-2 rounded-full bg-ink/40 px-5 py-3 font-label text-sm font-semibold text-white"
-                title="Chờ API xác nhận nhận hàng"
-              >
-                Xác nhận đã nhận hàng
-              </span>
             </div>
             <ApiNote className="w-full">
-              Chưa có API cho người mua xác nhận "Đã nhận hàng" (RECEIVED) và nhật ký sự kiện bưu tá chi tiết — các mốc
-              dưới đây dựng từ thời điểm tạo / gửi / giao của vận đơn.
+              Trạng thái vận chuyển, xác nhận nhận hàng và hoàn hàng do Staff đối soát với GHTK rồi cập nhật. Người mua
+              chỉ theo dõi hành trình và gửi yêu cầu hoàn tiền khi có sự cố.
             </ApiNote>
           </section>
         </>

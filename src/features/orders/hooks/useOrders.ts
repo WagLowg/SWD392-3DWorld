@@ -2,7 +2,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { useSession } from '../../../shared/session/useSession'
 import { buyerOrderService, orderService, paymentService, sellerOrderService } from '../services/order.service'
 import { useOrderPaymentsStore } from '../stores/order-payments.store'
-import type { RefundInput, SavePackagesInput, ShipmentEvent } from '../types/order.types'
+import type { RefundInput, SavePackagesInput } from '../types/order.types'
 
 export const orderKeys = {
   mine: ['orders', 'mine'] as const,
@@ -65,14 +65,6 @@ export function useCancelOrder() {
   return useMutation({
     mutationFn: ({ orderId, reason }: { orderId: number; reason: string }) => buyerOrderService.cancel(orderId, reason),
     onSuccess: (_, v) => refresh(v.orderId),
-  })
-}
-
-export function useConfirmReceived() {
-  const refresh = useRefreshOrder()
-  return useMutation({
-    mutationFn: (orderId: number) => buyerOrderService.confirmReceived(orderId),
-    onSuccess: (_, orderId) => refresh(orderId),
   })
 }
 
@@ -139,16 +131,6 @@ export function useSellerOrderActions() {
     updateStatus: useMutation({
       mutationFn: ({ orderId, status }: { orderId: number; status: string }) =>
         sellerOrderService.updateStatus(orderId, status),
-      onSuccess: (_, v) => refresh(v.orderId),
-    }),
-    createShipment: useMutation({
-      mutationFn: ({ orderId, carrierName }: { orderId: number; carrierName: string }) =>
-        sellerOrderService.createShipment(orderId, carrierName),
-      onSuccess: (_, v) => refresh(v.orderId),
-    }),
-    shipmentEvent: useMutation({
-      mutationFn: ({ shipmentId, event }: { shipmentId: number; orderId: number; event: ShipmentEvent }) =>
-        sellerOrderService.applyShipmentEvent(shipmentId, event),
       onSuccess: (_, v) => refresh(v.orderId),
     }),
   }

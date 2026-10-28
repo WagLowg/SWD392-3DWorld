@@ -18,23 +18,37 @@ export const buyerKeys = {
   transaction: (id: string) => [...K, 'transactions', id] as const,
 }
 
-export const useNotifications = () => useQuery({ queryKey: buyerKeys.notifications, queryFn: buyerService.notifications })
+export const useNotifications = () =>
+  useQuery({ queryKey: buyerKeys.notifications, queryFn: buyerService.notifications })
 export const useSessions = () => useQuery({ queryKey: buyerKeys.sessions, queryFn: buyerService.sessions })
 export const useHelp = () => useQuery({ queryKey: buyerKeys.help, queryFn: buyerService.help })
-export const usePolicy = (slug: string) => useQuery({ queryKey: buyerKeys.policy(slug), queryFn: () => buyerService.policy(slug) })
+export const usePolicy = (slug: string) =>
+  useQuery({ queryKey: buyerKeys.policy(slug), queryFn: () => buyerService.policy(slug) })
 export const useRefundCases = () => useQuery({ queryKey: buyerKeys.refunds, queryFn: buyerService.refunds })
-export const useRefundCase = (id: string) => useQuery({ queryKey: buyerKeys.refund(id), queryFn: () => buyerService.refund(id) })
+export const useRefundCase = (id: string) =>
+  useQuery({ queryKey: buyerKeys.refund(id), queryFn: () => buyerService.refund(id) })
 export const useReports = () => useQuery({ queryKey: buyerKeys.reports, queryFn: buyerService.reports })
-export const useReport = (id: string) => useQuery({ queryKey: buyerKeys.report(id), queryFn: () => buyerService.report(id) })
+export const useReport = (id: string) =>
+  useQuery({ queryKey: buyerKeys.report(id), queryFn: () => buyerService.report(id) })
 export const useReviews = () => useQuery({ queryKey: buyerKeys.reviews, queryFn: buyerService.reviews })
 export const useTransactions = () => useQuery({ queryKey: buyerKeys.transactions, queryFn: buyerService.transactions })
-export const useTransaction = (id: string) => useQuery({ queryKey: buyerKeys.transaction(id), queryFn: () => buyerService.transaction(id) })
+export const useTransaction = (id: string) =>
+  useQuery({ queryKey: buyerKeys.transaction(id), queryFn: () => buyerService.transaction(id) })
 
-export const useMarkRead = () => useMockAction((id: string | undefined) => buyerService.markRead(id), [buyerKeys.notifications])
+export const useMarkRead = () =>
+  useMockAction((id: string | undefined) => buyerService.markRead(id), [buyerKeys.notifications])
 export const useRevokeSession = () =>
-  useMockAction((id: string | undefined) => buyerService.revokeSession(id), [buyerKeys.sessions], 'Đã đăng xuất thiết bị.')
+  useMockAction(
+    (id: string | undefined) => buyerService.revokeSession(id),
+    [buyerKeys.sessions],
+    'Đã đăng xuất thiết bị.',
+  )
 export const useChangePassword = () =>
-  useMockAction(({ current, next }: { current: string; next: string }) => buyerService.changePassword(current, next), [], 'Đã cập nhật mật khẩu (mô phỏng).')
+  useMockAction(
+    ({ current, next }: { current: string; next: string }) => buyerService.changePassword(current, next),
+    [],
+    'Đã cập nhật mật khẩu (mô phỏng).',
+  )
 export const useSubmitTicket = () =>
   useMockAction(
     (input: { orderId?: string; topic: string; detail: string }) => buyerService.submitTicket(input),
@@ -42,7 +56,11 @@ export const useSubmitTicket = () =>
     (r: { ticketId: string }) => `Đã gửi phiếu hỗ trợ ${r.ticketId}.`,
   )
 export const useAddRefundEvidence = () =>
-  useMockAction(({ id, note }: { id: string; note: string }) => buyerService.addRefundEvidence(id, note), [buyerKeys.refunds], 'Đã nộp thêm bằng chứng.')
+  useMockAction(
+    ({ id, note }: { id: string; note: string }) => buyerService.addRefundEvidence(id, note),
+    [buyerKeys.refunds],
+    'Đã nộp thêm bằng chứng.',
+  )
 export const useCreateReport = () =>
   useMockAction(
     (
@@ -56,7 +74,8 @@ export const useCreateReport = () =>
   )
 export const useSaveReview = () =>
   useMockAction(
-    (input: { orderId: number; product: string; storefront: string; rating: number; comment: string }) => buyerService.saveReview(input),
+    (input: { orderId: number; product: string; storefront: string; rating: number; comment: string }) =>
+      buyerService.saveReview(input),
     [buyerKeys.reviews],
     'Đã lưu đánh giá.',
   )
@@ -65,10 +84,4 @@ export const useCancelRequest = () =>
     ({ orderId, reason }: { orderId: number; reason: string }) => buyerService.cancelRequest(orderId, reason),
     [['orders']],
     (r: { requestId: string }) => `Đã huỷ đơn ${r.requestId}.`,
-  )
-export const useConfirmReceived = () =>
-  useMockAction(
-    ({ orderId, note }: { orderId: number; note: string }) => buyerService.confirmReceived(orderId, note),
-    [['orders']],
-    'Đã xác nhận nhận hàng — bắt đầu thời hạn hoàn tiền.',
   )
