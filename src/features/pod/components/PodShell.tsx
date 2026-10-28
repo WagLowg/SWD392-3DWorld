@@ -16,8 +16,7 @@ const links = [
   ['/', 'In Theo Yêu Cầu'],
   ['/how-it-works', 'Quy Trình'],
   ['/materials', 'Vật Liệu'],
-  ['/requests', 'Đơn In & Báo Giá'],
-  ['/orders', 'Đơn Hoạt Động'],
+  ['/orders', 'Đơn In Của Tôi'],
 ] as const
 
 export function PodShell({ children }: PropsWithChildren) {
@@ -42,7 +41,6 @@ export function PodShell({ children }: PropsWithChildren) {
           {links.map(([to, label]) => (
             <NavLink key={to} to={to} end={to === '/'} onClick={() => setOpen(false)}>{label}</NavLink>
           ))}
-          <NavLink to="/staff">Điều Hành Xưởng</NavLink>
         </nav>
         <div className="pod-header-actions">
           <button type="button" className="pod-icon-btn" aria-label="Tìm kiếm"><Search size={19} /></button>
@@ -50,7 +48,7 @@ export function PodShell({ children }: PropsWithChildren) {
           <a className="pod-user" href="/login/">
             <CircleUserRound size={20} /> <span>Tài khoản</span> <ChevronDown size={14} />
           </a>
-          <Link className="pod-primary pod-header-cta" to="/requests/new"><Printer size={17} /> Gửi File In 3D</Link>
+          <Link className="pod-primary pod-header-cta" to="/"><Printer size={17} /> Gửi File In 3D</Link>
           <button type="button" className="pod-menu" onClick={() => setOpen(true)} aria-label="Mở menu"><Menu /></button>
         </div>
       </header>
@@ -58,7 +56,7 @@ export function PodShell({ children }: PropsWithChildren) {
       <footer className="pod-footer">
         <div>
           <div className="pod-brand pod-brand-footer"><span className="pod-brand-mark"><Box size={20} /></span><span>3D World POD</span></div>
-          <p>Xưởng chế tác mô hình 3D theo yêu cầu, bảo hộ ký quỹ và kiểm định Micro-QC.</p>
+          <p>Xưởng chế tác mô hình 3D theo yêu cầu, báo giá có snapshot và kiểm định Micro-QC.</p>
         </div>
         <div><strong>Dịch vụ</strong><Link to="/">Đặt in 3D</Link><Link to="/materials">Vật liệu</Link><Link to="/how-it-works">Quy trình</Link></div>
         <div><strong>Tài khoản</strong><Link to="/requests">Yêu cầu in</Link><Link to="/payments">Thanh toán</Link><Link to="/claims">Khiếu nại</Link></div>

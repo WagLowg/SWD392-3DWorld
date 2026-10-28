@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  AlertCircle, Box, CheckCircle2, CircleHelp, Cloud, CloudOff, Download, Loader2, Lock, Printer, Redo2, Save, ShieldCheck, Undo2, Upload,
+  AlertCircle, CheckCircle2, CircleHelp, Cloud, CloudOff, Download, Loader2, Lock, Printer, Redo2, Save, ShieldCheck, Undo2, Upload,
 } from 'lucide-react';
 import { useStudio } from '../store';
 import { fmtTime } from './ui';
@@ -48,7 +48,6 @@ export default function TopBar() {
 
   return (
     <header className="topbar">
-      <a className="brand" href="#/" title="Về trang chủ Studio"><Box size={22} color="var(--primary)" /> 3DWorld <small>STUDIO</small></a>
       <nav className="crumbs" aria-label="breadcrumb">
         <a href="#/projects" className="crumb-link">Dự án</a><span>/</span>
         <input

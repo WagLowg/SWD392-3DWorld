@@ -1,16 +1,14 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import { Home, MapPin, Pencil, Plus, Star, Trash2 } from 'lucide-react'
-import { useEffect, useId, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useEffect, useState } from 'react'
 import { ApiClientError } from '../../../shared/api'
 import { ConfirmButton } from '../../../shared/ui/ConfirmButton'
-import { Field, FormError, inputClass, SubmitButton } from '../../../shared/ui/form'
 import { PageHeading } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { useToast } from '../../../shared/ui/toast'
+import { AddressEditor } from '../components/AddressEditor'
 import { useAddressList, useAddressMutations } from '../hooks/useAccount'
-import { type AddressFormValues, addressSchema } from '../schemas/account.schemas'
+import { formatStructuredAddress, isGhtkReadyAddress } from '../lib/address'
 import type { Address } from '../types/account.types'
 
 /** MP 012 · Sổ Địa Chỉ Nhận Hàng */
@@ -30,7 +28,7 @@ export function AddressesPage() {
         eyebrow="Tài khoản người dùng"
         title="Sổ Địa Chỉ"
         accent="Nhận Hàng Vật Lý."
-        description="Địa chỉ mặc định được chọn sẵn khi đặt hàng. Mỗi đơn con lưu một bản chụp địa chỉ riêng nên sửa địa chỉ không ảnh hưởng đơn đã đặt."
+        description="Địa chỉ mặc định được chọn khi đặt hàng và làm điểm lấy hàng GHTK nếu bạn mở gian hàng. Mỗi đơn lưu một bản chụp riêng nên sửa địa chỉ không ảnh hưởng đơn đã đặt."
         aside={
           <button
             type="button"
@@ -117,8 +115,13 @@ function AddressCard({ address: a, onEdit }: { address: Address; onEdit: () => v
         )}
       </div>
       <p className="mt-4 flex-1 text-sm leading-relaxed text-ink-soft">
-        {[a.addressLine, a.city].filter(Boolean).join(', ')}
+        {formatStructuredAddress(a)}
       </p>
+      {!isGhtkReadyAddress(a) && (
+        <p className="mt-3 rounded-xl bg-peach/60 px-3 py-2 text-xs font-medium text-orange-deep">
+          Địa chỉ chưa đủ tỉnh/thành, phường/xã hoặc số điện thoại để dùng với GHTK.
+        </p>
+      )}
       <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
         {!a.isDefault && (
           <button
@@ -147,105 +150,5 @@ function AddressCard({ address: a, onEdit }: { address: Address; onEdit: () => v
         </ConfirmButton>
       </div>
     </article>
-  )
-}
-
-function AddressEditor({ address, onDone }: { address?: Address; onDone: () => void }) {
-  const uid = useId()
-  const { create, update } = useAddressMutations()
-  const toast = useToast()
-  const {
-    register,
-    handleSubmit,
-    setError,
-    formState: { errors },
-  } = useForm<AddressFormValues>({
-    resolver: zodResolver(addressSchema),
-    defaultValues: {
-      recipientName: address?.recipientName ?? '',
-      phone: address?.phone ?? '',
-      addressLine: address?.addressLine ?? '',
-      city: address?.city ?? '',
-    },
-  })
-
-  const submit = handleSubmit(async (v) => {
-    const input = {
-      recipientName: v.recipientName,
-      addressLine: v.addressLine,
-      phone: v.phone || undefined,
-      city: v.city || undefined,
-    }
-    try {
-      if (address) await update.mutateAsync({ id: address.id, input })
-      else await create.mutateAsync(input)
-      toast(address ? 'Đã cập nhật địa chỉ.' : 'Đã thêm địa chỉ.')
-      onDone()
-    } catch (e) {
-      setError('root', { message: e instanceof ApiClientError ? e.message : 'Không lưu được địa chỉ.' })
-    }
-  })
-
-  return (
-    <form onSubmit={submit} noValidate className="grid gap-4 sm:grid-cols-2">
-      <Field id={`${uid}-name`} label="Người nhận *" error={errors.recipientName?.message}>
-        <input
-          id={`${uid}-name`}
-          autoComplete="name"
-          aria-invalid={!!errors.recipientName}
-          className={inputClass}
-          {...register('recipientName')}
-        />
-      </Field>
-      <Field id={`${uid}-phone`} label="Số điện thoại" error={errors.phone?.message}>
-        <input
-          id={`${uid}-phone`}
-          inputMode="tel"
-          autoComplete="tel"
-          aria-invalid={!!errors.phone}
-          className={inputClass}
-          {...register('phone')}
-        />
-      </Field>
-      <Field
-        id={`${uid}-line`}
-        label="Địa chỉ chi tiết *"
-        error={errors.addressLine?.message}
-        className="sm:col-span-2"
-      >
-        <input
-          id={`${uid}-line`}
-          autoComplete="street-address"
-          placeholder="Số nhà, đường, phường/xã, quận/huyện"
-          aria-invalid={!!errors.addressLine}
-          className={inputClass}
-          {...register('addressLine')}
-        />
-      </Field>
-      <Field id={`${uid}-city`} label="Tỉnh / Thành phố" error={errors.city?.message}>
-        <input
-          id={`${uid}-city`}
-          autoComplete="address-level1"
-          aria-invalid={!!errors.city}
-          className={inputClass}
-          {...register('city')}
-        />
-      </Field>
-      <div className="flex items-end justify-end gap-2">
-        <button
-          type="button"
-          onClick={onDone}
-          className="rounded-full px-5 py-3 font-label text-sm font-semibold text-ink-soft hover:bg-surface-low"
-        >
-          Huỷ
-        </button>
-        <SubmitButton busy={create.isPending || update.isPending}>
-          {address ? 'Lưu địa chỉ' : 'Thêm địa chỉ'}
-        </SubmitButton>
-      </div>
-      <div className="sm:col-span-2">
-        <FormError message={errors.root?.message} />
-      </div>
-    </form>
   )
 }

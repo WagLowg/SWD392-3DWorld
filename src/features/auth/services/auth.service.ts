@@ -1,18 +1,8 @@
 import { http, type ApiEnvelope } from '../../../shared/api'
 import { tokenStore } from '../../../shared/session/token'
+import type { SessionUser } from '../../../shared/session/types'
 
-export type AuthUser = {
-  id: string
-  email: string
-  name: string
-  role: string
-  avatarUrl?: string | null
-  dateOfBirth?: string | null
-  phone?: string | null
-  emailVerified?: boolean
-  roles?: string[]
-  capabilities?: string[]
-}
+export type AuthUser = SessionUser
 
 export type LoginInput = {
   email: string
@@ -61,14 +51,18 @@ function mapUser(user: BackendUserResponse): AuthUser {
 export const authService = {
   async getCurrentUser(signal?: AbortSignal) {
     const response = await http.get<ApiEnvelope<BackendUserResponse>>('/api/auth/me', { signal })
-    return mapUser(response.data)
+    const user = mapUser(response.data)
+    tokenStore.setUser(user)
+    return user
   },
 
   async login(input: LoginInput) {
     tokenStore.clear()
     const response = await http.post<ApiEnvelope<LoginResponse>, LoginInput>('/api/auth/login', input)
     tokenStore.set(response.data.accessToken, response.data.expiresAt)
-    return mapUser(response.data.user)
+    const user = mapUser(response.data.user)
+    tokenStore.setUser(user)
+    return user
   },
 
   async register(input: RegisterInput) {

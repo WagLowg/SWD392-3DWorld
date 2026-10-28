@@ -20,7 +20,7 @@
   --r-card: 12px;
   --r-panel: 16px;
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
-  --header-h: 64px;
+  --header-h: 72px;
   --rail-w: 72px;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color-scheme: dark;
@@ -48,16 +48,25 @@ img { display: block; max-width: 100%; }
 /* ---------- Shell ---------- */
 .shell { display: grid; grid-template-columns: var(--rail-w) 1fr; grid-template-rows: var(--header-h) 1fr; height: 100vh; }
 .header {
-  grid-column: 1 / -1; display: flex; align-items: center; gap: 24px; padding: 0 20px;
-  border-bottom: 1px solid var(--border-soft); background: var(--bg);
+  grid-column: 1 / -1; position: relative; z-index: 100; height: var(--header-h); padding: 0 22px;
+  display: grid; grid-template-columns: minmax(210px, 1fr) auto minmax(210px, 1fr); align-items: center; gap: 18px;
+  border-bottom: 1px solid var(--border-soft); background: rgba(11, 14, 20, .96); backdrop-filter: blur(16px);
 }
-.brand { display: flex; align-items: center; gap: 14px; color: var(--text); font-weight: 700; font-size: 18px; white-space: nowrap; }
-.brand small { font-size: 11px; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; margin-left: 6px; }
+.brand { justify-self: start; display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 700; font-size: 16px; white-space: nowrap; }
+.brand-logo { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; color: #0b0e15; background: var(--grad); box-shadow: 0 8px 24px rgba(114, 214, 247, .14); }
+.brand-copy { display: grid; }
+.brand small { margin: 1px 0 0; font-size: 9px; letter-spacing: .13em; color: var(--primary); font-weight: 700; }
+.header-modules { justify-self: center; }
+.header-account { justify-self: end; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.header-user { min-width: 0; display: flex; align-items: center; gap: 9px; color: var(--text); }
+.header-user-copy { min-width: 0; display: grid; line-height: 1.25; }
+.header-user-copy b, .header-user-copy small { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.header-user-copy b { font-size: 12px; }
+.header-user-copy small { color: var(--faint); font-size: 10px; }
+.header-icon { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; }
+.header-icon:hover { border-color: var(--border); background: var(--panel); color: var(--text); }
 .crumbs { color: var(--muted); font-size: 13px; display: flex; gap: 8px; align-items: center; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .crumbs b { color: var(--text); font-weight: 500; }
-.header-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
-.credit-pill { display: inline-flex; align-items: center; gap: 8px; color: var(--primary); font-size: 13px; font-weight: 500; padding: 6px 10px; border-radius: 999px; }
-.credit-pill:hover { background: var(--elevated); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; flex: none; }
 .avatar {
   width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: 12px;
@@ -333,8 +342,10 @@ img { display: block; max-width: 100%; }
 @media (max-width: 760px) {
   :root { --rail-w: 0px; }
   .shell { grid-template-columns: 1fr; grid-template-rows: 56px 1fr 60px; }
-  .header { gap: 12px; padding: 0 16px; }
-  .crumbs, .brand small { display: none; }
+  .header { height: 56px; padding: 0 10px; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; }
+  .brand-copy, .header-user-copy, .header-account .header-icon:first-child { display: none; }
+  .brand-logo { width: 36px; height: 36px; }
+  .header-modules { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
   .rail { grid-row: 3; flex-direction: row; justify-content: space-around; border-right: 0; border-top: 1px solid var(--border-soft); padding: 6px 8px; }
   .rail .spacer, .rail .desk { display: none; }
   .rail [data-tip]:hover::after { display: none; }
