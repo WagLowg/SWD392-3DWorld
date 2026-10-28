@@ -19,6 +19,10 @@ import { SellerProductsPage } from '../seller/pages/SellerProductsPage'
 import { SellerRegisterPage } from '../seller/pages/SellerRegisterPage'
 import { StorefrontProfilePage } from '../seller/pages/StorefrontProfilePage'
 import { SubscriptionPage } from '../seller/pages/SubscriptionPage'
+import { RevenuePage } from '../seller/pages/RevenuePage'
+import { EarningDetailPage } from '../seller/pages/EarningDetailPage'
+import { PayoutRequestPage } from '../seller/pages/PayoutRequestPage'
+import { SellerAccessGate } from '../seller/components/SellerAccessGate'
 import { ModelLibraryPage } from '../models/pages/ModelLibraryPage'
 import { ModelUploadPage } from '../models/pages/ModelUploadPage'
 import { ModelVersionsPage } from '../models/pages/ModelVersionsPage'
@@ -50,15 +54,18 @@ const ACCOUNT_ROUTES: { path: string; element: ReactNode }[] = [
   { path: 'reports', element: <ReportsPage /> },
   { path: 'reports/new', element: <NewReportPage /> },
   { path: 'reports/:reportId', element: <ReportDetailPage /> },
-  { path: 'seller', element: <SellerDashboardPage /> },
+  { path: 'seller', element: <SellerAccessGate minimum="active"><SellerDashboardPage /></SellerAccessGate> },
   { path: 'seller/register', element: <SellerRegisterPage /> },
-  { path: 'seller/storefront', element: <StorefrontProfilePage /> },
-  { path: 'seller/subscription', element: <SubscriptionPage /> },
-  { path: 'seller/products', element: <SellerProductsPage /> },
-  { path: 'seller/products/new', element: <ProductEditorPage /> },
-  { path: 'seller/products/:productId', element: <SellerProductDetailPage /> },
-  { path: 'seller/products/:productId/edit', element: <ProductEditorPage /> },
-  { path: 'seller/inventory', element: <InventoryPage /> },
+  { path: 'seller/storefront', element: <SellerAccessGate minimum="verified"><StorefrontProfilePage /></SellerAccessGate> },
+  { path: 'seller/subscription', element: <SellerAccessGate minimum="storefront"><SubscriptionPage /></SellerAccessGate> },
+  { path: 'seller/revenue', element: <SellerAccessGate minimum="active"><RevenuePage /></SellerAccessGate> },
+  { path: 'seller/revenue/:earningId', element: <SellerAccessGate minimum="active"><EarningDetailPage /></SellerAccessGate> },
+  { path: 'seller/payouts/new', element: <SellerAccessGate minimum="active"><PayoutRequestPage /></SellerAccessGate> },
+  { path: 'seller/products', element: <SellerAccessGate minimum="active"><SellerProductsPage /></SellerAccessGate> },
+  { path: 'seller/products/new', element: <SellerAccessGate minimum="active"><ProductEditorPage /></SellerAccessGate> },
+  { path: 'seller/products/:productId', element: <SellerAccessGate minimum="active"><SellerProductDetailPage /></SellerAccessGate> },
+  { path: 'seller/products/:productId/edit', element: <SellerAccessGate minimum="active"><ProductEditorPage /></SellerAccessGate> },
+  { path: 'seller/inventory', element: <SellerAccessGate minimum="active"><InventoryPage /></SellerAccessGate> },
   { path: 'ops/products', element: <ProductQueuePage /> },
   { path: 'ops/products/:caseId', element: <ProductReviewPage /> },
   { path: 'ops/reports', element: <ReportQueuePage /> },
@@ -67,10 +74,10 @@ const ACCOUNT_ROUTES: { path: string; element: ReactNode }[] = [
   { path: 'ops/storefronts/:caseId', element: <StorefrontReviewPage /> },
   { path: 'ops/users', element: <UsersAdminPage /> },
   { path: 'ops/users/:caseId', element: <UserAdminDetailPage /> },
-  { path: 'seller/orders', element: <SellerOrdersPage /> },
-  { path: 'seller/orders/:orderId', element: <SellerOrderDetailPage /> },
-  { path: 'seller/shipments', element: <SellerShipmentsPage /> },
-  { path: 'seller/shipments/:orderId', element: <SellerShipmentDetailPage /> },
+  { path: 'seller/orders', element: <SellerAccessGate minimum="active"><SellerOrdersPage /></SellerAccessGate> },
+  { path: 'seller/orders/:orderId', element: <SellerAccessGate minimum="active"><SellerOrderDetailPage /></SellerAccessGate> },
+  { path: 'seller/shipments', element: <SellerAccessGate minimum="active"><SellerShipmentsPage /></SellerAccessGate> },
+  { path: 'seller/shipments/:orderId', element: <SellerAccessGate minimum="active"><SellerShipmentDetailPage /></SellerAccessGate> },
   { path: 'models', element: <ModelLibraryPage /> },
   { path: 'models/upload', element: <ModelUploadPage /> },
   { path: 'models/:modelId', element: <ModelDetailPage /> },

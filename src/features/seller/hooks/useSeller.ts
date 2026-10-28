@@ -23,7 +23,6 @@ export const useStorefront = () => useQuery({ queryKey: sellerKeys.storefront, q
 export const useSellerProducts = () => useQuery({ queryKey: sellerKeys.products, queryFn: sellerService.products })
 export const useSellerProduct = (id: number) =>
   useQuery({ queryKey: sellerKeys.product(id), queryFn: () => sellerService.product(id), enabled: Number.isFinite(id) })
-export const useInventoryLogs = () => useQuery({ queryKey: sellerKeys.inventory, queryFn: sellerService.inventoryLogs })
 export const useDisputes = () => useQuery({ queryKey: sellerKeys.disputes, queryFn: sellerService.disputes })
 export const useDispute = (id: string) => useQuery({ queryKey: sellerKeys.dispute(id), queryFn: () => sellerService.dispute(id) })
 export const useEarnings = () => useQuery({ queryKey: sellerKeys.earnings, queryFn: sellerService.earnings })
@@ -84,9 +83,15 @@ export const useAdjustStock = () =>
   )
 export const useChangePrice = () =>
   useMockAction(
-    ({ variantId, price, reason }: { variantId: number; price: number; reason: string }) => sellerService.changePrice(variantId, price, reason),
+    ({ variantId, price }: { variantId: number; price: number }) => sellerService.changePrice(variantId, price),
     ALL,
-    'Đã cập nhật giá & ghi log.',
+    'Đã cập nhật giá.',
+  )
+export const useRequestPayout = () =>
+  useMockAction(
+    (input: { amount: number; bankAccountId: number; reason: string }) => sellerService.requestPayout(input),
+    [sellerKeys.earnings],
+    'Đã gửi yêu cầu rút tiền để quản trị viên duyệt.',
   )
 export const useRespondDispute = () =>
   useMockAction(

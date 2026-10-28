@@ -36,7 +36,7 @@ export function NewReportPage() {
           <>
             <Section n={1} title="Đối tượng báo cáo">
               <div className="flex flex-wrap gap-2">
-                {(Object.keys(TARGET_TYPE) as ViolationReport['targetType'][]).map((t) => (
+                {(['PRODUCT', 'USER'] as ViolationReport['targetType'][]).map((t) => (
                   <button
                     key={t}
                     type="button"
@@ -81,11 +81,6 @@ export function NewReportPage() {
                   className={inputClass}
                 />
               </label>
-              {form.targetType === 'STOREFRONT' && (
-                <p className="mt-3 rounded-2xl bg-peach/60 p-3 text-xs text-orange-deep">
-                  API hiện chỉ nhận báo cáo theo sản phẩm hoặc người dùng — hãy báo cáo sản phẩm cụ thể của gian hàng.
-                </p>
-              )}
             </Section>
           </>
         }
@@ -100,7 +95,7 @@ export function NewReportPage() {
               <Btn variant="primary" disabled={!ok || create.isPending} onClick={() =>
                   create.mutate(
                     { ...form, targetId: form.targetType === 'PRODUCT' ? presetId : undefined },
-                    { onSuccess: (r) => navigate(`/reports/${r.id}`) },
+                    { onSuccess: (r) => navigate(`/reports?submitted=${r.id}`) },
                   )
                 }>
                 Gửi báo cáo cho bộ phận thẩm định

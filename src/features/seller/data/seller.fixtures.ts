@@ -25,6 +25,10 @@ export type SellerApplication = {
   verifiedBankAvailable?: boolean
   /** Có khi đã tạo gian hàng. */
   storefrontId?: number
+  /** Trạng thái vận hành hiện tại của gian hàng, dùng để chặn khu vực quản trị khi chưa mua/hết gói. */
+  storefrontStatus?: Storefront['status']
+  /** Địa chỉ mặc định có đủ dữ liệu để backend dùng làm điểm lấy hàng GHTK. */
+  pickupAddressReady?: boolean
   audit: AuditEntry[]
 }
 

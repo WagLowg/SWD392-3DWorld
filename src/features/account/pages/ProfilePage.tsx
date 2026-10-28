@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { BadgeCheck, History, Mail, PencilLine, Phone, ShieldCheck, ShoppingBag, Store, User } from 'lucide-react'
+import { BadgeCheck, Camera, History, Mail, PencilLine, Phone, ShieldCheck, ShoppingBag, Store, User } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { ApiClientError } from '../../../shared/api'
@@ -7,7 +7,7 @@ import { Field, FormError, inputClass, SubmitButton } from '../../../shared/ui/f
 import { ApiNote, PageHeading } from '../../../shared/ui/primitives'
 import { useToast } from '../../../shared/ui/toast'
 import { QueryState } from '../../../shared/ui/QueryState'
-import { useProfile, useUpdateProfile } from '../hooks/useAccount'
+import { useProfile, useUpdateProfile, useUploadAvatar } from '../hooks/useAccount'
 import { type ProfileFormValues, profileSchema } from '../schemas/account.schemas'
 import type { Profile } from '../types/account.types'
 
@@ -62,6 +62,7 @@ function ProfileContent({ profile }: { profile: Profile }) {
   const uid = useId()
   const [isEditing, setIsEditing] = useState(false)
   const update = useUpdateProfile()
+  const avatar = useUploadAvatar()
   const toast = useToast()
   const {
     register,
@@ -92,16 +93,35 @@ function ProfileContent({ profile }: { profile: Profile }) {
     reset({ fullName: profile.fullName ?? '', phone: profile.phone ?? '' })
     setIsEditing(false)
   }
+  const uploadAvatar = (file: File | undefined) => {
+    if (!file) return
+    if (!['image/jpeg', 'image/png'].includes(file.type)) return toast('Ảnh đại diện chỉ nhận JPEG hoặc PNG.', 'error')
+    if (file.size > 5_000_000) return toast('Ảnh đại diện tối đa 5 MB.', 'error')
+    avatar.mutate(file, {
+      onSuccess: () => toast('Đã cập nhật ảnh đại diện.'),
+      onError: (error) => toast(error.message || 'Không tải được ảnh đại diện.', 'error'),
+    })
+  }
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[360px_1fr]">
       <aside className="space-y-4">
         <div className="rounded-[2rem] bg-white/95 p-6 text-center shadow-soft">
           <div className="mx-auto grid h-28 w-28 place-items-center rounded-full bg-gradient-to-br from-orange to-violet p-1">
-            <span className="grid h-full w-full place-items-center rounded-full bg-white font-display text-5xl font-bold text-violet">
-              {profile.fullName?.charAt(0).toUpperCase() || '?'}
-            </span>
+            {profile.avatarUrl ? (
+              <img src={profile.avatarUrl} alt={`Ảnh đại diện ${profile.fullName}`} className="h-full w-full rounded-full bg-white object-cover" />
+            ) : (
+              <span className="grid h-full w-full place-items-center rounded-full bg-white font-display text-5xl font-bold text-violet">
+                {profile.fullName?.charAt(0).toUpperCase() || '?'}
+              </span>
+            )}
           </div>
+          {isEditing && (
+            <label className="mx-auto mt-3 inline-flex cursor-pointer items-center gap-2 rounded-full bg-surface-low px-3 py-2 font-label text-xs font-semibold hover:bg-surface-high">
+              <Camera size={14} /> {avatar.isPending ? 'Đang tải ảnh…' : 'Đổi ảnh đại diện'}
+              <input type="file" accept="image/jpeg,image/png" disabled={avatar.isPending} className="sr-only" onChange={(e) => uploadAvatar(e.target.files?.[0])} />
+            </label>
+          )}
           <h2 className="mt-4 font-display text-2xl font-bold">{profile.fullName}</h2>
           <p className="mt-1 font-mono text-xs text-ink-soft">UID: usr_{profile.userId}</p>
           <p

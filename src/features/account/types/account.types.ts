@@ -2,6 +2,8 @@ export type Profile = {
   userId: number
   email: string
   fullName: string
+  avatarUrl?: string | null
+  dateOfBirth?: string | null
   phone?: string | null
   emailVerified: boolean
   roles: string[]
@@ -19,6 +21,9 @@ export type Address = {
   phone?: string | null
   addressLine: string
   city?: string | null
+  province?: string | null
+  district?: string | null
+  ward?: string | null
   isDefault: boolean
 }
 
@@ -27,6 +32,9 @@ export type AddressInput = {
   phone?: string
   addressLine: string
   city?: string
+  province?: string
+  district?: string
+  ward?: string
 }
 
 /** Số tài khoản không bao giờ trả về đầy đủ, chỉ có accountNumberMasked. */

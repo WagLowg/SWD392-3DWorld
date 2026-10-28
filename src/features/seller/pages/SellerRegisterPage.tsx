@@ -1,11 +1,15 @@
-import { CheckCircle2, Landmark, Link2, Mail, Phone, Store } from 'lucide-react'
+import { Link2, MapPin, Pencil, Store } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
+import { AddressEditor } from '../../account/components/AddressEditor'
+import { useAddressList } from '../../account/hooks/useAccount'
+import { formatStructuredAddress, isGhtkReadyAddress } from '../../account/lib/address'
 import { inputClass } from '../../../shared/ui/form'
 import { AuditTimeline, Btn, DetailLayout, Hero, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import type { SellerApplication } from '../data/seller.fixtures'
 import { useApplication, useSubmitApplication } from '../hooks/useSeller'
 import { APPLICATION_STATUS } from '../lib/status'
+import { SellerPrerequisites } from '../components/SellerPrerequisites'
 
 const TECHS = ['Resin SLA', 'Resin DLP', 'FDM PLA', 'FDM PETG', 'Sơn tay thủ công']
 
@@ -34,6 +38,8 @@ export function SellerRegisterPage() {
 function ApplicationForm({ app }: { app: SellerApplication }) {
   const uid = useId()
   const submit = useSubmitApplication()
+  const addresses = useAddressList()
+  const [editingPickup, setEditingPickup] = useState(false)
   const [form, setForm] = useState({
     storefrontName: app.storefrontName,
     description: app.description,
@@ -41,12 +47,25 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
     technologies: app.technologies,
     evidence: app.evidenceLink ?? '',
   })
+  const pickup = addresses.data?.find((address) => address.isDefault)
+  const addressToComplete = pickup ?? addresses.data?.[0]
+  const pickupReady = isGhtkReadyAddress(pickup)
+
+  useEffect(() => {
+    if (!pickupReady) return
+    const address = formatStructuredAddress(pickup)
+    setForm((current) => (current.address === address ? current : { ...current, address }))
+  }, [pickup, pickupReady])
+
   const locked = app.status === 'PENDING' || app.status === 'VERIFIED'
   const valid =
     form.storefrontName.trim().length >= 3 &&
     form.address.trim() &&
     form.technologies.length &&
     form.evidence.trim().length >= 5 &&
+    pickupReady &&
+    app.emailVerified &&
+    app.phoneVerified &&
     app.verifiedBankAvailable !== false
 
   return (
@@ -73,19 +92,7 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
                 </Btn>
               </div>
             )}
-            {app.verifiedBankAvailable === false && !locked && (
-              <p className="mt-3 rounded-2xl bg-peach/60 p-4 text-sm text-orange-deep">
-                Cần ít nhất một tài khoản ngân hàng đã được quản trị viên duyệt.{' '}
-                <a href="/portal/bank-accounts" className="font-semibold underline">
-                  Quản lý tài khoản ngân hàng
-                </a>
-              </p>
-            )}
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <Check icon={Mail} label="Xác thực email" ok={app.emailVerified} />
-              <Check icon={Phone} label="Xác thực số điện thoại" ok={app.phoneVerified} />
-              <Check icon={Landmark} label="Tài khoản ngân hàng" ok={app.bank?.status === 'APPROVED'} pending={app.bank?.status === 'PENDING'} />
-            </div>
+            <SellerPrerequisites application={app} />
           </Section>
 
           <Section n={1} title="Hồ sơ xưởng & thiết bị chế tác">
@@ -98,10 +105,50 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
                 <span className="mb-1.5 block font-label text-xs font-semibold text-ink-soft">Giới thiệu năng lực & phong cách chế tác * (≥ 20 ký tự)</span>
                 <textarea id={`${uid}-desc`} rows={4} disabled={locked} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputClass} />
               </label>
-              <label className="block" htmlFor={`${uid}-addr`}>
-                <span className="mb-1.5 block font-label text-xs font-semibold text-ink-soft">Địa chỉ cơ sở chế tác thực tế *</span>
-                <input id={`${uid}-addr`} disabled={locked} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className={inputClass} />
-              </label>
+              <div>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-label text-xs font-semibold text-ink-soft">Địa chỉ lấy hàng GHTK *</p>
+                    <p className="mt-1 text-xs text-ink-soft">Backend sử dụng địa chỉ mặc định của tài khoản làm điểm lấy hàng cho gian hàng.</p>
+                  </div>
+                  {pickupReady && !editingPickup && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingPickup(true)}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-surface-low px-3 py-2 font-label text-xs font-semibold hover:bg-surface-high"
+                    >
+                      <Pencil size={13} /> Chỉnh sửa
+                    </button>
+                  )}
+                </div>
+                <QueryState isLoading={addresses.isLoading} error={addresses.error} onRetry={() => addresses.refetch()}>
+                  {pickupReady && !editingPickup ? (
+                    <div className="rounded-2xl border border-mint bg-mint/35 p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-violet"><MapPin size={17} /></span>
+                        <div className="min-w-0 text-sm">
+                          <p className="font-semibold">{pickup.recipientName} · {pickup.phone}</p>
+                          <p className="mt-1 leading-relaxed text-ink-soft">{formatStructuredAddress(pickup)}</p>
+                          <p className="mt-2 font-label text-[11px] font-bold uppercase tracking-wider text-[#0f7050]">Địa chỉ mặc định · Sẵn sàng cho GHTK</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-orange/25 bg-peach/30 p-4">
+                      <p className="mb-4 text-sm text-orange-deep">
+                        {addressToComplete
+                          ? 'Địa chỉ mặc định hiện thiếu dữ liệu GHTK. Vui lòng bổ sung các trường bên dưới.'
+                          : 'Bạn chưa có địa chỉ lấy hàng. Địa chỉ này sẽ được lưu vào Sổ địa chỉ và đặt làm mặc định.'}
+                      </p>
+                      <AddressEditor
+                        address={addressToComplete}
+                        forceDefault
+                        onDone={() => setEditingPickup(false)}
+                      />
+                    </div>
+                  )}
+                </QueryState>
+              </div>
               <fieldset>
                 <legend className="mb-1.5 font-label text-xs font-semibold text-ink-soft">Công nghệ in chủ đạo *</legend>
                 <div className="flex flex-wrap gap-2">
@@ -172,6 +219,7 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
   )
 }
 
+/* Removed: prerequisite status cards now live in SellerPrerequisites.
 function Check({ icon: Icon, label, ok, pending }: { icon: typeof Mail; label: string; ok: boolean; pending?: boolean }) {
   return (
     <div className="flex items-center gap-3 rounded-2xl bg-surface-low p-3">
@@ -185,3 +233,4 @@ function Check({ icon: Icon, label, ok, pending }: { icon: typeof Mail; label: s
     </div>
   )
 }
+*/

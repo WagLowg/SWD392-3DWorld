@@ -1,16 +1,13 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import { Clock, Landmark, Lock, Pencil, Plus, ShieldCheck, ShieldX, Star, Trash2 } from 'lucide-react'
-import { useEffect, useId, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useEffect, useState } from 'react'
 import { ApiClientError } from '../../../shared/api'
 import { ConfirmButton } from '../../../shared/ui/ConfirmButton'
-import { Field, FormError, inputClass, SubmitButton } from '../../../shared/ui/form'
 import { PageHeading } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { useToast } from '../../../shared/ui/toast'
+import { BankAccountEditor } from '../components/BankAccountEditor'
 import { useBankAccountMutations, useBankAccounts } from '../hooks/useAccount'
-import { type BankAccountFormValues, bankAccountSchema } from '../schemas/account.schemas'
 import type { BankAccount } from '../types/account.types'
 
 const VERIFY: Record<string, { label: string; tone: string; icon: typeof Clock }> = {
@@ -66,7 +63,7 @@ export function BankAccountsPage() {
         {editing === 'new' && (
           <section className="rounded-[2rem] bg-white/95 p-6 shadow-soft">
             <h2 className="mb-4 font-display text-xl font-bold">Thêm tài khoản ngân hàng</h2>
-            <BankEditor onDone={() => setEditing(null)} />
+            <BankAccountEditor onDone={() => setEditing(null)} />
           </section>
         )}
         <QueryState isLoading={list.isLoading} error={list.error} onRetry={() => list.refetch()}>
@@ -91,7 +88,7 @@ export function BankAccountsPage() {
                 editing === a.id ? (
                   <section key={a.id} className="rounded-[2rem] bg-white/95 p-6 shadow-soft md:col-span-2">
                     <h2 className="mb-4 font-display text-xl font-bold">Sửa tài khoản {a.bankName}</h2>
-                    <BankEditor account={a} onDone={() => setEditing(null)} />
+                    <BankAccountEditor account={a} onDone={() => setEditing(null)} />
                   </section>
                 ) : (
                   <BankCard key={a.id} account={a} onEdit={() => setEditing(a.id)} />
@@ -172,100 +169,5 @@ function BankCard({ account: a, onEdit }: { account: BankAccount; onEdit: () => 
         </ConfirmButton>
       </div>
     </article>
-  )
-}
-
-function BankEditor({ account, onDone }: { account?: BankAccount; onDone: () => void }) {
-  const uid = useId()
-  const { create, update } = useBankAccountMutations()
-  const toast = useToast()
-  const {
-    register,
-    handleSubmit,
-    setError,
-    formState: { errors },
-  } = useForm<BankAccountFormValues>({
-    resolver: zodResolver(bankAccountSchema),
-    defaultValues: {
-      bankCode: account?.bankCode ?? '',
-      bankName: account?.bankName ?? '',
-      accountHolder: account?.accountHolder ?? '',
-      accountNumber: '',
-    },
-  })
-
-  const submit = handleSubmit(async (input) => {
-    try {
-      if (account) await update.mutateAsync({ id: account.id, input })
-      else await create.mutateAsync(input)
-      toast(account ? 'Đã cập nhật — tài khoản chờ xác minh lại.' : 'Đã thêm tài khoản, chờ xác minh.')
-      onDone()
-    } catch (e) {
-      setError('root', { message: e instanceof ApiClientError ? e.message : 'Không lưu được tài khoản.' })
-    }
-  })
-
-  return (
-    <form onSubmit={submit} noValidate className="grid gap-4 sm:grid-cols-2">
-      <Field id={`${uid}-code`} label="Mã ngân hàng *" error={errors.bankCode?.message} hint="Vd. VCB, TCB, MB, ACB">
-        <input
-          id={`${uid}-code`}
-          aria-invalid={!!errors.bankCode}
-          className={`${inputClass} uppercase`}
-          {...register('bankCode')}
-        />
-      </Field>
-      <Field id={`${uid}-bank`} label="Tên ngân hàng *" error={errors.bankName?.message}>
-        <input id={`${uid}-bank`} aria-invalid={!!errors.bankName} className={inputClass} {...register('bankName')} />
-      </Field>
-      <Field
-        id={`${uid}-holder`}
-        label="Chủ tài khoản *"
-        error={errors.accountHolder?.message}
-        hint="Viết hoa không dấu như trên thẻ."
-      >
-        <input
-          id={`${uid}-holder`}
-          autoComplete="name"
-          aria-invalid={!!errors.accountHolder}
-          className={`${inputClass} uppercase`}
-          {...register('accountHolder')}
-        />
-      </Field>
-      <Field
-        id={`${uid}-number`}
-        label="Số tài khoản *"
-        error={errors.accountNumber?.message}
-        hint={
-          account
-            ? `Nhập lại số đầy đủ (hiện tại: ${account.accountNumberMasked}).`
-            : 'Chỉ hiển thị dạng che sau khi lưu.'
-        }
-      >
-        <input
-          id={`${uid}-number`}
-          inputMode="numeric"
-          autoComplete="off"
-          aria-invalid={!!errors.accountNumber}
-          className={`${inputClass} font-mono tracking-widest`}
-          {...register('accountNumber')}
-        />
-      </Field>
-      <div className="sm:col-span-2">
-        <FormError message={errors.root?.message} />
-      </div>
-      <div className="flex justify-end gap-2 sm:col-span-2">
-        <button
-          type="button"
-          onClick={onDone}
-          className="rounded-full px-5 py-3 font-label text-sm font-semibold text-ink-soft hover:bg-surface-low"
-        >
-          Huỷ
-        </button>
-        <SubmitButton busy={create.isPending || update.isPending}>
-          {account ? 'Lưu & gửi xác minh lại' : 'Thêm tài khoản'}
-        </SubmitButton>
-      </div>
-    </form>
   )
 }

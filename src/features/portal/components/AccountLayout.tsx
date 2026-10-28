@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { BadgeCheck, Box, Boxes, CircleUserRound, ClipboardList, CreditCard, House, Library, LogOut, MapPin, PackageSearch, PanelLeft, ReceiptText, RotateCcw, ShieldCheck, ShoppingBag, Store, Truck, UserRoundCog, WalletCards } from 'lucide-react'
+import { BadgeCheck, Box, Boxes, CircleDollarSign, CircleUserRound, ClipboardList, CreditCard, House, Library, LogOut, MapPin, PackageSearch, PanelLeft, ReceiptText, RotateCcw, ShieldCheck, ShoppingBag, Store, Truck, UserRoundCog, WalletCards } from 'lucide-react'
 import { type ReactNode, useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { hasStoredSession, isSeller, logout } from '../../auth/services/session'
@@ -29,6 +29,7 @@ const SELLER_TABS = [
   { to: '/seller/shipments', label: 'Vận chuyển', icon: Truck },
   { to: '/seller/storefront', label: 'Gian hàng', icon: Store },
   { to: '/seller/subscription', label: 'Gói thuê gian hàng', icon: CreditCard },
+  { to: '/seller/revenue', label: 'Doanh thu & ví', icon: CircleDollarSign },
   { to: '/seller/register', label: 'Xác thực người bán', icon: BadgeCheck },
 ]
 

@@ -13,12 +13,14 @@ export const profileSchema = z.object({
 })
 export type ProfileFormValues = z.infer<typeof profileSchema>
 
-/** AddressRequest: recipientName, addressLine bắt buộc. */
+/** AddressRequest đầy đủ cho giao hàng và địa chỉ lấy hàng GHTK. */
 export const addressSchema = z.object({
   recipientName: z.string().trim().min(1, 'Nhập tên người nhận.').max(120, 'Tối đa 120 ký tự.'),
-  phone,
+  phone: z.string().trim().regex(/^\+?[0-9]{8,15}$/, 'Số điện thoại gồm 8–15 chữ số.'),
   addressLine: z.string().trim().min(1, 'Nhập địa chỉ chi tiết.').max(255, 'Tối đa 255 ký tự.'),
-  city: z.string().trim().max(120, 'Tối đa 120 ký tự.').optional(),
+  province: z.string().trim().min(1, 'Nhập tỉnh/thành phố.').max(255, 'Tối đa 255 ký tự.'),
+  district: z.string().trim().max(255, 'Tối đa 255 ký tự.').optional(),
+  ward: z.string().trim().min(1, 'Nhập phường/xã.').max(255, 'Tối đa 255 ký tự.'),
 })
 export type AddressFormValues = z.infer<typeof addressSchema>
 

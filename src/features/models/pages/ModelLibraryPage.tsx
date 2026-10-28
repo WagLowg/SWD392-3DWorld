@@ -106,7 +106,7 @@ export function ModelLibraryPage() {
       </div>
       {(origin || term) && (
         <ApiNote className="mt-3">
-          Lọc nguồn gốc / tìm kiếm áp dụng trên trang hiện tại — API /api/models/my chỉ hỗ trợ phân trang.
+          Lọc nguồn gốc / tìm kiếm áp dụng trên trang hiện tại — API /api/models/getAll chỉ hỗ trợ phân trang.
         </ApiNote>
       )}
 
