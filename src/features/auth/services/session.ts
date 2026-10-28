@@ -43,6 +43,13 @@ export function isSeller(user: SessionUser | null | undefined) {
   )
 }
 
+/** Quản trị viên hệ thống. Dùng chung cho điều hướng sau đăng nhập và route guard. */
+export function isAdmin(user: SessionUser | null | undefined) {
+  if (!user) return false
+  const roles = user.roles ?? [user.role]
+  return roles.some((role) => /(?:^|_)ADMIN$/i.test(role))
+}
+
 export async function logout(redirectTo = '/') {
   await authService.logout().catch(() => {})
   location.assign(redirectTo)

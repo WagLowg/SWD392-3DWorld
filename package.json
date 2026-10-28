@@ -9,9 +9,9 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "preview": "vite preview",
-    "lint": "biome lint src/app src/shared src/features/account src/features/auth src/features/buyer src/features/design src/features/marketplace src/features/models src/features/ops src/features/orders src/features/pod src/features/portal src/features/seller src/features/wallet",
-    "format": "biome format --write src/app src/shared src/features/account src/features/auth src/features/buyer src/features/design src/features/marketplace src/features/models src/features/ops src/features/orders src/features/pod src/features/portal src/features/seller src/features/wallet",
-    "format:check": "biome format src/app src/shared src/features/account src/features/auth src/features/buyer src/features/design src/features/marketplace src/features/models src/features/ops src/features/orders src/features/pod src/features/portal src/features/seller src/features/wallet",
+    "lint": "biome lint src/app src/shared src/features/account src/features/admin src/features/auth src/features/buyer src/features/design src/features/marketplace src/features/models src/features/ops src/features/orders src/features/pod src/features/portal src/features/seller src/features/wallet",
+    "format": "biome format --write src/app src/shared src/features/account src/features/admin src/features/auth src/features/buyer src/features/design src/features/marketplace src/features/models src/features/ops src/features/orders src/features/pod src/features/portal src/features/seller src/features/wallet",
+    "format:check": "biome format src/app src/shared src/features/account src/features/admin src/features/auth src/features/buyer src/features/design src/features/marketplace src/features/models src/features/ops src/features/orders src/features/pod src/features/portal src/features/seller src/features/wallet",
     "test": "vitest run",
     "test:watch": "vitest"
   },
