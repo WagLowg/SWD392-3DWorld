@@ -30,6 +30,39 @@ export function categoryLabel(code: string | null | undefined) {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
+const SHIPPING_CLASS_LABELS: Record<string, string> = {
+  STANDARD: 'Hộp tiêu chuẩn',
+  FRAGILE: 'Hộp chống sốc / hàng dễ vỡ',
+  OVERSIZED: 'Kiện cồng kềnh',
+}
+
+export function shippingClassLabel(code: string | null | undefined) {
+  if (!code) return ''
+  return SHIPPING_CLASS_LABELS[code.toUpperCase()] ?? categoryLabel(code)
+}
+
+/** Hiển thị JSON specifications của Backend thành nội dung dễ đọc; dữ liệu text cũ vẫn giữ nguyên. */
+export function formatProductSpecifications(raw: string | null | undefined) {
+  if (!raw) return ''
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return raw
+    const specs = parsed as Record<string, unknown>
+    const lines: string[] = []
+    if (typeof specs.material === 'string' && specs.material) lines.push(`Vật liệu: ${specs.material}`)
+    if (Array.isArray(specs.dimensionsMm) && specs.dimensionsMm.length === 3) {
+      lines.push(`Kích thước tham chiếu: ${specs.dimensionsMm.join(' × ')} mm`)
+    }
+    if (typeof specs.polygonCount === 'number') {
+      lines.push(`Số polygon: ${specs.polygonCount.toLocaleString('vi-VN')}`)
+    }
+    if (typeof specs.manifold === 'boolean') lines.push(`Lưới kín (manifold): ${specs.manifold ? 'Có' : 'Không'}`)
+    return lines.length ? lines.join('\n') : raw
+  } catch {
+    return raw
+  }
+}
+
 export function formatVnd(value: number | null | undefined) {
   return `${vnd.format(Math.round(Number(value) || 0))}₫`
 }

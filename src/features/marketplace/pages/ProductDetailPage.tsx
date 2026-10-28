@@ -28,9 +28,11 @@ import {
   badgeLabel,
   categoryLabel,
   formatAttributes,
+  formatProductSpecifications,
   formatRating,
   formatVnd,
   resolveMediaUrl,
+  shippingClassLabel,
 } from '../lib/format'
 import { useMarketplaceUiStore } from '../stores/marketplace-ui.store'
 import type { ProductDetail, ProductVariant } from '../types/catalog.types'
@@ -491,7 +493,7 @@ function DetailTabs({ detail, variants }: { detail: ProductDetail; variants: Pro
           <div className="overflow-x-auto">
             {detail.specifications && (
               <p className="mb-6 whitespace-pre-line rounded-2xl bg-surface-low p-5 text-sm leading-relaxed">
-                {detail.specifications}
+                {formatProductSpecifications(detail.specifications)}
               </p>
             )}
             <table className="w-full min-w-[560px] text-left text-sm">
@@ -545,7 +547,7 @@ function DetailTabs({ detail, variants }: { detail: ProductDetail; variants: Pro
           <div className="grid gap-5 md:grid-cols-3">
             {detail.shippingClass && (
               <p className="rounded-2xl bg-teal-soft/60 p-4 text-sm text-teal md:col-span-3">
-                Hạng vận chuyển: <strong>{categoryLabel(detail.shippingClass)}</strong>
+                Hạng vận chuyển: <strong>{shippingClassLabel(detail.shippingClass)}</strong>
               </p>
             )}
             {[

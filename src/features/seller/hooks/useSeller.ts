@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMockAction } from '../../../shared/mock/useMockAction'
 import type { ProductStatus, SellerApplication, SellerProduct, Storefront } from '../data/seller.fixtures'
-import { sellerService } from '../services/seller.service'
+import { sellerService, type PendingProductMedia } from '../services/seller.service'
 
 export const sellerKeys = {
   all: ['seller'] as const,
@@ -50,8 +50,8 @@ export const useRenew = () =>
   useMockAction(() => sellerService.renew(), ALL, 'Đang chuyển sang ZaloPay để thanh toán gói…')
 export const useUploadProductMedia = () =>
   useMockAction(
-    ({ productId, file, sortOrder }: { productId: number; file: File; sortOrder?: number }) =>
-      sellerService.uploadMedia(productId, file, sortOrder),
+    ({ productId, file, sortOrder, variantId }: { productId: number; file: File; sortOrder?: number; variantId?: number }) =>
+      sellerService.uploadMedia(productId, file, sortOrder, variantId),
     ALL,
     'Đã tải ảnh lên — sản phẩm cần nộp duyệt lại.',
   )
@@ -65,7 +65,11 @@ export const useUpdateStorefront = () =>
   useMockAction((patch: Partial<Storefront>) => sellerService.updateStorefront(patch), ALL, 'Đã lưu hồ sơ gian hàng.')
 export const useSaveProduct = () =>
   useMockAction(
-    ({ input, submit }: { input: Parameters<typeof sellerService.saveProduct>[0]; submit: boolean }) => sellerService.saveProduct(input, submit),
+    ({ input, submit, pendingMedia = [] }: {
+      input: Parameters<typeof sellerService.saveProduct>[0]
+      submit: boolean
+      pendingMedia?: PendingProductMedia[]
+    }) => sellerService.saveProduct(input, submit, pendingMedia),
     ALL,
     (p: SellerProduct) => (p.status === 'PENDING_REVIEW' ? 'Đã gửi duyệt sản phẩm.' : 'Đã lưu sản phẩm.'),
   )
