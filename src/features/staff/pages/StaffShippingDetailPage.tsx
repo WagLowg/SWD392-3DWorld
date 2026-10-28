@@ -1,5 +1,4 @@
 import {
-  AlertCircle,
   AlertTriangle,
   ArrowRight,
   Building2,
@@ -7,7 +6,6 @@ import {
   Clock,
   Lock,
   MapPin,
-  Package,
   RotateCcw,
   Truck,
 } from 'lucide-react'
@@ -17,9 +15,11 @@ import { ApiClientError } from '../../../shared/api'
 import { formatDateTime, formatVnd } from '../../../shared/format'
 import { DetailLayout, KeyValues, MoneyRows, Pill, Section } from '../../../shared/ui/kit'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
+import { formatAttributes } from '../../marketplace/lib/format'
 import { StaffHeader } from '../components/StaffHeader'
 import { StaffHorizontalShippingTracker } from '../components/StaffHorizontalShippingTracker'
 import { StaffShipmentBadge } from '../components/StaffStatusBadge'
+import { CodOperationsPanel } from '../components/CodOperationsPanel'
 import {
   isValidShipmentTransition,
   SHIPMENT_STATUS_LABELS,
@@ -275,11 +275,16 @@ export function StaffShippingDetailPage() {
                 items={[
                   {
                     label: 'Tổng khối lượng cước',
-                    value: `${shipment.totalWeightGrams} grams`,
+                    value: shipment.totalWeightGrams > 0 ? `${shipment.totalWeightGrams} g` : 'Chưa cập nhật',
                   },
                   {
                     label: 'Kích thước kiện (D x R x C)',
-                    value: `${shipment.packageDimensionsCm.length} x ${shipment.packageDimensionsCm.width} x ${shipment.packageDimensionsCm.height} cm`,
+                    value:
+                      shipment.packageDimensionsCm.length > 0 &&
+                      shipment.packageDimensionsCm.width > 0 &&
+                      shipment.packageDimensionsCm.height > 0
+                        ? `${shipment.packageDimensionsCm.length} x ${shipment.packageDimensionsCm.width} x ${shipment.packageDimensionsCm.height} cm`
+                        : 'Chưa cập nhật',
                   },
                   {
                     label: 'Số lần phát hàng',
@@ -305,11 +310,13 @@ export function StaffShippingDetailPage() {
                           <p className="font-semibold text-ink">{it.productTitle}</p>
                         </td>
                         <td className="px-4 py-3 text-ink-soft">
-                          <span>{it.variantName}</span>
+                          <span>{formatAttributes(it.variantName) || 'Mặc định'}</span>
                           <span className="block font-mono text-[10px] opacity-70">{it.sku}</span>
                         </td>
                         <td className="px-4 py-3 text-center font-bold text-ink">x{it.quantity}</td>
-                        <td className="px-4 py-3 text-right font-mono text-ink-soft">{it.weightGrams}g</td>
+                        <td className="px-4 py-3 text-right font-mono text-ink-soft">
+                          {it.weightGrams > 0 ? `${it.weightGrams} g` : '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -317,25 +324,10 @@ export function StaffShippingDetailPage() {
               </div>
             </Section>
 
-            {/* Demoted Section: Dữ liệu hành trình GHTK ban đầu (Historical Demo Data) */}
-            <Section
-              n={4}
-              title="Dữ liệu hành trình GHTK ban đầu (Historical Demo Data)"
-              subtitle="Lộ trình tham khảo từ đơn vị giao vận — Không kết nối API trực tiếp"
-            >
-              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/60 p-3.5 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
-                <div className="flex items-start gap-2">
-                  <AlertCircle size={16} className="mt-0.5 shrink-0 text-amber-600" />
-                  <div>
-                    <strong className="font-semibold">Lưu ý tích hợp:</strong> Nền tảng hiện chưa kết nối trực tiếp với
-                    API nhà vận chuyển GHTK. Lộ trình dưới đây là dữ liệu mô phỏng minh họa hành trình tiêu chuẩn. Mọi
-                    thay đổi thực tế cần do Staff xác nhận qua bảng điều khiển vận hành bên cạnh.
-                  </div>
-                </div>
-              </div>
-
-              <ol className="relative space-y-6 border-l-2 border-line/80 pl-6 text-sm">
-                {shipment.events.map((ev, idx) => (
+            <Section n={4} title="Hành trình giao vận" subtitle="Các mốc vận chuyển đã được hệ thống ghi nhận">
+              {shipment.events.length ? (
+                <ol className="relative space-y-6 border-l-2 border-line/80 pl-6 text-sm">
+                  {shipment.events.map((ev, idx) => (
                   <li key={ev.id} className="relative">
                     <span
                       className={`absolute -left-[31px] top-0 grid h-5 w-5 place-items-center rounded-full ring-4 ring-white ${
@@ -358,13 +350,23 @@ export function StaffShippingDetailPage() {
                       )}
                     </div>
                   </li>
-                ))}
-              </ol>
+                  ))}
+                </ol>
+              ) : (
+                <p className="rounded-2xl bg-surface-low px-4 py-3 text-sm text-ink-soft">
+                  Chưa có sự kiện hành trình chi tiết từ đơn vị vận chuyển.
+                </p>
+              )}
             </Section>
           </>
         }
         aside={
           <>
+            <CodOperationsPanel
+              orderId={shipment.orderId}
+              paymentMethod={shipment.paymentMethod}
+              fulfillmentStatus={shipment.status}
+            />
             {/* Staff Action Panel: Manual Status Management */}
             <Section title="Thao tác vận hành Staff" subtitle="Cập nhật trạng thái thủ công (Manual Status Management)">
               {awaitingSellerHandoff ? (
@@ -454,20 +456,6 @@ export function StaffShippingDetailPage() {
                         <span>Xác nhận giao thành công</span>
                       </div>
                       <span className="font-mono text-[10px] uppercase">DELIVERED</span>
-                    </button>
-                  )}
-
-                  {allowedTransitions.includes('RECEIVED') && (
-                    <button
-                      type="button"
-                      onClick={() => handleOpenModal('RECEIVED')}
-                      className="flex w-full items-center justify-between rounded-2xl bg-mint px-4 py-3 font-label text-xs font-bold text-[#0f5132] transition hover:brightness-95"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Package size={16} />
-                        <span>Xác nhận người mua đã nhận hàng</span>
-                      </div>
-                      <span className="font-mono text-[10px] uppercase">RECEIVED</span>
                     </button>
                   )}
 

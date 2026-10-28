@@ -207,12 +207,15 @@ export type ShippingQuote = {
   shops: ShippingShopQuote[]
 }
 
+export type PaymentMethod = 'COD' | 'GATEWAY'
+
 export type CheckoutInput = {
   cartItemIds: number[]
   shippingAddressId: number
   /** Backend chỉ đọc key trong body. */
   idempotencyKey: string
   shippingQuoteToken: string
+  paymentMethod: PaymentMethod
 }
 
 export type OrderItem = {
@@ -242,6 +245,8 @@ export type Order = {
   refundWindowHoursSnapshot?: number | null
   autoConfirmHoursSnapshot?: number | null
   shippingAddressSnapshot?: string | null
+  paymentMethod?: PaymentMethod | null
+  onlinePaymentRequired?: boolean
 }
 
 export type Payment = {

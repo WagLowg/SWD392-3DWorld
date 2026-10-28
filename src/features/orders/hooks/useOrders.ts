@@ -1,8 +1,9 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSession } from '../../../shared/session/useSession'
-import { buyerOrderService, orderService, paymentService, sellerOrderService } from '../services/order.service'
+import { buyerOrderService, codAdminService, orderService, paymentService, sellerOrderService } from '../services/order.service'
 import { useOrderPaymentsStore } from '../stores/order-payments.store'
-import type { RefundInput, SavePackagesInput } from '../types/order.types'
+import type { CodRecordInput, PaymentMethod, RefundInput, SavePackagesInput } from '../types/order.types'
+import { autoConfirmRefetchInterval } from '../lib/autoConfirm'
 
 export const orderKeys = {
   mine: ['orders', 'mine'] as const,
@@ -13,6 +14,7 @@ export const orderKeys = {
   history: (orderId: number) => ['orders', orderId, 'history'] as const,
   packages: (orderId: number) => ['orders', orderId, 'packages'] as const,
   packagingProfiles: ['shipping', 'packaging-profiles'] as const,
+  codPayment: (orderId: number) => ['orders', orderId, 'cod-payment'] as const,
 }
 
 const validId = (id: number | undefined): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0
@@ -22,6 +24,7 @@ export function useOrder(orderId: number | undefined) {
     queryKey: orderKeys.detail(orderId ?? -1),
     queryFn: ({ signal }) => orderService.detail(orderId as number, signal),
     enabled: validId(orderId),
+    refetchInterval: (query) => autoConfirmRefetchInterval(query.state.data),
   })
 }
 
@@ -39,6 +42,39 @@ export function useOrderPackages(orderId: number | undefined) {
     queryFn: ({ signal }) => orderService.packages(orderId as number, signal),
     enabled: validId(orderId),
   })
+}
+
+export function useCodPayment(orderId: number | undefined, paymentMethod: PaymentMethod | null | undefined) {
+  return useQuery({
+    queryKey: orderKeys.codPayment(orderId ?? -1),
+    queryFn: ({ signal }) => orderService.codPayment(orderId as number, signal),
+    enabled: validId(orderId) && paymentMethod === 'COD',
+  })
+}
+
+function useCodRecord(kind: 'collection' | 'settlement') {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orderId, input }: { orderId: number; input: CodRecordInput }) =>
+      kind === 'collection'
+        ? codAdminService.recordCollection(orderId, input)
+        : codAdminService.recordSettlement(orderId, input),
+    onSuccess: (payment, variables) => {
+      qc.setQueryData(orderKeys.codPayment(variables.orderId), payment)
+      qc.invalidateQueries({ queryKey: orderKeys.detail(variables.orderId) })
+    },
+    onError: (_error, variables) => {
+      qc.invalidateQueries({ queryKey: orderKeys.codPayment(variables.orderId) })
+    },
+  })
+}
+
+export function useRecordCodCollection() {
+  return useCodRecord('collection')
+}
+
+export function useRecordCodSettlement() {
+  return useCodRecord('settlement')
 }
 
 export function usePackagingProfiles(enabled = true) {
@@ -91,6 +127,7 @@ export function useMyOrders() {
     queryKey: orderKeys.mine,
     queryFn: ({ signal }) => buyerOrderService.list(signal),
     enabled: !!user,
+    refetchInterval: (query) => autoConfirmRefetchInterval(query.state.data),
   })
 }
 

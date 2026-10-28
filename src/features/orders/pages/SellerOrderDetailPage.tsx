@@ -16,6 +16,7 @@ import {
   StorefrontLabel,
 } from '../components/OrderParts'
 import { PackagesPanel } from '../components/PackagesPanel'
+import { CodPaymentPanel } from '../components/CodPaymentPanel'
 import { SellerOrderActions } from '../components/SellerActions'
 import { ShippingAddressSnapshot } from '../components/ShippingAddressSnapshot'
 import { useOrder, useOrderHistory, useSellerShipments } from '../hooks/useOrders'
@@ -68,6 +69,11 @@ export function SellerOrderDetailPage() {
             </div>
             <span className="font-label text-xs text-ink-soft">Tạo lúc {formatDateTime(order.createdAt)}</span>
           </section>
+          {order.paymentMethod === 'COD' && order.status === 'CREATED' && order.reservationExpiresAt && (
+            <p className="mt-3 rounded-2xl bg-peach/60 px-5 py-3 text-sm font-semibold text-orange-deep">
+              Đơn COD cần được tiếp nhận trước {formatDateTime(order.reservationExpiresAt)}.
+            </p>
+          )}
 
           <section className="mt-6 rounded-[2rem] bg-white/95 p-6 shadow-soft sm:p-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -140,6 +146,9 @@ export function SellerOrderDetailPage() {
                 <h2 className="font-display text-xl font-bold">Doanh thu đơn con</h2>
                 <div className="mt-4">
                   <OrderMoney order={order} />
+                </div>
+                <div className="mt-4">
+                  <CodPaymentPanel orderId={order.id} paymentMethod={order.paymentMethod} orderStatus={order.status} />
                 </div>
               </section>
               <section className="rounded-[2rem] bg-white/95 p-6 shadow-soft">

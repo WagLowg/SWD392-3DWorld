@@ -21,7 +21,8 @@ export const VALID_SHIPMENT_TRANSITIONS: Record<ShipmentStatus, ShipmentStatus[]
   HANDED_TO_CARRIER: ['IN_TRANSIT', 'FAILED', 'RETURNED'],
   IN_TRANSIT: ['ARRIVED_AT_DESTINATION', 'FAILED', 'RETURNED'],
   ARRIVED_AT_DESTINATION: ['DELIVERED', 'FAILED', 'RETURNED'],
-  DELIVERED: ['RECEIVED', 'RETURNED'],
+  // RECEIVED chỉ do Buyer xác nhận hoặc Backend tự xác nhận sau thời hạn; Staff không được chuyển trạng thái này.
+  DELIVERED: ['RETURNED'],
   RECEIVED: [],
   RETURNED: [],
   FAILED: ['IN_TRANSIT', 'RETURNED'],

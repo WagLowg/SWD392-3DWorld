@@ -28,6 +28,11 @@ export function CancelOrderPage() {
   const [detail, setDetail] = useState('')
   const [sent, setSent] = useState<string | null>(null)
   const order = orders.data
+  const canCancel = order
+    ? order.paymentMethod === 'COD'
+      ? order.status === 'CREATED'
+      : ['CREATED', 'PENDING_PAYMENT'].includes(order.status)
+    : false
 
   useEffect(() => {
     document.title = `Huỷ đơn ${orderCode(orderId)} · 3DWorld`
@@ -71,10 +76,10 @@ export function CancelOrderPage() {
                       <p className="mt-4 rounded-2xl bg-surface-low p-4 text-sm text-ink-soft">
                         Đơn đã huỷ{order.cancellationReason ? ` — lý do: ${order.cancellationReason}` : ''}.
                       </p>
-                    ) : !['CREATED', 'PENDING_PAYMENT'].includes(order.status) ? (
+                    ) : !canCancel ? (
                       <p className="mt-4 flex gap-2 rounded-2xl bg-[#ffdad6] p-4 text-sm text-danger">
                         <AlertTriangle size={16} className="shrink-0" /> Đơn đã thanh toán nên không huỷ trực tiếp được. Hãy dùng yêu cầu hoàn tiền.
-                        <Btn to={`/refunds/new?orderId=${order.id}`} size="sm">
+                        <Btn to={`/refunds?orderId=${order.id}`} size="sm">
                           Yêu cầu hoàn tiền
                         </Btn>
                       </p>

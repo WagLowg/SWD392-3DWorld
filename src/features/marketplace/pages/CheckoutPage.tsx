@@ -30,6 +30,7 @@ import { useSession } from '../../../shared/session/useSession'
 import { groupByStorefront, storefrontName } from '../lib/cart'
 import { formatAttributes, formatVnd } from '../lib/format'
 import { paymentResultUrl } from '../lib/payment'
+import { ordersRequiringGatewayPayment } from '../lib/checkoutPayment'
 import { isShippingQuoteUsable, SHIPPING_QUOTE_EXPIRY_BUFFER_MS } from '../lib/shipping'
 import { useVariantIndexStore } from '../stores/variant-index.store'
 import { useOrderPaymentsStore } from '../../orders/stores/order-payments.store'
@@ -40,10 +41,8 @@ import {
   savePendingCheckout,
   type PendingCheckoutAttempt,
 } from '../lib/checkoutAttempt'
-import type { Address, CheckoutInput, Order, Payment, ShippingQuoteInput } from '../types/catalog.types'
+import type { Address, CheckoutInput, Order, Payment, PaymentMethod, ShippingQuoteInput } from '../types/catalog.types'
 import { AddressForm } from '../components/AddressForm'
-
-type PaymentMethod = 'zalopay' | 'cod'
 
 type PaymentState = { orderId: number; payment?: Payment; error?: string }
 
@@ -71,8 +70,8 @@ export function CheckoutPage() {
   const [params] = useSearchParams()
   const [orders, setOrders] = useState<Order[] | null>(null)
   const [payments, setPayments] = useState<PaymentState[]>([])
-  const [method, setMethod] = useState<PaymentMethod>('zalopay')
   const [pendingAttempt, setPendingAttempt] = useState<PendingCheckoutAttempt | null>(() => loadPendingCheckout())
+  const [method, setMethod] = useState<PaymentMethod>(() => pendingAttempt?.payload.paymentMethod ?? 'GATEWAY')
 
   useEffect(() => {
     document.title = 'Đặt Hàng & Thanh Toán · 3DWorld'
@@ -289,6 +288,7 @@ function CheckoutForm({
         shippingAddressId: address.id,
         idempotencyKey: newKey(),
         shippingQuoteToken: quote.quoteToken,
+        paymentMethod: method,
       }
     }
     const attempt = pendingAttempt ?? savePendingCheckout(payload)
@@ -299,8 +299,8 @@ function CheckoutForm({
       clearPendingCheckout(payload.idempotencyKey)
       onPendingAttemptChange(null)
       const paid: PaymentState[] = []
-      if (method === 'zalopay') {
-        for (const order of placed) {
+      if (payload.paymentMethod === 'GATEWAY') {
+        for (const order of ordersRequiringGatewayPayment(placed, payload.paymentMethod)) {
           try {
             const payment = await pay.mutateAsync(order.id)
             rememberPayment(order.id, { transactionId: payment.transactionId, amount: payment.amount })
@@ -510,22 +510,24 @@ function CheckoutForm({
         ))}
 
         {/* 3. Thanh toán */}
-        <Section n={3} icon={<Wallet size={18} />} title="Phương Thức Thanh Toán" tag="ZaloPay sandbox">
+        <Section n={3} icon={<Wallet size={18} />} title="Phương Thức Thanh Toán">
           <div className="space-y-3">
             <PayOption
-              active={method === 'zalopay'}
-              onSelect={() => onMethodChange('zalopay')}
+              active={method === 'GATEWAY'}
+              disabled={!!pendingAttempt}
+              onSelect={() => onMethodChange('GATEWAY')}
               icon={<CreditCard size={18} />}
               title="Cổng thanh toán ZaloPay"
               badge="Khuyên dùng"
               body="Sau khi tạo đơn, mỗi đơn con có một liên kết ZaloPay để thanh toán (ATM, thẻ quốc tế, ví ZaloPay)."
             />
             <PayOption
-              active={method === 'cod'}
-              onSelect={() => onMethodChange('cod')}
+              active={method === 'COD'}
+              disabled={!!pendingAttempt}
+              onSelect={() => onMethodChange('COD')}
               icon={<Banknote size={18} />}
               title="Thanh toán khi nhận hàng (COD)"
-              body="Trả tiền mặt cho nhân viên giao hàng khi nhận từng kiện."
+              body="Thanh toán toàn bộ tiền hàng và phí vận chuyển cho đơn vị giao hàng khi nhận từng kiện."
             />
             <PayOption
               disabled
@@ -534,10 +536,7 @@ function CheckoutForm({
               badge="Sắp có"
               body="Thanh toán bằng số dư ví, tiền được giữ an toàn đến khi bạn nhận hàng."
             />
-            <ApiNote>
-              CheckoutRequest chưa có trường phương thức thanh toán: COD = chỉ tạo đơn; ZaloPay = tạo đơn rồi gọi
-              /api/payments/zalopay (PHYSICAL_ORDER · FULL) cho từng đơn con. Số dư ví chưa có API.
-            </ApiNote>
+            <ApiNote>COD không tạo giao dịch ZaloPay. Báo giá vận chuyển GHTK vẫn bắt buộc cho cả hai phương thức.</ApiNote>
           </div>
         </Section>
       </div>
@@ -647,7 +646,7 @@ function CheckoutForm({
                 ? 'Đang xử lý…'
                 : pendingAttempt
                   ? 'Kiểm Tra Lại Yêu Cầu'
-                  : method === 'cod'
+                  : method === 'COD'
                     ? 'Xác Nhận Đặt Hàng'
                     : 'Xác Nhận Thanh Toán'}
             </span>
@@ -691,6 +690,7 @@ function OrderResult({
   const pay = useZaloPayPayment()
   const rememberPayment = useOrderPaymentsStore((s) => s.remember)
   const total = orders.reduce((s, o) => s + (Number(o.totalAmount) || 0), 0)
+  const gatewayOrders = ordersRequiringGatewayPayment(orders, method)
 
   const retry = async (orderId: number) => {
     try {
@@ -713,9 +713,9 @@ function OrderResult({
           <h2 className="font-display text-2xl font-bold">Đã tạo {orders.length} đơn con thành công</h2>
           <p className="text-sm text-ink-soft">
             Tồn kho đã được giữ chỗ.{' '}
-            {method === 'zalopay'
+            {method === 'GATEWAY'
               ? 'Thanh toán từng đơn con qua ZaloPay bên dưới.'
-              : 'Bạn sẽ thanh toán khi nhận từng kiện hàng.'}
+              : 'Đặt hàng COD thành công, đang chờ người bán xác nhận.'}
           </p>
         </div>
         <div className="text-right">
@@ -740,7 +740,8 @@ function OrderResult({
               </div>
               {order.reservationExpiresAt && (
                 <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-peach/50 px-3 py-1 font-label text-[11px] font-semibold text-orange-deep">
-                  <Clock size={12} /> Giữ chỗ tồn kho đến {formatTime(order.reservationExpiresAt)}
+                  <Clock size={12} /> {method === 'COD' ? 'Người bán nhận đơn trước' : 'Giữ chỗ tồn kho đến'}{' '}
+                  {formatTime(order.reservationExpiresAt)}
                 </p>
               )}
               <ul className="mt-4 space-y-1.5 text-sm">
@@ -761,7 +762,7 @@ function OrderResult({
                   value={<strong className="font-display text-lg">{formatVnd(order.totalAmount)}</strong>}
                 />
               </dl>
-              {method === 'zalopay' && (
+              {method === 'GATEWAY' && order.onlinePaymentRequired !== false && order.paymentMethod !== 'COD' && (
                 <div className="mt-4">
                   {p?.payment?.orderUrl ? (
                     <a
@@ -791,11 +792,11 @@ function OrderResult({
       </div>
 
       <div className="flex flex-wrap justify-center gap-3">
-        {method === 'zalopay' && (
+        {gatewayOrders.length > 0 && (
           <Link
             to={paymentResultUrl(
               'order',
-              orders.map((o) => o.id),
+              gatewayOrders.map((o) => o.id),
             ).replace('/marketplace', '')}
             className="rounded-full bg-[#0068ff] px-6 py-3 font-label text-sm font-semibold text-white hover:opacity-90"
           >

@@ -7,6 +7,7 @@ const payload: CheckoutInput = {
   shippingAddressId: 4,
   idempotencyKey: '311706e8-74d6-457d-a61b-d05e384fe913',
   shippingQuoteToken: 'quote-token',
+  paymentMethod: 'COD',
 }
 
 describe('pending checkout attempt', () => {

@@ -1,4 +1,4 @@
-import { ArrowLeft, Box, LogOut, Shield, User } from 'lucide-react'
+import { ArrowLeft, Box, LogOut, Shield } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { logout } from '../../auth/services/session'
 import { useSession } from '../../../shared/session/useSession'
@@ -15,6 +15,7 @@ export function StaffHeader({
   backLabel?: string
 }) {
   const { data: user } = useSession()
+  const role = user?.roles?.includes('ADMIN') ? 'ADMIN' : 'PRINT_STAFF'
 
   return (
     <div className="mb-6 space-y-3">
@@ -34,6 +35,7 @@ export function StaffHeader({
               </span>
             </div>
             {title && <p className="font-display text-base font-bold text-ink">{title}</p>}
+            {subtitle && <p className="text-xs text-ink-soft">{subtitle}</p>}
           </div>
         </div>
 
@@ -42,7 +44,7 @@ export function StaffHeader({
             <div className="hidden items-center gap-2 text-right sm:flex">
               <div>
                 <p className="font-label text-xs font-bold text-ink">{user.name}</p>
-                <p className="font-mono text-[10px] font-semibold text-teal">Role: PRINT_STAFF</p>
+                <p className="font-mono text-[10px] font-semibold text-teal">Role: {role}</p>
               </div>
               <span className="grid h-8 w-8 place-items-center rounded-full bg-orange text-xs font-bold text-white shadow-soft">
                 {user.name?.charAt(0).toUpperCase() ?? 'S'}

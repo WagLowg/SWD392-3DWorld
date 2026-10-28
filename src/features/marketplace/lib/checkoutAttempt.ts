@@ -21,7 +21,8 @@ function validPayload(value: unknown): value is CheckoutInput {
     typeof payload.idempotencyKey === 'string' &&
     payload.idempotencyKey.length > 0 &&
     typeof payload.shippingQuoteToken === 'string' &&
-    payload.shippingQuoteToken.length > 0
+    payload.shippingQuoteToken.length > 0 &&
+    (payload.paymentMethod === 'COD' || payload.paymentMethod === 'GATEWAY')
   )
 }
 

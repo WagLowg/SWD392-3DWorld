@@ -31,6 +31,7 @@ describe('orderService.checkout', () => {
       shippingAddressId: 4,
       idempotencyKey: '311706e8-74d6-457d-a61b-d05e384fe913',
       shippingQuoteToken: 'quote-token',
+      paymentMethod: 'COD',
     }
     const post = vi.spyOn(http, 'post').mockResolvedValue({ data: [] } as unknown as ApiEnvelope<Order[]>)
 
