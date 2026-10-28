@@ -46,7 +46,7 @@ function requiredAction(app: SellerApplication, minimum: SellerAccessLevel): Gat
     return {
       eyebrow: 'Thiếu địa chỉ lấy hàng',
       title: 'Hoàn thiện địa chỉ GHTK',
-      body: 'Gian hàng cần một địa chỉ mặc định có đủ người liên hệ, số điện thoại, tỉnh/thành, phường/xã và địa chỉ chi tiết để báo phí và tạo vận đơn.',
+      body: 'Gian hàng cần một địa chỉ mặc định có đủ người liên hệ, số điện thoại, tỉnh/thành, phường/xã và địa chỉ chi tiết để báo phí và hệ thống tự tạo vận đơn GHTK.',
       action: 'Cập nhật địa chỉ lấy hàng',
       to: '/seller/register',
       icon: Store,
@@ -108,11 +108,17 @@ export function SellerAccessGate({ minimum, children }: { minimum: SellerAccessL
           <div className="grid gap-8 p-7 sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
               <p className="font-label text-xs font-bold uppercase tracking-[.16em] text-orange-deep">{gate.eyebrow}</p>
-              <h1 className="mt-3 max-w-2xl font-display text-3xl font-bold tracking-tight sm:text-4xl">{gate.title}</h1>
+              <h1 className="mt-3 max-w-2xl font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                {gate.title}
+              </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-ink-soft sm:text-base">{gate.body}</p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Btn to={gate.to} variant="primary" icon={gate.icon}>{gate.action}</Btn>
-                <Btn to="/profile" variant="soft">Quay lại tài khoản</Btn>
+                <Btn to={gate.to} variant="primary" icon={gate.icon}>
+                  {gate.action}
+                </Btn>
+                <Btn to="/profile" variant="soft">
+                  Quay lại tài khoản
+                </Btn>
               </div>
             </div>
             <div className="grid h-28 w-28 place-items-center rounded-[2rem] bg-violet-soft text-violet sm:h-36 sm:w-36">
@@ -126,7 +132,9 @@ export function SellerAccessGate({ minimum, children }: { minimum: SellerAccessL
               ['3', 'Kích hoạt gói bán hàng'],
             ].map(([step, label]) => (
               <div key={step} className="flex items-center gap-3 bg-white px-6 py-4 text-ink-soft">
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-low font-display font-bold text-violet">{step}</span>
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-low font-display font-bold text-violet">
+                  {step}
+                </span>
                 <span className="font-label font-semibold">{label}</span>
               </div>
             ))}

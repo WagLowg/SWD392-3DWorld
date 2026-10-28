@@ -22,7 +22,7 @@ import { formatDateTime } from '../../../shared/format'
 import { Hero, Pill, Section, StatCard, StatGrid } from '../../../shared/ui/kit'
 import { StaffHeader } from '../components/StaffHeader'
 import { StaffRefundBadge, StaffShipmentBadge } from '../components/StaffStatusBadge'
-import { useStaffRefunds, useStaffShipments } from '../mocks/staffMockData'
+import { useStaffRefunds, useStaffShipments } from '../services/staff.service'
 import type { ShipmentStatus, RefundStatus } from '../types/staff.types'
 
 interface ActivityItem {
@@ -37,8 +37,8 @@ interface ActivityItem {
 }
 
 export function StaffDashboardPage() {
-  const { refunds: staffRefunds } = useStaffRefunds()
-  const { shipments: staffShipments } = useStaffShipments()
+  const { refunds: staffRefunds = [] } = useStaffRefunds()
+  const { shipments: staffShipments = [] } = useStaffShipments()
 
   useEffect(() => {
     document.title = 'Tổng quan vận hành (Staff) · 3DWorld'
@@ -49,7 +49,9 @@ export function StaffDashboardPage() {
     return {
       total: staffShipments.length,
       pending: staffShipments.filter((s) => s.status === 'PENDING').length,
-      shipped: staffShipments.filter((s) => s.status === 'SHIPPED').length,
+      shipped: staffShipments.filter(
+        (s) => s.status === 'HANDED_TO_CARRIER' || s.status === 'SHIPPED',
+      ).length,
       delivered: staffShipments.filter((s) => s.status === 'DELIVERED').length,
       failed: staffShipments.filter((s) => s.status === 'FAILED').length,
       returned: staffShipments.filter((s) => s.status === 'RETURNED').length,
@@ -59,11 +61,10 @@ export function StaffDashboardPage() {
   const refundKpi = useMemo(() => {
     return {
       total: staffRefunds.length,
-      submitted: staffRefunds.filter((r) => r.status === 'SUBMITTED').length,
-      underReview: staffRefunds.filter((r) => r.status === 'UNDER_REVIEW').length,
-      needsInfo: staffRefunds.filter((r) => r.status === 'NEEDS_INFO').length,
+      pending: staffRefunds.filter((r) => r.status === 'PENDING').length,
       approved: staffRefunds.filter((r) => r.status === 'APPROVED').length,
       rejected: staffRefunds.filter((r) => r.status === 'REJECTED').length,
+      paid: staffRefunds.filter((r) => r.status === 'PAID').length,
     }
   }, [staffRefunds])
 
@@ -119,7 +120,7 @@ export function StaffDashboardPage() {
         eyebrow="Bàn Làm Việc Nhân Viên Vận Hành"
         title="Tổng Quan Vận Hành"
         accent="Trung Tâm Quản Lý Vận Chuyển & Yêu Cầu Hoàn Tiền."
-        description="Theo dõi toàn diện trạng thái luân chuyển bưu kiện GHTK và các yêu cầu khiếu nại, hoàn tiền sản phẩm 3D. Mọi số liệu và thao tác hiển thị là dữ liệu mô phỏng trong môi trường xem trước."
+        description="Theo dõi toàn diện trạng thái luân chuyển bưu kiện GHTK và các yêu cầu khiếu nại, hoàn tiền sản phẩm 3D. Thống kê được đồng bộ trực tiếp từ API hệ thống và cập nhật theo thực tế."
       />
 
       {/* 4.5 Quick Navigation Actions */}
@@ -265,33 +266,17 @@ export function StaffDashboardPage() {
             to="/staff/refunds"
           />
           <StatCard
-            label="Chờ tiếp nhận"
-            value={refundKpi.submitted}
+            label="Chờ thẩm định"
+            value={refundKpi.pending}
             hint="Hồ sơ mới gửi"
             icon={Clock}
             tone="orange"
             to="/staff/refunds"
           />
           <StatCard
-            label="Đang thẩm định"
-            value={refundKpi.underReview}
-            hint="Đang đối chiếu chứng cứ"
-            icon={AlertCircle}
-            tone="violet"
-            to="/staff/refunds"
-          />
-          <StatCard
-            label="Cần bổ sung bằng chứng"
-            value={refundKpi.needsInfo}
-            hint="Chờ khách bổ sung ảnh/video"
-            icon={RotateCcw}
-            tone="orange"
-            to="/staff/refunds"
-          />
-          <StatCard
-            label="Đã duyệt (Chờ Admin)"
+            label="Đã duyệt"
             value={refundKpi.approved}
-            hint="Chờ Admin giải ngân"
+            hint="Đã chấp thuận hoàn tiền"
             icon={CheckCircle2}
             tone="green"
             to="/staff/refunds"
@@ -304,17 +289,25 @@ export function StaffDashboardPage() {
             tone="danger"
             to="/staff/refunds"
           />
+          <StatCard
+            label="Đã hoàn tiền"
+            value={refundKpi.paid}
+            hint="Đã thanh toán xong"
+            icon={ShieldCheck}
+            tone="violet"
+            to="/staff/refunds"
+          />
         </StatGrid>
       </div>
 
       {/* 4.4 Recent Activity Section */}
       <Section
         title="Nhật ký hoạt động vận hành gần đây"
-        subtitle="Tổng hợp sự kiện cập nhật vận đơn và xử lý khiếu nại gần nhất (Dữ liệu mô phỏng)"
+        subtitle="Tổng hợp sự kiện cập nhật vận đơn và xử lý khiếu nại gần nhất từ hệ thống"
         aside={
           <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-low px-3 py-1 font-label text-xs font-medium text-ink-soft">
             <Activity size={13} className="text-violet" />
-            <span>Mô phỏng thời gian thực</span>
+            <span>Realtime</span>
           </span>
         }
       >
