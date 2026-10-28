@@ -43,11 +43,16 @@ export type Version = {
   dimensions: Dimensions | null; createdAt: number; assets: Asset[]; glbUrl: string | null; thumbnailUrl: string | null;
 };
 
+/** Nguồn tạo mô hình: một ảnh, nhiều góc (Multi-View) hoặc mô tả văn bản. */
+export type SourceMode = 'single' | 'multi' | 'text';
+
 export type ProjectStatus = 'DRAFT' | 'PROCESSING' | 'READY' | 'FAILED';
 export type ProjectSummary = {
-  id: string; title: string; sourceMode: 'single' | 'multi'; favorite: boolean; archived: boolean; visibility: string;
+  id: string; title: string; sourceMode: SourceMode; favorite: boolean; archived: boolean; visibility: string;
   status: ProjectStatus; activeVersionId: string | null; versionCount: number; formats: string[];
   thumbnailUrl: string | null; stats: MeshStats | null; createdAt: number; updatedAt: number;
+  /** Tệp GLB mới nhất (cần token) — dùng để chụp ảnh xem trước khi chưa có thumbnail. */
+  modelUrl: string | null;
 };
 export type ProjectDetail = { project: ProjectSummary; versions: Version[]; tasks: Task[]; images: SourceImage[] };
 
@@ -57,21 +62,18 @@ export type Estimate = {
 };
 
 export type ConfigOptions = {
-  provider: 'meshy' | 'mock'; priceVersion: string;
+  /** unconfigured: Backend chưa cấu hình nhà cung cấp AI (chưa có MESHY key) → không tạo được mô hình. */
+  provider: 'meshy' | 'mock' | 'unconfigured'; priceVersion: string;
   models: { id: string; label: string; textureResolutions: string[]; geometryResolutions: string[] }[];
   presets: Record<'fast' | 'balanced' | 'high', { aiModel: string; textureResolution: string; geometryResolution: string }>;
   upload: { maxBytes: number; mimes: string[]; minSide: number };
+  /** Bảng giá công bố bởi Backend (config-options.pricing). */
+  pricing: { label: string; credits: number; texture?: boolean; aiModel?: string }[];
 };
 
 export type LedgerEntry = { id: string; amount: number; type: string; taskId: string | null; note: string | null; createdAt: number; projectTitle: string | null };
-export type Wallet = { balance: number; held: number; spent: number; ledger: LedgerEntry[] };
+export type Wallet = { balance: number; held: number; spent: number; ledger: LedgerEntry[]; totalTasks?: number; successfulTasks?: number };
 
-export type PodOptions = Record<'FDM' | 'RESIN', { materials: string[]; qualities: string[] }>;
-export type Handoff = {
-  id: string; printRequestId: string; versionId: string; versionLabel: string; projectTitle: string; projectId: string;
-  config: { technology: string; material: string; quality: string; color: string; quantity: number; note: string; dimensions: Dimensions };
-  files: { id: string; format: string; checksum: string; size_bytes: number }[]; status: string; createdAt: number;
-};
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string, public data?: Record<string, unknown>) {
@@ -84,7 +86,7 @@ type Opts = { method?: string; body?: unknown; headers?: Record<string, string>;
 /**
  * Sự kiện cho AuthProvider:
  * - 'expired': phiên 3DWorld thật sự hết hạn (/api/auth/me cũng bị từ chối) → về trang đăng nhập.
- * - 'ai-unauthorized': phiên vẫn hợp lệ nhưng dịch vụ AI từ chối token (chưa chạy / chưa dùng chung JWT).
+ * - 'ai-unauthorized': phiên vẫn hợp lệ nhưng Backend trả 401 (Spring trả 401 khi lỗi nội bộ / route không tồn tại).
  */
 export const authEvents = new EventTarget();
 
@@ -112,7 +114,9 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T> {
   }
   const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
   if (!res.ok) {
-    const err = data?.error || data || {};
+    // Backend chính trả { status, message, data }; dịch vụ cũ trả { error: { code, message } }
+    const err = data?.error || { ...(data?.data && typeof data.data === 'object' ? data.data : {}), message: data?.message, code: data?.code } || {};
+    if (res.status === 402 && !err.code) err.code = 'INSUFFICIENT_CREDITS';
     if (res.status === 401 && !path.startsWith('/api/auth/')) {
       // 401 từ API AI chưa chắc là hết phiên: backend chính không có /api/ai-studio/* cũng trả 401.
       if (await sessionStillValid()) {
@@ -120,7 +124,7 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T> {
         throw new ApiError(
           401,
           AI_UNAUTHORIZED,
-          'Dịch vụ AI Studio chưa nhận phiên đăng nhập 3DWorld (máy chủ AI chưa chạy hoặc chưa dùng chung JWT với backend chính).',
+          'Máy chủ từ chối yêu cầu AI Studio (thường là lỗi nội bộ phía Backend). Phiên đăng nhập của bạn vẫn hợp lệ.',
           err,
         );
       }
@@ -129,6 +133,8 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T> {
     }
     throw new ApiError(res.status, err.code || 'HTTP_' + res.status, err.message || `Lỗi ${res.status}`, err);
   }
+  // Bóc envelope { status, message, data, timestamp }
+  if (data && typeof data === 'object' && 'data' in data && 'status' in data && 'message' in data) return data.data as T;
   return data as T;
 }
 

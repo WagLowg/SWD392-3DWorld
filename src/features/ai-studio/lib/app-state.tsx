@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-react';
-import { api, authEvents, type User, type Wallet } from './api';
-import { fetchMe, logout as logoutSession } from '../../auth/services/session';
+import { authEvents, type ConfigOptions, type User, type Wallet } from './api';
+import { aiStudio } from './backend';
+import { fetchMe, logout as logoutSession } from '../../../shared/session/session';
 
 // ---------------- Toasts ----------------
 type ToastKind = 'success' | 'error' | 'warning' | 'info';
@@ -41,7 +42,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 type AuthState = {
   user: User | null;
   loading: boolean;
-  provider: 'meshy' | 'mock' | null;
+  provider: ConfigOptions['provider'] | null;
   wallet: Wallet | null;
   refreshWallet: () => Promise<void>;
   setUser: (u: User | null) => void;
@@ -53,7 +54,7 @@ export const useAuth = () => useContext(AuthCtx);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [provider, setProvider] = useState<'meshy' | 'mock' | null>(null);
+  const [provider, setProvider] = useState<ConfigOptions['provider'] | null>(null);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const toast = useToast();
 
@@ -71,10 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (active) setLoading(false);
       });
 
-    // AI service có thể khởi động riêng; lỗi health không được chặn phiên đăng nhập hay treo toàn màn hình.
-    api<{ provider: 'meshy' | 'mock' }>('/api/health')
-      .then((health) => {
-        if (active) setProvider(health.provider);
+    // Nhà cung cấp AI đọc từ config-options; lỗi không được chặn phiên đăng nhập hay treo toàn màn hình.
+    aiStudio
+      .configOptions()
+      .then((o) => {
+        if (active) setProvider(o.provider);
       })
       .catch(() => {
         if (active) setProvider(null);
@@ -95,8 +97,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       warned = true;
       toast(
         'warning',
-        'AI Studio chưa kết nối được máy chủ AI',
-        'Bạn vẫn đăng nhập bình thường. Dịch vụ AI chưa chạy hoặc chưa nhận token chung của 3DWorld.',
+        'Máy chủ từ chối một yêu cầu AI Studio',
+        'Bạn vẫn đăng nhập bình thường. Thử lại sau hoặc báo lỗi Backend nếu lặp lại.',
       );
     };
     authEvents.addEventListener('expired', onExpired);
@@ -108,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [toast]);
 
   const refreshWallet = useCallback(async () => {
-    try { setWallet(await api<Wallet>('/api/ai-studio/wallet')); } catch { /* bỏ qua */ }
+    try { setWallet(await aiStudio.wallet()); } catch { /* bỏ qua */ }
   }, []);
   useEffect(() => { if (user) refreshWallet(); else setWallet(null); }, [user, refreshWallet]);
 

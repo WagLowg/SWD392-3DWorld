@@ -1,18 +1,8 @@
-import { http, type ApiEnvelope } from '../../../shared/api'
+import { type ApiEnvelope, http } from '../../../shared/api'
+import { type BackendUserResponse, fetchCurrentUser, logoutRequest, mapUser } from '../../../shared/session/session'
 import { tokenStore } from '../../../shared/session/token'
 
-export type AuthUser = {
-  id: string
-  email: string
-  name: string
-  role: string
-  avatarUrl?: string | null
-  dateOfBirth?: string | null
-  phone?: string | null
-  emailVerified?: boolean
-  roles?: string[]
-  capabilities?: string[]
-}
+export type { AuthUser } from '../../../shared/session/session'
 
 export type LoginInput = {
   email: string
@@ -24,18 +14,6 @@ export type RegisterInput = LoginInput & {
   phone?: string
 }
 
-type BackendUserResponse = {
-  userId: number
-  email: string
-  fullName: string
-  avatarUrl: string | null
-  dateOfBirth: string | null
-  phone: string | null
-  emailVerified: boolean
-  roles: string[]
-  capabilities: string[]
-}
-
 type LoginResponse = {
   accessToken: string
   tokenType: 'Bearer' | string
@@ -43,26 +21,8 @@ type LoginResponse = {
   user: BackendUserResponse
 }
 
-function mapUser(user: BackendUserResponse): AuthUser {
-  return {
-    id: String(user.userId),
-    email: user.email,
-    name: user.fullName || user.email.split('@')[0],
-    role: user.roles[0] ?? 'CUSTOMER',
-    avatarUrl: user.avatarUrl,
-    dateOfBirth: user.dateOfBirth,
-    phone: user.phone,
-    emailVerified: user.emailVerified,
-    roles: user.roles,
-    capabilities: user.capabilities,
-  }
-}
-
 export const authService = {
-  async getCurrentUser(signal?: AbortSignal) {
-    const response = await http.get<ApiEnvelope<BackendUserResponse>>('/api/auth/me', { signal })
-    return mapUser(response.data)
-  },
+  getCurrentUser: fetchCurrentUser,
 
   async login(input: LoginInput) {
     tokenStore.clear()
@@ -99,11 +59,5 @@ export const authService = {
     return http.post<void>('/api/auth/reset-password', input)
   },
 
-  async logout() {
-    try {
-      await http.post<void>('/api/auth/logout')
-    } finally {
-      tokenStore.clear()
-    }
-  },
+  logout: logoutRequest,
 }

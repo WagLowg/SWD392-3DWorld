@@ -1,5 +1,5 @@
 import { BrowserRouter } from 'react-router-dom'
-import LandingPage from './landing/LandingPage'
+import LandingPage from './pages/LandingPage'
 
 /** Trang chủ (Landing). Các module khác là trang riêng: /ai/, /studio/, /marketplace/, /pod/, /login/. */
 export default function App() {

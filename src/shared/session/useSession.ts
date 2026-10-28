@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchMe } from '../../features/auth/services/session'
+import { fetchMe } from './session'
 
 /** Người dùng hiện tại; null nếu chưa đăng nhập. */
 export function useSession() {

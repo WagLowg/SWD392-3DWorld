@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { ApiClientError } from '../api'
-import { goLogin } from '../../features/auth/services/session'
+import { goLogin } from '../session/session'
 
 export type ErrorKind = '403' | '404' | '503' | 'session'
 

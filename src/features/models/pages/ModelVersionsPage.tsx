@@ -1,7 +1,7 @@
 import { ArrowLeft, ChevronDown, GitBranch, GitCommitVertical } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { Pagination } from '../../../shared/ui/Pagination'
 import { Breadcrumbs, PageHeading } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'

@@ -68,11 +68,65 @@ export const podService = {
     const form = new FormData()
     form.append('file', file)
     const response = await http.post<ApiEnvelope<PrintRequest>, FormData>(
-      `/api/print/requests/getId/${printRequestId}/file/correct`,
+      `/api/print/requests/getId/${printRequestId}/file/versions/create`,
       form,
       { params: { expectedCurrentFileVersion } },
     )
     return dataOf(response)
+  },
+
+  /**
+   * Tạo yêu cầu in từ một tệp (dùng chung cho AI Studio & 3D Studio): tạo bản nháp → cập nhật thông số
+   * (kích thước, màu, số lượng, ghi chú) → tuỳ chọn xác nhận xem trước + gửi thẩm định.
+   * Mỗi bước sau bước tạo là best-effort: lỗi không xoá yêu cầu đã tạo, người dùng vẫn sửa tiếp ở module POD.
+   */
+  async createFromFile(
+    file: File,
+    materialId: number,
+    spec: {
+      color?: string
+      quality?: string
+      widthMm?: number
+      heightMm?: number
+      depthMm?: number
+      quantity?: number
+      notes?: string
+    },
+    options: { submit?: boolean } = {},
+  ) {
+    let request = await podService.createRequest(file, materialId, true)
+    const workflow = (request as PrintRequest & { workflow?: { currentFileVersion?: number; currentSpecVersion?: number } })
+      .workflow
+    const fileVersion = workflow?.currentFileVersion ?? 1
+    let specVersion = workflow?.currentSpecVersion ?? 1
+    const item = request.items?.[0]
+    if (item) {
+      try {
+        const updated = dataOf(
+          await http.patch<ApiEnvelope<{ version?: number }>>(
+            `/api/print/requests/getId/${request.printRequestId}/updateSpecification`,
+            {
+              expectedCurrentSpecVersion: specVersion,
+              items: [{ printRequestItemId: item.printRequestItemId, materialId, ...spec }],
+            },
+          ),
+        )
+        if (updated?.version) specVersion = updated.version
+      } catch {
+        // giữ thông số mặc định
+      }
+    }
+    if (options.submit) {
+      const versions = { expectedFileVersion: fileVersion, expectedSpecVersion: specVersion }
+      try {
+        await http.post(`/api/print/requests/getId/${request.printRequestId}/preview/confirm`, versions)
+        await http.post(`/api/print/requests/getId/${request.printRequestId}/submit`, versions)
+      } catch {
+        // chưa gửi được thẩm định → người dùng gửi lại ở module POD
+      }
+      request = await podService.getRequest(String(request.printRequestId)).catch(() => request)
+    }
+    return request
   },
 
   async getProfile(signal?: AbortSignal) {

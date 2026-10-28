@@ -2,10 +2,10 @@ import { StrictMode, lazy, Suspense, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, Link } from 'react-router-dom';
-import './styles/global.css';
+import './ai-studio.css';
 import { AuthProvider, ToastProvider, useAuth } from './lib/app-state';
 import { AppShell } from './components/AppShell';
-import { goLogin } from '../auth/services/session';
+import { goLogin } from '../../shared/session/session';
 
 const Studio = lazy(() => import('./pages/Studio'));
 const Library = lazy(() => import('./pages/Library'));

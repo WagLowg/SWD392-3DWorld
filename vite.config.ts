@@ -42,25 +42,12 @@ const backend = (port: string | number): ProxyOptions => ({
   },
 })
 
-/**
- * AI Studio và 3D Studio có thể chạy ở dịch vụ riêng (vd. backend/ Spring trong repo, chạy port khác 8080):
- *   AI_API_PORT      → /api/ai-studio, /api/health, /api/webhooks
- *   STUDIO_API_PORT  → /api/studio (mặc định dùng AI_API_PORT)
- * Không đặt → mọi /api đi về backend chính như trước.
- */
-const aiPort = process.env.AI_API_PORT?.trim()
-const studioPort = process.env.STUDIO_API_PORT?.trim() || aiPort
-const aiProxy = {
-  ...(aiPort ? Object.fromEntries(['/api/ai-studio', '/api/health', '/api/webhooks'].map((p) => [p, backend(aiPort)])) : {}),
-  ...(studioPort ? { '/api/studio': backend(studioPort) } : {}),
-}
-
 export default defineConfig({
   plugins: [react(), tailwindcss(), moduleFallback()],
   server: {
     port: 5173,
-    // Đường dẫn AI khai báo trước '/api' để được ưu tiên.
-    proxy: { ...aiProxy, '/api': backend(process.env.API_PORT || 8080) },
+    // Mọi /api đi về Backend chính (3DWorld-SWD-BE), mặc định port 8080.
+    proxy: { '/api': backend(process.env.API_PORT || 8080) },
   },
   build: {
     chunkSizeWarningLimit: 2000,

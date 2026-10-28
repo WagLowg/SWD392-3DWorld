@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, MapPin, Truck } from 'lucide-react'
 import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { Breadcrumbs } from '../../../shared/ui/primitives'
 import { PackagesPanel } from '../components/PackagesPanel'

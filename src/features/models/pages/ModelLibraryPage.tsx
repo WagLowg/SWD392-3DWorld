@@ -1,7 +1,7 @@
 import { ArrowRight, Boxes, History, Lock, Search, Sparkles, Upload } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { formatDate } from '../../../shared/format'
+import { formatDate } from '../../../shared/lib/format'
 import { Pagination } from '../../../shared/ui/Pagination'
 import { ApiNote, PageHeading } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'

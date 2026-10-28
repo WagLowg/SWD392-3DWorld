@@ -1,6 +1,6 @@
 import { Camera, Fingerprint, Ruler } from 'lucide-react'
 import { useParams } from 'react-router-dom'
-import { formatDateTime, formatVnd } from '../../../shared/format'
+import { formatDateTime, formatVnd } from '../../../shared/lib/format'
 import { Btn, CellTitle, KeyValues, MediaTile, MoneyRows, Pill, Section } from '../../../shared/ui/kit'
 import { categoryLabel, resolveMediaUrl } from '../../marketplace/lib/format'
 import type { OpsCase } from '../data/ops.fixtures'

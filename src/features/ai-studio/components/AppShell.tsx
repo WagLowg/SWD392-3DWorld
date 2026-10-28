@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Box, Sparkles, LayoutGrid, Download, Printer, Wallet, HelpCircle, LogOut } from 'lucide-react';
 import { useAuth, useOnline } from '../lib/app-state';
 import { initials, num } from '../lib/format';
-import { ModuleSwitcher } from '../../../shared/ModuleSwitcher';
+import { ModuleSwitcher } from '../../../shared/ui/ModuleSwitcher';
 
 /** Breadcrumb do từng trang đặt qua context đơn giản */
 let setCrumbGlobal: ((c: ReactNode) => void) | null = null;

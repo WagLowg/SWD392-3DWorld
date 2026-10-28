@@ -1,6 +1,6 @@
 import { Camera, FileText } from 'lucide-react'
 import { useParams } from 'react-router-dom'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { Btn, CellTitle, KeyValues, MediaTile, Pill, Section } from '../../../shared/ui/kit'
 import { BankVerifyPanel } from '../components/BankVerifyPanel'
 import { OpsQueue, OpsReview, statusColumn, val } from '../components/OpsScaffold'

@@ -4,6 +4,9 @@ import type { SourceImage } from '../lib/api';
 import { bytes } from '../lib/format';
 import { Progress } from './ui';
 import { useToast } from '../lib/app-state';
+import { uploadResponseToImage } from '../lib/backend';
+import { tokenStore } from '../../../shared/session/token';
+import { AuthedImg } from './AuthedImg';
 
 const MAX = 20 * 1024 * 1024;
 const TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -14,12 +17,15 @@ function uploadFile(file: File, onProgress: (p: number) => void): Promise<Source
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/ai-studio/uploads');
+    const token = tokenStore.get();
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
     xhr.onload = () => {
-      let data: { image?: SourceImage; error?: { message: string } } = {};
+      let data: { data?: unknown; message?: string; error?: { message: string } } = {};
       try { data = JSON.parse(xhr.responseText); } catch { /* ignore */ }
-      if (xhr.status >= 200 && xhr.status < 300 && data.image) resolve(data.image);
-      else reject(new Error(data.error?.message || `Tải ảnh thất bại (HTTP ${xhr.status})`));
+      const image = xhr.status >= 200 && xhr.status < 300 ? uploadResponseToImage(data.data) : null;
+      if (image) resolve(image);
+      else reject(new Error(data.error?.message || data.message || `Tải ảnh thất bại (HTTP ${xhr.status})`));
     };
     xhr.onerror = () => reject(new Error('Mất kết nối khi tải ảnh. Vui lòng thử lại.'));
     const fd = new FormData();
@@ -89,6 +95,9 @@ export function ImagePicker({ mode, images, onChange, recent, disabled }: {
   const [slotTarget, setSlotTarget] = useState(0);
   const imgsRef = useRef(images);
   imgsRef.current = images;
+  // Ảnh có trong danh sách nhưng tệp không tải được (vd. "req-13" Backend tự tạo, trả 404) → ẩn đi.
+  const [broken, setBroken] = useState<Set<string>>(() => new Set());
+  const shownRecent = recent.filter((r) => !broken.has(r.id)).slice(0, 8);
 
   const put = async (file: File, slot: number) => {
     const img = await upload(file);
@@ -122,8 +131,8 @@ export function ImagePicker({ mode, images, onChange, recent, disabled }: {
               <span className="label-up">Ảnh tham chiếu</span>
               <button className="btn ghost sm" style={{ color: 'var(--primary)', padding: 0, height: 'auto' }} onClick={() => { setSlotTarget(0); slotInput.current?.click(); }} disabled={disabled}>Thay ảnh</button>
             </div>
-            <img className="ref-img" src={main.url} alt={main.name} />
-            <div className="row small"><span className="muted grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{main.name}</span><span className="tabular">{main.width} × {main.height}</span></div>
+            <AuthedImg className="ref-img" src={main.url} alt={main.name} />
+            <div className="row small"><span className="muted grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{main.name}</span>{main.width > 0 && <span className="tabular">{main.width} × {main.height}</span>}</div>
             <div className="row">
               <button className="btn sm" onClick={() => onChange([null, null, null, null])} disabled={disabled}>Xóa</button>
               <span className="muted small">{bytes(main.sizeBytes)}</span>
@@ -143,7 +152,7 @@ export function ImagePicker({ mode, images, onChange, recent, disabled }: {
                   onClick={() => { if (!disabled) { setSlotTarget(i); slotInput.current?.click(); } }}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) put(f, i); }}>
-                  {img ? <img src={img.url} alt={lbl} /> : <Plus size={20} />}
+                  {img ? <AuthedImg src={img.url} alt={lbl} /> : <Plus size={20} />}
                   <span className="tag">{lbl}{i === 0 ? ' · chính' : ''}</span>
                   {img && !disabled && (
                     <button className="x" aria-label={`Xóa ảnh ${lbl}`} onClick={(e) => { e.stopPropagation(); const n = [...images]; n[i] = null; onChange(n); }}><X size={14} /></button>
@@ -166,17 +175,17 @@ export function ImagePicker({ mode, images, onChange, recent, disabled }: {
         </div>
       )}
 
-      {recent.length > 0 && !disabled && (
+      {shownRecent.length > 0 && !disabled && (
         <div className="stack" style={{ gap: 8 }}>
           <span className="label-up">Ảnh gần đây</span>
           <div className="thumbs">
-            {recent.slice(0, 8).map((r) => (
+            {shownRecent.map((r) => (
               <button key={r.id} title={r.name} onClick={() => {
                 const n = [...images];
                 n[mode === 'single' ? 0 : firstEmpty()] = r;
                 onChange(n);
               }}>
-                <img src={r.url} alt={r.name} loading="lazy" />
+                <AuthedImg src={r.url} alt={r.name} loading="lazy" onLoadError={() => setBroken((b) => new Set(b).add(r.id))} />
               </button>
             ))}
           </div>

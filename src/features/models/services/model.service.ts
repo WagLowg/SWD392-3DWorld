@@ -13,25 +13,26 @@ import type {
 export const modelService = {
   async mine(page: number, size: number, signal?: AbortSignal) {
     return (
-      await http.get<ApiEnvelope<Paged<ModelSummary>>>(`/api/models/my${toQueryString({ page, size })}`, { signal })
+      await http.get<ApiEnvelope<Paged<ModelSummary>>>(`/api/models/getAll${toQueryString({ page, size })}`, { signal })
     ).data
   },
 
   async detail(modelId: string, signal?: AbortSignal) {
-    return (await http.get<ApiEnvelope<ModelDetail>>(`/api/models/${modelId}`, { signal })).data
+    return (await http.get<ApiEnvelope<ModelDetail>>(`/api/models/getId/${modelId}`, { signal })).data
   },
 
   async versions(modelId: string, page: number, size: number, signal?: AbortSignal) {
     return (
       await http.get<ApiEnvelope<Paged<VersionSummary>>>(
-        `/api/models/${modelId}/versions${toQueryString({ page, size })}`,
+        `/api/models/getId/${modelId}/versions/getAll${toQueryString({ page, size })}`,
         { signal },
       )
     ).data
   },
 
   async version(modelId: string, versionId: number | string, signal?: AbortSignal) {
-    return (await http.get<ApiEnvelope<VersionDetail>>(`/api/models/${modelId}/versions/${versionId}`, { signal })).data
+    return (await http.get<ApiEnvelope<VersionDetail>>(`/api/models/getId/${modelId}/versions/getId/${versionId}`, { signal }))
+      .data
   },
 
   /** Tải tệp có kiểm tra quyền (cần Bearer token) → trả Blob để lưu xuống máy. */
@@ -40,8 +41,8 @@ export const modelService = {
   },
 
   /**
-   * Multipart: part `metadata` (JSON CreateModelRequest) + part `file`.
-   * Backend chấp nhận .glb .stl .obj .3mf, tối đa 50.000.000 byte.
+   * POST /api/models/create — multipart `file` (OpenAPI chỉ khai báo `file`; part `metadata` gửi kèm để Backend
+   * dùng tên/mô tả nếu hỗ trợ). Backend chấp nhận .glb .stl .obj .3mf, tối đa 50.000.000 byte.
    */
   async upload(input: UploadInput, onProgress?: (percent: number) => void) {
     const form = new FormData()
@@ -53,7 +54,7 @@ export const modelService = {
     )
     form.append('file', input.file)
     return (
-      await http.post<ApiEnvelope<UploadResult>, FormData>('/api/models/uploads', form, {
+      await http.post<ApiEnvelope<UploadResult>, FormData>('/api/models/create', form, {
         timeout: 300_000,
         onUploadProgress: (e) => onProgress?.(e.total ? Math.round((e.loaded / e.total) * 100) : 0),
       })

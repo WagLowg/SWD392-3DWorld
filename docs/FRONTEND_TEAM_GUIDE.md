@@ -6,7 +6,7 @@ Tài liệu này giúp team biết nên đặt code ở đâu và các phần k�
 
 ```text
 src/
-├── app/                         # Provider, routing và cấu hình cấp app
+├── app/providers/               # Provider dùng chung cấp app
 ├── features/                    # Mỗi nghiệp vụ có một source chính
 │   ├── landing/
 │   ├── auth/
@@ -19,15 +19,17 @@ src/
 │   ├── models/
 │   ├── buyer/
 │   ├── seller/
-│   ├── wallet/
-│   ├── design/
 │   ├── ops/
 │   └── portal/
 ├── shared/
 │   ├── api/                     # Axios client, lỗi và type API chung
-│   ├── config/                  # Biến môi trường public
-│   ├── session/                 # Hook phiên đăng nhập dùng chung
+│   ├── config/                  # Biến môi trường public, danh sách module
+│   ├── lib/                     # Hàm tiện ích (format, query string)
+│   ├── mock/                    # Dữ liệu mẫu cho màn chưa có API
+│   ├── session/                 # Token, fetchMe/goLogin, hook phiên đăng nhập
+│   ├── stores/                  # State UI dùng chung
 │   └── ui/                      # Component dùng ở nhiều feature
+├── drafts/                      # Màn chưa có route (chờ API Backend): wallet, design, một số màn buyer/seller/ops
 └── test/                        # Setup test chung
 
 entries/                         # HTML entry, không chứa business logic

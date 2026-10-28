@@ -1,7 +1,7 @@
 import { Box, LogOut, ShoppingBag } from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
 import { useSession } from '../../../shared/session/useSession'
-import { goLogin, logout } from '../../auth/services/session'
+import { goLogin, logout } from '../../../shared/session/session'
 import { useCart } from '../hooks/useCart'
 
 const NAV = [

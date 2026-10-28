@@ -5,19 +5,18 @@ import {
 import { navigate, href, type Route } from '../router';
 import {
   createProject, duplicateProject, fetchProject, listProjects, normalizeSearch, type ProjectMeta,
-} from '../projects';
-import { TEMPLATES, TEMPLATE_CATEGORIES, keychainTemplate, type Template, type TemplateCategory } from '../scene';
-import { cachedThumbnail } from '../thumbnail';
-import { exportStl, download } from '../io';
-import { printableNodes } from '../printCheck';
+} from '../services/projects';
+import { TEMPLATES, TEMPLATE_CATEGORIES, keychainTemplate, type Template, type TemplateCategory } from '../lib/scene';
+import { cachedThumbnail } from '../lib/thumbnail';
+import { exportStl, download } from '../lib/io';
+import { printableNodes } from '../lib/printCheck';
 import { useStudio } from '../store';
-import { Alert } from '../components/ui';
 import { Toasts } from '../components/StatusBar';
 import { ActionMenu, ProjectCard, ShapeIcon, SkeletonGrid, type MenuItem } from './ProjectCard';
 import { CreateProjectDialog, DeleteDialog, RenameDialog } from './dialogs';
 import { sessionUser } from '../session';
-import { logout } from '../../auth/services/session';
-import { ModuleSwitcher } from '../../../shared/ModuleSwitcher';
+import { logout } from '../../../shared/session/session';
+import { ModuleSwitcher } from '../../../shared/ui/ModuleSwitcher';
 
 const USER = {
   get full() { return sessionUser()?.name ?? 'Khách'; },
@@ -201,7 +200,6 @@ function Welcome({ onNew }: { onNew: (templateId?: string) => void }) {
             <button className="btn primary lg" onClick={() => onNew()}><Plus size={16} /> Tạo dự án trống</button>
             <a className="btn lg" href={href({ name: 'templates' })}><LayoutTemplate size={16} /> Khám phá mẫu</a>
           </div>
-          <Alert kind="info" title="Khách có thể thử Studio">Lưu dự án và Đặt in 3D cần đăng nhập. Scene hiện tại được giữ khi xác thực.</Alert>
         </div>
         <div className="hero-art">{hero ? <img src={hero} alt="Móc khóa STUDIO 60 × 24 × 4 mm" /> : <Box size={96} color="var(--primary)" strokeWidth={1} />}</div>
       </div>
@@ -278,7 +276,7 @@ function Templates({ onNew }: { onNew: (templateId?: string) => void }) {
 }
 
 /* ---------------- DASH-06 template detail ---------------- */
-function TemplateDetail({ id, onNew, onUse }: { id: string; onNew: () => void; onUse: (t: Template) => void }) {
+function TemplateDetail({ id, onNew, onUse }: { id: string; onNew: () => void; onUse: (t: Template) => Promise<void> }) {
   const t = TEMPLATES.find((x) => x.id === id);
   const big = useMemo(() => (t ? cachedThumbnail(`tpl:${t.id}:big`, t.build, { width: 1140, height: 780, view: [0.3, 1.2, 0.85], padding: 1.0 }) : null), [t]);
   const [busy, setBusy] = useState(false);
@@ -302,7 +300,7 @@ function TemplateDetail({ id, onNew, onUse }: { id: string; onNew: () => void; o
             <dt>Độ khó</dt><dd>{t.difficulty}</dd>
             <dt>Khởi tạo</dt><dd>Bản sao độc lập của mẫu</dd>
           </dl>
-          <button className="btn primary lg" disabled={busy} onClick={() => { setBusy(true); onUse(t); }}><Pencil size={15} /> {busy ? 'Đang tạo…' : 'Tùy chỉnh mẫu'}</button>
+          <button className="btn primary lg" disabled={busy} onClick={() => { setBusy(true); void onUse(t).finally(() => setBusy(false)); }}><Pencil size={15} /> {busy ? 'Đang tạo…' : 'Tùy chỉnh mẫu'}</button>
           <p className="hint">Chưa xác nhận khả năng sản xuất. Chạy kiểm tra và chờ staff review trước khi in.</p>
         </div>
       </div>
@@ -333,7 +331,7 @@ export default function Dashboard({ route }: { route: Exclude<Route, { name: 'st
           </>
         )}
         {route.name === 'templates' && <Templates onNew={onNew} />}
-        {route.name === 'template' && <TemplateDetail id={route.id} onNew={() => onNew()} onUse={(t) => void useTemplate(t)} />}
+        {route.name === 'template' && <TemplateDetail id={route.id} onNew={() => onNew()} onUse={useTemplate} />}
       </main>
       <footer className="dash-foot"><span>Create freely. Design precisely. Bring your ideas into reality.</span><span>3DWorld Studio · MVP</span></footer>
       {creating && (

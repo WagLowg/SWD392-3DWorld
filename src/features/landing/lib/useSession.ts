@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchMe, type SessionUser } from '../../auth/services/session'
+import { fetchMe, type SessionUser } from '../../../shared/session/session'
 
 /** Người dùng đang đăng nhập (nếu có) — để landing hiện tên thay cho "Sign In". */
 export function useSession() {

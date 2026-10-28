@@ -1,7 +1,7 @@
 import { ArrowRight, Check, FlaskConical, type LucideIcon, ShieldAlert } from 'lucide-react'
 import { type ReactNode, useId, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { formatDateTime } from '../format'
+import { formatDateTime } from '../lib/format'
 import { inputClass } from './form'
 
 /* ------------------------------------------------------------------ tones */

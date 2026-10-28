@@ -1,7 +1,7 @@
 import { Camera, Download } from 'lucide-react'
 import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { AuditTimeline, Btn, DetailLayout, Hero, KeyValues, MediaTile, MockNotice, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { useReport } from '../hooks/useBuyer'

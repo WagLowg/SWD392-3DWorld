@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   RotateCcw, Grid3x3, Box as BoxIcon, Sun, Camera, Maximize, RefreshCw, Download, Printer, Plus,
-  Check, Loader2, Circle, Pencil, Heart, AlertTriangle, Sparkles, Cuboid, Play,
+  Check, Loader2, Circle, Pencil, AlertTriangle, Sparkles, Cuboid, Play,
 } from 'lucide-react';
-import { api, ApiError, newKey, type ConfigOptions, type Estimate, type GenConfig, type ProjectDetail, type SourceImage, type Task } from '../lib/api';
+import { ApiError, newKey, type ConfigOptions, type Estimate, type GenConfig, type ProjectDetail, type SourceImage, type SourceMode, type Task } from '../lib/api';
+import { aiStudio } from '../lib/backend';
+import { AuthedImg } from '../components/AuthedImg';
 import { useAuth, useToast } from '../lib/app-state';
 import { bytes, elapsed, isActive, MODEL_LABEL, num, TASK_STATUS, time, dateTime } from '../lib/format';
 import { useCrumb } from '../components/AppShell';
@@ -35,7 +37,8 @@ export default function Studio() {
   const [recent, setRecent] = useState<SourceImage[]>([]);
 
   // --- cấu hình tạo ---
-  const [mode, setMode] = useState<'single' | 'multi'>('single');
+  const [mode, setMode] = useState<SourceMode>('single');
+  const [prompt, setPrompt] = useState('');
   const [images, setImages] = useState<(SourceImage | null)[]>(EMPTY_IMGS);
   const [cfg, setCfg] = useState<GenConfig>(DEFAULT_CONFIG);
   const [preset, setPreset] = useState<Preset>('balanced');
@@ -61,8 +64,8 @@ export default function Studio() {
   const vpRef = useRef<HTMLDivElement>(null);
   const [, tick] = useState(0);
 
-  useEffect(() => { api<ConfigOptions>('/api/ai-studio/config-options').then(setOptions).catch(() => {}); }, []);
-  const loadRecent = useCallback(() => api<{ images: SourceImage[] }>('/api/ai-studio/uploads').then((r) => setRecent(r.images)).catch(() => {}), []);
+  useEffect(() => { aiStudio.configOptions().then(setOptions).catch(() => {}); }, []);
+  const loadRecent = useCallback(() => aiStudio.uploads().then(setRecent).catch(() => {}), []);
   useEffect(() => { loadRecent(); }, [loadRecent]);
 
   // --- tải dự án ---
@@ -70,7 +73,7 @@ export default function Studio() {
   const load = useCallback(async (initial = false) => {
     if (!projectId) return;
     try {
-      const d = await api<ProjectDetail>(`/api/ai-studio/projects/${projectId}`);
+      const d = await aiStudio.project(projectId);
       setDetail(d);
       setLoadError(null);
       // Thông báo khi task đổi trạng thái cuối (FRD-AI-017)
@@ -84,17 +87,12 @@ export default function Studio() {
         }
         prevStatuses.current[t.id] = t.status;
       }
-      if (initial) {
-        const latest = d.tasks[0];
-        if (latest) {
-          setCfg({ ...DEFAULT_CONFIG, ...latest.config });
-          setPreset('custom');
-          const m = latest.type === 'multi-image-to-3d' ? 'multi' : 'single';
-          setMode(m);
-          const imgs = latest.imageIds.map((iid) => d.images.find((x) => x.id === iid) || null);
-          setImages([...imgs, null, null, null, null].slice(0, 4));
-          setConsent(true);
-        }
+      // Khôi phục form tạo từ tác vụ gần nhất (cấu hình + chế độ) để Generate lại trong cùng dự án.
+      if (initial && d.tasks[0]) {
+        const last = d.tasks[0];
+        setConsent(true);
+        if (last.config.aiModel) { setCfg(last.config); setPreset('custom'); }
+        setMode(last.type.includes('text') ? 'text' : 'single');
       }
       setSelectedId((cur) => (cur && d.versions.some((v) => v.id === cur) ? cur : d.project.activeVersionId || d.versions[d.versions.length - 1]?.id || null));
     } catch (e) {
@@ -109,24 +107,36 @@ export default function Studio() {
     setStats(null);
     if (projectId) load(true);
     else {
-      setImages(EMPTY_IMGS); setCfg(DEFAULT_CONFIG); setPreset('balanced'); setConsent(false); setTitle(''); setVariants(1); setMode('single');
+      setImages(EMPTY_IMGS); setCfg(DEFAULT_CONFIG); setPreset('balanced'); setConsent(false); setTitle(''); setVariants(1); setMode('single'); setPrompt('');
     }
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeTasks = useMemo(() => detail?.tasks.filter((t) => isActive(t.status)) || [], [detail]);
-  // Polling khi còn task đang chạy (webhook + polling ở backend, frontend chỉ đọc trạng thái nội bộ)
+  // Polling khi còn task đang chạy: đọc trạng thái mỗi 2 giây.
   useEffect(() => {
     if (!activeTasks.length) return;
     const iv = setInterval(() => { load(); tick((x) => x + 1); }, 2000);
     return () => clearInterval(iv);
   }, [activeTasks.length, load]);
 
+  // Backend chỉ tự cập nhật khi Meshy gọi webhook — chạy local thì Meshy không gọi tới được,
+  // tác vụ kẹt ở 50%. Nên mỗi 10 giây nhờ Backend hỏi lại Meshy (POST /tasks/{id}/refresh).
+  const activeIds = activeTasks.map((t) => t.id).join(',');
+  useEffect(() => {
+    if (!activeIds) return;
+    const ids = activeIds.split(',');
+    const sync = () => Promise.all(ids.map((id) => aiStudio.refreshTask(id).catch(() => undefined))).then(() => load());
+    const first = setTimeout(sync, 3000);
+    const iv = setInterval(sync, 10_000);
+    return () => { clearTimeout(first); clearInterval(iv); };
+  }, [activeIds, load]);
+
   // --- ước tính chi phí (server tính) ---
   const imageCount = images.filter(Boolean).length;
   useEffect(() => {
     const ctl = new AbortController();
     const t = setTimeout(() => {
-      api<Estimate>('/api/ai-studio/estimates', { body: { mode, config: cfg, variants }, signal: ctl.signal })
+      aiStudio.estimate({ mode, config: cfg, variants }, ctl.signal)
         .then((e) => { setEstimate(e); setEstimateError(null); })
         .catch((e) => { if (e.name !== 'AbortError') { setEstimate(null); setEstimateError(e.message); } });
     }, 250);
@@ -134,10 +144,13 @@ export default function Studio() {
   }, [mode, cfg, variants]);
 
   const blocker = !options ? 'Đang tải cấu hình…'
+    : mode === 'text' && prompt.trim().length < 3 ? 'Nhập mô tả mô hình để bắt đầu.'
     : mode === 'single' && !images[0] ? 'Tải ảnh tham chiếu để bắt đầu.'
     : mode === 'multi' && !images[0] ? 'Multi-View cần ảnh góc Trước.'
-    : !consent ? 'Xác nhận quyền sử dụng ảnh để tiếp tục.'
+    : mode === 'multi' && imageCount < 2 ? 'Multi-View cần ít nhất 2 ảnh.'
+    : !consent ? (mode === 'text' ? 'Xác nhận chính sách nội dung để tiếp tục.' : 'Xác nhận quyền sử dụng ảnh để tiếp tục.')
     : estimate && !estimate.sufficient ? 'Không đủ tín dụng cho lần tạo này.'
+    : options.provider === 'unconfigured' ? 'Máy chủ chưa cấu hình nhà cung cấp AI (Meshy) nên chưa tạo được mô hình.'
     : null;
 
   const startGenerate = () => {
@@ -148,14 +161,18 @@ export default function Studio() {
   const submit = async () => {
     if (!confirm || !estimate) return;
     setSubmitting(true);
-    const imageIds = mode === 'single' ? [images[0]!.id] : images.filter(Boolean).map((i) => i!.id);
     try {
-      const r = await api<{ projectId: string; tasks: Task[] }>('/api/ai-studio/tasks', {
-        body: {
-          projectId: projectId || undefined, title: title.trim() || images[0]?.name.replace(/\.\w+$/, ''), mode, imageIds, config: cfg, variants,
-          quotedCredits: estimate.total, priceVersion: estimate.priceVersion, consent,
-        },
-        headers: { 'Idempotency-Key': confirm.key },
+      const name = title.trim() || project?.title || (mode === 'text' ? prompt.trim().slice(0, 60) : images[0]!.name.replace(/\.\w+$/, ''));
+      const r = await aiStudio.createTask({
+        mode,
+        name,
+        prompt,
+        images: mode === 'single' ? [images[0]!] : images.filter((x): x is SourceImage => !!x),
+        config: cfg,
+        variants,
+        projectId,
+        estimate,
+        key: confirm.key,
       });
       setConfirm(null);
       toast('info', 'Đã gửi tác vụ', `${r.tasks.length} tác vụ đang được xử lý. Bạn có thể rời trang, tiến trình vẫn được lưu.`);
@@ -182,7 +199,7 @@ export default function Studio() {
 
   const cancel = async (t: Task) => {
     try {
-      await api(`/api/ai-studio/tasks/${t.id}/cancel`, { method: 'POST' });
+      await aiStudio.cancelTask(t.id);
       toast('info', 'Đã hủy tác vụ', 'Credit đã được hoàn lại.');
       refreshWallet();
       load();
@@ -191,13 +208,13 @@ export default function Studio() {
     }
   };
   const refreshTask = async (t: Task) => {
-    try { await api(`/api/ai-studio/tasks/${t.id}/refresh`, { method: 'POST' }); load(); } catch (e) { toast('error', 'Không làm mới được', (e as Error).message); }
+    try { await aiStudio.refreshTask(t.id); load(); } catch (e) { toast('error', 'Không làm mới được', (e as Error).message); }
   };
 
   const patchProject = async (body: Record<string, unknown>) => {
     if (!detail) return;
     try {
-      await api(`/api/ai-studio/projects/${detail.project.id}`, { method: 'PATCH', body });
+      await aiStudio.patchProject(detail.project.id, body);
       load();
     } catch (e) { toast('error', 'Không lưu được', (e as Error).message); }
   };
@@ -237,15 +254,27 @@ export default function Studio() {
       {/* ---------------- Trái: nguồn & cấu hình ---------------- */}
       <aside className="studio-left" aria-label="Cấu hình tạo mô hình">
         <div className="panel-title">
-          <h2>Ảnh sang 3D</h2>
+          <h2>{mode === 'text' ? 'Văn bản sang 3D' : 'Ảnh sang 3D'}</h2>
           {projectId && <button className="btn sm outline" onClick={() => nav('/studio')} title="Bắt đầu dự án mới"><Plus size={14} />Mới</button>}
         </div>
         <div className="stack lg">
-          <Segmented value={mode} onChange={(m) => setMode(m)} label="Nguồn ảnh" options={[{ value: 'single', label: 'Một ảnh' }, { value: 'multi', label: 'Multi-View' }]} />
-          <ImagePicker mode={mode} images={images} onChange={(imgs) => { setImages(imgs); loadRecent(); }} recent={recent} />
+          {/* Multi-View tạm ẩn: Backend (createUnifiedTask) chỉ dùng ảnh đầu tiên. */}
+          <Segmented value={mode} onChange={(m) => setMode(m)} label="Nguồn"
+            options={[{ value: 'single', label: 'Một ảnh' }, { value: 'text', label: 'Văn bản' }]} />
+          {mode === 'text' ? (
+            <label className="field">
+              <span>Mô tả mô hình</span>
+              <textarea rows={5} maxLength={800} value={prompt} onChange={(e) => setPrompt(e.target.value)}
+                placeholder="VD: Rương gỗ cổ điển có khoá đồng, chạm khắc hoa văn" style={{ resize: 'vertical' }} />
+              <small className="muted">{prompt.length}/800 ký tự · mô tả bằng tiếng Anh thường cho kết quả tốt hơn.</small>
+            </label>
+          ) : (
+            <ImagePicker mode={mode} images={images} onChange={(imgs) => { setImages(imgs); loadRecent(); }} recent={recent} />
+          )}
           <GeneratePanel
             options={options} mode={mode} cfg={cfg} setCfg={setCfg} preset={preset} setPreset={setPreset}
-            variants={variants} setVariants={setVariants} title={title} setTitle={setTitle} showTitle={!projectId}
+            // Backend trừ tín dụng theo số biến thể nhưng chỉ tạo 1 tác vụ → giữ 1 biến thể.
+            variants={variants} setVariants={setVariants} maxVariants={1} title={title} setTitle={setTitle} showTitle={!projectId}
             consent={consent} setConsent={setConsent} estimate={estimate} estimateError={estimateError}
             blocker={blocker} busy={submitting} onGenerate={startGenerate}
           />
@@ -285,7 +314,7 @@ export default function Studio() {
             </>
           ) : primaryActive ? (
             <div className="vp-overlay">
-              {(() => { const src = detail?.images.find((i) => i.id === primaryActive.imageIds[0]); return src ? <img className="vp-src-img" src={src.url} alt="" /> : null; })()}
+              {(() => { const src = detail?.images.find((i) => i.id === primaryActive.imageIds[0]); return src ? <AuthedImg className="vp-src-img" src={src.url} alt="" /> : null; })()}
               <div className="box" style={{ position: 'relative' }}>
                 <Cuboid size={40} color="var(--primary)" style={{ margin: '0 auto' }} />
                 <h3>{project?.title} đang thành hình</h3>
@@ -309,6 +338,7 @@ export default function Studio() {
                 <Sparkles size={40} color="var(--primary)" style={{ margin: '0 auto' }} />
                 <h3>Biến ảnh thành mô hình 3D</h3>
                 <p className="muted">Tải một ảnh vật thể ở bảng bên trái, chọn cấu hình và bấm Generate. Kết quả sẽ hiển thị tại đây để xoay, phóng to và kiểm tra.</p>
+                {provider === 'unconfigured' && <div className="banner warning" style={{ textAlign: 'left', marginTop: 16 }}><AlertTriangle size={16} style={{ flex: 'none' }} /><span>Máy chủ <b>chưa cấu hình nhà cung cấp AI</b> (Meshy) nên chưa tạo được mô hình mới. Bạn vẫn xem được các mô hình đã có.</span></div>}
                 {provider === 'mock' && <div className="banner warning" style={{ textAlign: 'left', marginTop: 16 }}><AlertTriangle size={16} style={{ flex: 'none' }} /><span>Đang ở <b>chế độ mô phỏng</b>: chưa cấu hình <code>MESHY_API_KEY</code> nên kết quả là mô hình mẫu, không gọi Meshy.</span></div>}
               </div>
             </div>
@@ -326,7 +356,7 @@ export default function Studio() {
                 <div className="variant-list">
                   {detail.versions.map((v) => (
                     <button key={v.id} className="variant" aria-current={v.id === selectedId} onClick={() => { setSelectedId(v.id); setStats(null); }}>
-                      {v.thumbnailUrl ? <img src={v.thumbnailUrl} alt="" /> : <span className="ph"><Cuboid size={18} /></span>}
+                      {v.thumbnailUrl ? <AuthedImg src={v.thumbnailUrl} alt="" /> : <span className="ph"><Cuboid size={18} /></span>}
                       <div>
                         <b>{v.label}{v.id === project?.activeVersionId && <span className="badge info" style={{ marginLeft: 6 }}>Chính</span>}</b>
                         <span>{MODEL_LABEL[v.metadata.aiModel || ''] || v.metadata.aiModel} · {time(v.createdAt)}</span>
@@ -375,15 +405,11 @@ export default function Studio() {
                 <div className="row" style={{ gap: 6 }}>
                   <h3 style={{ margin: 0, fontSize: 18 }} className="grow">{project!.title}</h3>
                   <button className="icon-btn" aria-label="Đổi tên" onClick={() => setEditingTitle(true)}><Pencil size={15} /></button>
-                  <button className={`icon-btn${project!.favorite ? ' on' : ''}`} aria-label="Yêu thích" aria-pressed={project!.favorite} onClick={() => patchProject({ favorite: !project!.favorite })}>
-                    <Heart size={16} fill={project!.favorite ? 'currentColor' : 'none'} />
-                  </button>
                 </div>
               )}
               {version && (
                 <div className="row small" style={{ marginTop: 6 }}>
                   <Badge tone="info">{version.label}</Badge>
-                  {version.id !== project!.activeVersionId && <button className="btn ghost sm" style={{ height: 24, padding: '0 6px', color: 'var(--primary)' }} onClick={() => patchProject({ activeVersionId: version.id })}>Đặt làm bản chính</button>}
                 </div>
               )}
               <p className="muted small" style={{ margin: '6px 0 0' }}>Tạo lúc {dateTime(project!.createdAt)} · Riêng tư</p>
@@ -461,10 +487,11 @@ export default function Studio() {
         }>
           <div className="stack">
             <dl className="kv">
-              <dt>Nguồn</dt><dd>{mode === 'single' ? 'Một ảnh' : `Multi-View · ${imageCount} ảnh`}</dd>
+              <dt>Nguồn</dt><dd>{mode === 'single' ? 'Một ảnh' : mode === 'text' ? 'Văn bản' : `Multi-View · ${imageCount} ảnh`}</dd>
               <dt>Mô hình AI</dt><dd>{MODEL_LABEL[cfg.aiModel]}</dd>
               <dt>Đầu ra</dt><dd>{cfg.shouldTexture ? `Mesh + Texture ${cfg.textureResolution.toUpperCase()}${cfg.enablePbr ? ' · PBR' : ''}` : 'Chỉ Mesh'}{cfg.shouldRemesh ? ` · ${num(cfg.targetPolycount)} mặt` : ''}</dd>
               <dt>Số biến thể</dt><dd>{variants}</dd>
+              {projectId && <><dt>Lưu vào</dt><dd>Phiên bản mới của dự án này</dd></>}
             </dl>
             <hr className="divider" style={{ margin: '4px 0' }} />
             {estimate.breakdown.map((b) => (

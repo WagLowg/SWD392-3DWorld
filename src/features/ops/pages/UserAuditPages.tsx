@@ -1,7 +1,7 @@
 import { Download, Fingerprint, ShieldCheck, UserPlus } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { inputClass } from '../../../shared/ui/form'
 import {
   Btn,

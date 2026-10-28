@@ -19,13 +19,14 @@ Browser
 ## Quy tắc phụ thuộc
 
 - `features/*` có thể dùng `app` và `shared`.
-- Một feature có thể dùng public API của feature khác khi luồng nghiệp vụ cần, ví dụ Studio dùng session của Auth.
-- `shared` không phụ thuộc vào UI cụ thể của feature. Token dùng cho Axios nằm trong `shared/session`; các màn hình auth vẫn thuộc `features/auth`.
+- Một feature có thể dùng public API của feature khác khi luồng nghiệp vụ cần, ví dụ AI Studio và 3D Studio gửi in qua `pod/services`.
+- `shared` **không import** từ `features`. Token, `fetchMe` và `goLogin` nằm trong `shared/session`; các màn hình auth vẫn thuộc `features/auth`.
+- `src/drafts` có thể import `features`/`shared`, nhưng không nơi nào được import từ `drafts`.
 - `entries` chỉ boot module, không chứa component hay nghiệp vụ.
 
-## Backend trong repository
+## Backend
 
-- `backend/` là Spring Boot service chính, được giữ nguyên trong đợt hợp nhất frontend.
-- `AI/server/` là Node AI service cũ/độc lập, cũng được giữ nguyên. `AI/client` đã được đưa vào `src/features/ai-studio`.
+- Repository này chỉ chứa frontend. Mọi module gọi backend chính (3DWorld-SWD-BE, repo riêng) qua `/api`; port đặt bằng `API_PORT` (mặc định `8080`).
+- `AI/client` đã được đưa vào `src/features/ai-studio`; AI Studio và 3D Studio dùng `/api/ai-studio/*`, `/api/studio/*` của backend chính.
 
 Việc frontend chạy một port không có nghĩa backend phải chung port. Trong môi trường phát triển, trình duyệt chỉ mở port `5173`; Vite proxy che các port backend phía sau `/api`.

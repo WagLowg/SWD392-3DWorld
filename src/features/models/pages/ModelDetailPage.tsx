@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, History, Lock, Printer, Sparkles } from 'lucide-react'
 import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { ApiNote, Breadcrumbs } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { FileList } from '../components/FileList'

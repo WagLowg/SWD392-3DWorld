@@ -1,7 +1,7 @@
 import { ArrowLeft, Boxes, History, MapPin, Truck, Undo2, XCircle } from 'lucide-react'
 import { type ReactNode, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { Breadcrumbs } from '../../../shared/ui/primitives'
 import { ConfirmReceivedButton } from '../../buyer/components/ConfirmReceivedDialog'

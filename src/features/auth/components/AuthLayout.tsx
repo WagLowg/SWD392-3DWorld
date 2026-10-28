@@ -1,7 +1,7 @@
 import { Box, Clock3, Layers, ShieldCheck, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { MODULES } from '../../../shared/modules'
+import { MODULES } from '../../../shared/config/modules'
 
 /** Khung chung MP 005–009: header gọn, cột trái là form, cột phải là thẻ trưng bày. */
 export function AuthLayout({

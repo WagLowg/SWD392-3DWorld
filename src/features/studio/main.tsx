@@ -1,10 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-import { loadFonts } from './fonts';
-import { fetchMe, goLogin } from '../auth/services/session';
+import { loadFonts } from './lib/fonts';
+import { fetchMe, goLogin } from '../../shared/session/session';
 import { setSessionUser } from './session';
-import './styles.css';
+import './studio.css';
 import './dashboard/dashboard.css';
 
 const root = createRoot(document.getElementById('root')!);

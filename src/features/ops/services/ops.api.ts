@@ -1,6 +1,6 @@
 import { type ApiEnvelope, http } from '../../../shared/api'
 import { toQueryString } from '../../../shared/lib/query'
-import { formatVnd } from '../../../shared/format'
+import { formatVnd } from '../../../shared/lib/format'
 import type { AuditEntry } from '../../../shared/ui/kit'
 import type { ApiPage, ApiProduct, ApiSellerVerification } from '../../seller/services/seller.api'
 import { readEvidence } from '../../seller/services/seller.service'

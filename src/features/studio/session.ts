@@ -1,4 +1,4 @@
-import type { SessionUser } from '../auth/services/session';
+import type { SessionUser } from '../../shared/session/session';
 
 /** Người dùng đăng nhập (được nạp một lần khi mở Studio, xem main.tsx). */
 let current: SessionUser | null = null;

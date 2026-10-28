@@ -1,5 +1,5 @@
 import { Check, Package, Store, X } from 'lucide-react'
-import { formatDateTime, formatVnd } from '../../../shared/format'
+import { formatDateTime, formatVnd } from '../../../shared/lib/format'
 import { formatAttributes } from '../../marketplace/lib/format'
 import { ProductMedia } from '../../marketplace/components/ProductMedia'
 import { useVariantIndexStore } from '../../marketplace/stores/variant-index.store'

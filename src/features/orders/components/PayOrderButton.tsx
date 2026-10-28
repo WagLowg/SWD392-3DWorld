@@ -1,7 +1,7 @@
 import { CreditCard, ExternalLink } from 'lucide-react'
 import { useState } from 'react'
 import { ApiClientError } from '../../../shared/api'
-import { formatVnd } from '../../../shared/format'
+import { formatVnd } from '../../../shared/lib/format'
 import { useToast } from '../../../shared/ui/toast'
 import { paymentResultUrl } from '../../marketplace/lib/payment'
 import { usePayOrder } from '../hooks/useOrders'

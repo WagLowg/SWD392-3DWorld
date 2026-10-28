@@ -1,7 +1,7 @@
 import { AlertTriangle, ArrowRight, Boxes, Hammer, Package, ShieldAlert, Store, Truck, Wallet } from 'lucide-react'
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { formatVnd } from '../../../shared/format'
+import { formatVnd } from '../../../shared/lib/format'
 import { Btn, Hero, MockNotice, Pill, Section, StatCard, StatGrid, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { useSellerOrders } from '../../orders/hooks/useOrders'

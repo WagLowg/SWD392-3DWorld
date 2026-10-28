@@ -1,6 +1,6 @@
 import { CalendarClock, CreditCard, Eye, ShieldCheck, Store } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
-import { formatDate } from '../../../shared/format'
+import { formatDate } from '../../../shared/lib/format'
 import { inputClass } from '../../../shared/ui/form'
 import { Btn, DetailLayout, Hero, KeyValues, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'

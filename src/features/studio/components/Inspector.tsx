@@ -4,10 +4,10 @@ import {
   AlignCenterHorizontal, AlignEndHorizontal, AlignStartHorizontal, ArrowLeftRight, Printer, RefreshCw, RotateCcw, ShieldCheck,
 } from 'lucide-react';
 import { useStudio } from '../store';
-import { baseSize, buildGeometry, localSize, worldBox } from '../geometry';
-import { printableNodes, sceneHash } from '../printCheck';
+import { baseSize, buildGeometry, localSize, worldBox } from '../lib/geometry';
+import { printableNodes, sceneHash } from '../lib/printCheck';
 import { SWATCHES } from '../config';
-import type { BoolOp } from '../csg';
+import type { BoolOp } from '../lib/csg';
 import type { NodeParams, SceneNode, Vec3, PodStage } from '../types';
 import { Alert, LevelBadge, NumberField, fmtTime } from './ui';
 

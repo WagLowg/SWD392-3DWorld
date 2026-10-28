@@ -93,6 +93,10 @@ export interface Snapshot {
   unit: 'mm';
   consentVersion?: string;
   bytes: number;
+  /** Mã snapshot do Backend cấp (snapshotCode). */
+  serverCode?: string;
+  /** URL tải tệp snapshot từ Backend (cần Bearer token). */
+  downloadUrl?: string;
 }
 
 export type PodStage =

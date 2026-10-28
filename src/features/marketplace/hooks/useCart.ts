@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiClientError } from '../../../shared/api'
-import { goLogin } from '../../auth/services/session'
+import { goLogin } from '../../../shared/session/session'
 import { cartService } from '../services/cart.service'
 import { useMarketplaceUiStore } from '../stores/marketplace-ui.store'
 import type { AddCartItemInput, Cart } from '../types/catalog.types'
