@@ -2,9 +2,19 @@ import { Archive, EyeOff, Pencil, Play, Send } from 'lucide-react'
 import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { formatDateTime, formatVnd } from '../../../shared/format'
-import { AuditTimeline, Btn, DataTable, DetailLayout, Hero, KeyValues, Pill, Section, StatusPill } from '../../../shared/ui/kit'
+import {
+  AuditTimeline,
+  Btn,
+  DataTable,
+  DetailLayout,
+  Hero,
+  KeyValues,
+  Pill,
+  Section,
+  StatusPill,
+} from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
-import { categoryLabel, resolveMediaUrl } from '../../marketplace/lib/format'
+import { categoryLabel, resolveMediaUrl, shippingClassLabel } from '../../marketplace/lib/format'
 import { useSellerProduct, useSetProductStatus } from '../hooks/useSeller'
 import { PRODUCT_STATUS } from '../lib/status'
 
@@ -37,20 +47,36 @@ export function SellerProductDetailPage() {
                         Chỉnh sửa
                       </Btn>
                       {p.status === 'PUBLISHED' ? (
-                        <Btn icon={EyeOff} onClick={() => setStatus.mutate({ id: p.id, status: 'HIDDEN', note: 'Tạm dừng bán' })}>
+                        <Btn
+                          icon={EyeOff}
+                          onClick={() => setStatus.mutate({ id: p.id, status: 'HIDDEN', note: 'Tạm dừng bán' })}
+                        >
                           Tạm dừng bán
                         </Btn>
                       ) : p.status === 'HIDDEN' ? (
-                        <Btn variant="orange" icon={Play} onClick={() => setStatus.mutate({ id: p.id, status: 'PENDING_REVIEW', note: 'Nộp duyệt mở bán lại' })}>
+                        <Btn
+                          variant="orange"
+                          icon={Play}
+                          onClick={() =>
+                            setStatus.mutate({ id: p.id, status: 'PENDING_REVIEW', note: 'Nộp duyệt mở bán lại' })
+                          }
+                        >
                           Nộp duyệt mở bán lại
                         </Btn>
                       ) : p.status === 'DRAFT' || p.status === 'REJECTED' ? (
-                        <Btn variant="orange" icon={Send} onClick={() => setStatus.mutate({ id: p.id, status: 'PENDING_REVIEW', note: 'Gửi duyệt' })}>
+                        <Btn
+                          variant="orange"
+                          icon={Send}
+                          onClick={() => setStatus.mutate({ id: p.id, status: 'PENDING_REVIEW', note: 'Gửi duyệt' })}
+                        >
                           Gửi duyệt
                         </Btn>
                       ) : null}
                       {p.status !== 'ARCHIVED' && (
-                        <Btn icon={Archive} onClick={() => setStatus.mutate({ id: p.id, status: 'ARCHIVED', note: 'Lưu trữ' })}>
+                        <Btn
+                          icon={Archive}
+                          onClick={() => setStatus.mutate({ id: p.id, status: 'ARCHIVED', note: 'Lưu trữ' })}
+                        >
                           Lưu trữ
                         </Btn>
                       )}
@@ -70,7 +96,12 @@ export function SellerProductDetailPage() {
                         {!!p.mediaItems?.length && (
                           <div className="mt-4 flex gap-2 overflow-x-auto">
                             {p.mediaItems.map((m) => (
-                              <img key={m.id} src={resolveMediaUrl(m.url)} alt="" className="h-24 w-24 shrink-0 rounded-2xl object-cover" />
+                              <img
+                                key={m.id}
+                                src={resolveMediaUrl(m.url)}
+                                alt=""
+                                className="h-24 w-24 shrink-0 rounded-2xl object-cover"
+                              />
                             ))}
                           </div>
                         )}
@@ -78,9 +109,16 @@ export function SellerProductDetailPage() {
                           <KeyValues
                             cols={3}
                             items={[
-                              { label: 'Vận chuyển', value: p.shippingClass },
+                              { label: 'Vận chuyển', value: shippingClassLabel(p.shippingClass) },
                               { label: 'Polygon', value: p.polygonCount.toLocaleString('vi-VN') },
-                              { label: 'Lưới kín', value: p.manifold ? <Pill tone="green">Manifold</Pill> : <Pill tone="danger">Chưa kín</Pill> },
+                              {
+                                label: 'Lưới kín',
+                                value: p.manifold ? (
+                                  <Pill tone="green">Manifold</Pill>
+                                ) : (
+                                  <Pill tone="danger">Chưa kín</Pill>
+                                ),
+                              },
                             ]}
                           />
                         </div>
@@ -95,7 +133,15 @@ export function SellerProductDetailPage() {
                             { key: 'p', header: 'Đơn giá', render: (v) => <strong>{formatVnd(v.price)}</strong> },
                             { key: 's', header: 'Tồn kho', render: (v) => v.stock },
                             { key: 'r', header: 'Giữ chỗ 15p', render: (v) => v.reserved },
-                            { key: 'av', header: 'Khả dụng', render: (v) => <strong className={v.stock - v.reserved < 5 ? 'text-danger' : 'text-teal'}>{v.stock - v.reserved}</strong> },
+                            {
+                              key: 'av',
+                              header: 'Khả dụng',
+                              render: (v) => (
+                                <strong className={v.stock - v.reserved < 5 ? 'text-danger' : 'text-teal'}>
+                                  {v.stock - v.reserved}
+                                </strong>
+                              ),
+                            },
                           ]}
                         />
                         <div className="mt-3">

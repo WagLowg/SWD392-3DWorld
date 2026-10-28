@@ -110,6 +110,13 @@ export type SellerVariant = {
   stock: number
   reserved: number
   active: boolean
+  fragile: boolean
+  lowStockThreshold: number
+  packingGroup: string
+  weightGrams: number
+  lengthCm: number
+  widthCm: number
+  heightCm: number
 }
 
 export type SellerProduct = {
@@ -120,6 +127,8 @@ export type SellerProduct = {
   status: ProductStatus
   description: string
   shippingClass: string
+  /** Chuỗi JSON kỹ thuật Backend lưu trong products.specifications. */
+  specifications?: string
   polygonCount: number
   manifold: boolean
   media: number
@@ -143,6 +152,13 @@ const v = (id: number, sku: string, material: string, color: string, size: strin
   stock,
   reserved,
   active,
+  fragile: false,
+  lowStockThreshold: 5,
+  packingGroup: 'STANDARD',
+  weightGrams: 250,
+  lengthCm: 10,
+  widthCm: 10,
+  heightCm: 10,
 })
 
 export const products: SellerProduct[] = [
