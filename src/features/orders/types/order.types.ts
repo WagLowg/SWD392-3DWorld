@@ -40,6 +40,8 @@ export type Order = {
   autoConfirmDueAt?: string | null
   shippingPackageCount?: number | null
   shippingWeightGrams?: number | null
+  paymentMethod?: string | null
+  onlinePaymentRequired?: boolean
 }
 
 export type OrderHistoryEntry = {
@@ -83,8 +85,9 @@ export type SavePackagesInput = {
 
 /**
  * Máy trạng thái theo PhysicalOrder.transition (Backend):
- * CREATED → PENDING_PAYMENT → PAID → PROCESSING → SHIPPED → IN_TRANSIT → DELIVERED → RECEIVED
+ * CREATED → PENDING_PAYMENT → PAID → PROCESSING → SHIPPED → DELIVERED → RECEIVED
  * Nhánh thoát: CANCELLED (trước khi gửi), RETURNED (sau khi gửi).
+ * IN_TRANSIT chỉ được giữ để tương thích dữ liệu cũ; luồng mới lưu nó trong Shipment.
  */
 export type OrderStatus =
   | 'CREATED'

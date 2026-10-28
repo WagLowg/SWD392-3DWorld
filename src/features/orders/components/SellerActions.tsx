@@ -17,8 +17,10 @@ function useRun() {
 export function SellerOrderActions({ order, compact = false }: { order: Order; compact?: boolean }) {
   const { updateStatus } = useSellerOrderActions()
   const run = useRun()
+  const isCodCreated =
+    order.status === 'CREATED' && (order.paymentMethod === 'COD' || order.onlinePaymentRequired === false)
 
-  if (order.status === 'PAID' || order.status === 'CREATED') {
+  if (order.status === 'PAID' || isCodCreated) {
     return (
       <button
         type="button"
@@ -44,7 +46,7 @@ export function SellerOrderActions({ order, compact = false }: { order: Order; c
         onClick={() =>
           run(
             updateStatus.mutateAsync({ orderId: order.id, status: 'SHIPPED' }),
-            'Đã ghi nhận bàn giao kiện hàng cho đơn vị vận chuyển.',
+            'Đã bàn giao kiện hàng cho đơn vị vận chuyển.',
           )
         }
         className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2.5 font-label text-xs font-semibold text-white hover:bg-violet disabled:opacity-50"
@@ -62,7 +64,7 @@ export function SellerOrderActions({ order, compact = false }: { order: Order; c
     )
   }
 
-  if (!compact && order.status === 'PENDING_PAYMENT') {
+  if (!compact && (order.status === 'PENDING_PAYMENT' || order.status === 'CREATED')) {
     return <span className="font-label text-xs text-ink-soft">Chờ người mua thanh toán trước khi soạn hàng.</span>
   }
 

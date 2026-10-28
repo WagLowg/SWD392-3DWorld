@@ -37,15 +37,7 @@ export function statusMeta(status: string) {
 }
 
 /** Các bước hiển thị trên timeline người mua. */
-export const ORDER_FLOW: OrderStatus[] = [
-  'PENDING_PAYMENT',
-  'PAID',
-  'PROCESSING',
-  'SHIPPED',
-  'IN_TRANSIT',
-  'DELIVERED',
-  'RECEIVED',
-]
+export const ORDER_FLOW: OrderStatus[] = ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'RECEIVED']
 
 export function flowIndex(status: string) {
   const i = ORDER_FLOW.indexOf(status as OrderStatus)
@@ -64,11 +56,14 @@ export const STATUS_FILTERS: { value: string; label: string; match: string[] }[]
 
 export const SHIPMENT_STATUS: Record<string, { label: string; tone: Tone }> = {
   CREATED: { label: 'Đã tạo vận đơn tự động', tone: 'neutral' },
+  PREPARING: { label: 'Chờ Seller bàn giao', tone: 'orange' },
   PENDING: { label: 'Chờ Seller bàn giao', tone: 'orange' },
   PENDING_PICKUP: { label: 'Chờ Seller bàn giao', tone: 'orange' },
   SHIPPED: { label: 'Seller đã bàn giao', tone: 'violet' },
   IN_TRANSIT: { label: 'Đang vận chuyển', tone: 'teal' },
+  ARRIVED_AT_DESTINATION: { label: 'Đã đến điểm giao', tone: 'teal' },
   DELIVERED: { label: 'Giao thành công', tone: 'green' },
+  RECEIVED: { label: 'Đã nhận hàng', tone: 'green' },
   FAILED: { label: 'Giao thất bại', tone: 'danger' },
   RETURNED: { label: 'Hoàn trả', tone: 'danger' },
 }

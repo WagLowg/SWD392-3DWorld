@@ -3,8 +3,8 @@ import { formatDateTime, formatVnd } from '../../../shared/format'
 import { ProductMedia } from '../../marketplace/components/ProductMedia'
 import { formatAttributes } from '../../marketplace/lib/format'
 import { useVariantIndexStore } from '../../marketplace/stores/variant-index.store'
-import { flowIndex, ORDER_FLOW, shipmentMeta, statusMeta, TONE_CLASS } from '../lib/status'
-import type { Order, OrderHistoryEntry, OrderItem } from '../types/order.types'
+import { ORDER_FLOW, shipmentMeta, statusMeta, TONE_CLASS } from '../lib/status'
+import type { Order, OrderHistoryEntry, OrderItem, OrderStatus } from '../types/order.types'
 
 export function orderCode(id: number) {
   return `#ORD-${String(id).padStart(5, '0')}`
@@ -84,7 +84,7 @@ export function StorefrontLabel({ id }: { id: number }) {
   )
 }
 
-/** Tiến trình đơn: thanh toán → soạn hàng → bàn giao → vận chuyển → giao/nhận. */
+/** Tiến trình đơn online có bước thanh toán; COD đi thẳng từ CREATED sang PROCESSING. */
 export function OrderTimeline({
   order,
   history = [],
@@ -97,7 +97,10 @@ export function OrderTimeline({
   historyError?: boolean
 }) {
   const closed = order.status === 'CANCELLED' || order.status === 'RETURNED'
-  const current = flowIndex(order.status)
+  const isCod = order.paymentMethod === 'COD' || order.onlinePaymentRequired === false
+  const flow: OrderStatus[] = isCod ? ['CREATED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'RECEIVED'] : ORDER_FLOW
+  const normalizedStatus = (order.status === 'IN_TRANSIT' ? 'SHIPPED' : order.status) as OrderStatus
+  const current = flow.indexOf(normalizedStatus)
   const changedAtByStatus = new Map<string, string>()
 
   for (const entry of [...history].sort((a, b) => new Date(a.changedAt).getTime() - new Date(b.changedAt).getTime())) {
@@ -105,7 +108,9 @@ export function OrderTimeline({
   }
 
   const stepTime = (status: string) => {
-    const value = changedAtByStatus.get(status) ?? (status === 'PENDING_PAYMENT' ? order.createdAt : undefined)
+    const value =
+      changedAtByStatus.get(status) ??
+      (status === 'CREATED' || status === 'PENDING_PAYMENT' ? order.createdAt : undefined)
     if (value) return { value, label: formatDateTime(value) }
     if (historyLoading) return { value: undefined, label: 'Đang tải…' }
     if (historyError) return { value: undefined, label: 'Không tải được' }
@@ -114,8 +119,8 @@ export function OrderTimeline({
 
   return (
     <div>
-      <ol className="grid grid-cols-3 gap-y-6 sm:grid-cols-7">
-        {ORDER_FLOW.map((s, i) => {
+      <ol className={`grid grid-cols-3 gap-y-6 ${isCod ? 'sm:grid-cols-5' : 'sm:grid-cols-6'}`}>
+        {flow.map((s, i) => {
           const done = !closed && current >= i
           const active = !closed && current === i
           const m = statusMeta(s)

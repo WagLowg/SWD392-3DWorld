@@ -68,6 +68,14 @@ export function useCancelOrder() {
   })
 }
 
+export function useConfirmReceived() {
+  const refresh = useRefreshOrder()
+  return useMutation({
+    mutationFn: ({ orderId }: { orderId: number }) => buyerOrderService.confirmReceived(orderId),
+    onSuccess: (_, v) => refresh(v.orderId),
+  })
+}
+
 export function useSavePackages() {
   const refresh = useRefreshOrder()
   return useMutation({
@@ -131,6 +139,11 @@ export function useSellerOrderActions() {
     updateStatus: useMutation({
       mutationFn: ({ orderId, status }: { orderId: number; status: string }) =>
         sellerOrderService.updateStatus(orderId, status),
+      onSuccess: (_, v) => refresh(v.orderId),
+    }),
+    handoffShipment: useMutation({
+      mutationFn: ({ orderId: _orderId, shipmentId }: { orderId: number; shipmentId: number }) =>
+        sellerOrderService.handoffShipment(shipmentId),
       onSuccess: (_, v) => refresh(v.orderId),
     }),
   }

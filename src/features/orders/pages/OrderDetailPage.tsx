@@ -1,10 +1,12 @@
-import { ArrowLeft, Boxes, History, MapPin, Truck, Undo2, XCircle } from 'lucide-react'
+import { ArrowLeft, Boxes, CheckCircle2, History, MapPin, Truck, Undo2, XCircle } from 'lucide-react'
 import { type ReactNode, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ApiClientError } from '../../../shared/api'
 import { formatDateTime } from '../../../shared/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { Breadcrumbs } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'
+import { useToast } from '../../../shared/ui/toast'
 import {
   displayOrderCode,
   OrderItemRow,
@@ -18,7 +20,7 @@ import {
 } from '../components/OrderParts'
 import { PayOrderButton } from '../components/PayOrderButton'
 import { ShippingAddressSnapshot } from '../components/ShippingAddressSnapshot'
-import { useBuyerShipments, useOrder, useOrderHistory, useOrderPackages } from '../hooks/useOrders'
+import { useBuyerShipments, useConfirmReceived, useOrder, useOrderHistory, useOrderPackages } from '../hooks/useOrders'
 import { statusMeta } from '../lib/status'
 import { useOrderPaymentsStore } from '../stores/order-payments.store'
 
@@ -31,6 +33,8 @@ export function OrderDetailPage() {
   const history = useOrderHistory(order ? orderId : undefined)
   const packages = useOrderPackages(order ? orderId : undefined)
   const payment = useOrderPaymentsStore((s) => s.byOrder[orderId])
+  const confirmReceived = useConfirmReceived()
+  const toast = useToast()
 
   useEffect(() => {
     document.title = `Đơn ${orderCode(orderId)} · 3DWorld`
@@ -225,7 +229,23 @@ export function OrderDetailPage() {
                     <PayOrderButton orderId={order.id} amount={order.totalAmount} className="justify-center" />
                   )}
                   {order.status === 'DELIVERED' && (
-                    <span className="rounded-full bg-mint px-5 py-2.5 text-center font-label text-sm font-semibold text-[#0f5132]">
+                    <button
+                      type="button"
+                      disabled={confirmReceived.isPending}
+                      onClick={() =>
+                        confirmReceived
+                          .mutateAsync({ orderId: order.id })
+                          .catch((e) =>
+                            toast(e instanceof ApiClientError ? e.message : 'Không xác nhận nhận hàng được.', 'error'),
+                          )
+                      }
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-mint px-5 py-2.5 font-label text-sm font-semibold text-[#0f5132] hover:opacity-95 disabled:opacity-50"
+                    >
+                      <CheckCircle2 size={15} /> Xác nhận đã nhận hàng
+                    </button>
+                  )}
+                  {order.status === 'DELIVERED' && (
+                    <span className="rounded-full bg-surface-low px-5 py-2.5 text-center font-label text-sm font-semibold text-ink-soft">
                       Staff đang đối soát xác nhận nhận hàng
                     </span>
                   )}

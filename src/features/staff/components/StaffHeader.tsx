@@ -1,8 +1,7 @@
-import { ArrowLeft, Box, FlaskConical, LogOut, Shield, User } from 'lucide-react'
+import { ArrowLeft, Box, LogOut, Shield, User } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { logout } from '../../auth/services/session'
 import { useSession } from '../../../shared/session/useSession'
-import { STAFF_DEMO_NOTICE } from '../mocks/staffMockData'
 
 export function StaffHeader({
   title,
@@ -63,17 +62,14 @@ export function StaffHeader({
         </div>
       </div>
 
-      {/* Prototype Banner */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-violet/40 bg-violet-soft/40 px-4 py-2 font-label text-xs text-violet">
         <div className="flex items-center gap-2">
-          <FlaskConical size={15} className="text-violet" />
-          <strong className="font-bold">{STAFF_DEMO_NOTICE}</strong>
-          <span className="hidden text-ink-soft sm:inline">
-            — Không ghi đè cơ sở dữ liệu thật; thao tác mô phỏng trên bộ nhớ trình duyệt.
-          </span>
+          <Shield size={15} className="text-violet" />
+          <strong className="font-bold">Khu vực vận hành nội bộ</strong>
+          <span className="hidden text-ink-soft sm:inline">— Thao tác được đồng bộ với API thật của hệ thống.</span>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-ink shadow-soft">
-          <Shield size={12} className="text-orange" /> Khu vực vận hành độc lập
+          <Shield size={12} className="text-orange" /> Staff workspace
         </span>
       </div>
 

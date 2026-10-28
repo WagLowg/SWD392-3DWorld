@@ -1,6 +1,7 @@
-import { ArrowLeft, Copy, PackageSearch, ShieldCheck, Undo2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Copy, PackageSearch, ShieldCheck, Undo2 } from 'lucide-react'
 import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ApiClientError } from '../../../shared/api'
 import { formatDateTime } from '../../../shared/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { ApiNote, Breadcrumbs } from '../../../shared/ui/primitives'
@@ -9,7 +10,7 @@ import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { useToast } from '../../../shared/ui/toast'
 import { OrderStatusBadge, orderCode, REFUNDABLE, ShipmentStatusBadge } from '../components/OrderParts'
 import { ShipmentLog, ShipmentProgress } from '../components/ShipmentTimeline'
-import { useBuyerShipments, useMyOrders } from '../hooks/useOrders'
+import { useBuyerShipments, useConfirmReceived, useMyOrders } from '../hooks/useOrders'
 import type { Shipment } from '../types/order.types'
 
 /** MP 027 · Theo Dõi Vận Chuyển Đơn Hàng */
@@ -18,6 +19,8 @@ export function OrderTrackingPage() {
   const orders = useMyOrders()
   const order = orders.data?.find((o) => o.id === orderId)
   const shipments = useBuyerShipments(order ? orderId : undefined)
+  const confirmReceived = useConfirmReceived()
+  const toast = useToast()
 
   useEffect(() => {
     document.title = `Theo dõi vận chuyển ${orderCode(orderId)} · 3DWorld`
@@ -86,6 +89,22 @@ export function OrderTrackingPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              {order.status === 'DELIVERED' && (
+                <button
+                  type="button"
+                  disabled={confirmReceived.isPending}
+                  onClick={() =>
+                    confirmReceived
+                      .mutateAsync({ orderId: order.id })
+                      .catch((e) =>
+                        toast(e instanceof ApiClientError ? e.message : 'Không xác nhận nhận hàng được.', 'error'),
+                      )
+                  }
+                  className="inline-flex items-center gap-2 rounded-full bg-mint px-5 py-3 font-label text-sm font-semibold text-[#0f5132] hover:opacity-95 disabled:opacity-50"
+                >
+                  <CheckCircle2 size={15} /> Xác nhận đã nhận hàng
+                </button>
+              )}
               {REFUNDABLE.includes(order.status) && (
                 <Link
                   to={`/refunds/new?orderId=${order.id}`}

@@ -38,6 +38,13 @@ export const buyerOrderService = {
     return (await http.post<ApiEnvelope<Order>, { reason: string }>(`/api/orders/${orderId}/cancel`, { reason })).data
   },
 
+  /** Người mua xác nhận đã nhận hàng sau khi Staff cập nhật DELIVERED. */
+  async confirmReceived(orderId: number) {
+    return (await http.patch<ApiEnvelope<Order>, { status: 'RECEIVED' }>(`/api/orders/${orderId}/status`, {
+      status: 'RECEIVED',
+    })).data
+  },
+
   /** Hành trình vận chuyển mà người mua được xem. */
   async shipments(orderId: number, signal?: AbortSignal) {
     return (await http.get<ApiEnvelope<Shipment[]>>(`/api/orders/${orderId}/shipments`, { signal })).data ?? []
@@ -49,13 +56,22 @@ export const sellerOrderService = {
     return (await http.get<ApiEnvelope<Order[]>>('/api/orders/seller', { signal })).data ?? []
   },
 
-  /** Seller chỉ chuyển PAID/CREATED→PROCESSING và PROCESSING→SHIPPED (đã bàn giao). */
+  /** Seller chỉ dùng endpoint order status để nhận đơn: PAID/CREATED(COD) → PROCESSING. */
   async updateStatus(orderId: number, status: string) {
     return (await http.patch<ApiEnvelope<Order>, { status: string }>(`/api/orders/${orderId}/status`, { status })).data
   },
 
   async shipments(orderId: number, signal?: AbortSignal) {
     return (await http.get<ApiEnvelope<Shipment[]>>(`/api/seller/orders/${orderId}/shipments`, { signal })).data ?? []
+  },
+
+  /** Seller bàn giao kiện hàng qua shipment event; Backend đồng bộ cả Shipment và PhysicalOrder sang SHIPPED. */
+  async handoffShipment(shipmentId: number) {
+    return (
+      await http.patch<ApiEnvelope<Shipment>, { event: 'SHIPPED' }>(`/api/shipments/${shipmentId}/event`, {
+        event: 'SHIPPED',
+      })
+    ).data
   },
 
   /** Thay toàn bộ kiện đóng gói trước khi Seller bàn giao; mỗi đơn vị hàng phải được phân bổ đúng 1 lần. */
