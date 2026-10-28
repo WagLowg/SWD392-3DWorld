@@ -19,7 +19,7 @@ export function MarketplaceLayout({ children }: PropsWithChildren) {
       className={`flex min-h-screen flex-col ${home ? 'bg-surface' : 'bg-gradient-to-b from-[#FFF7EC] via-[#FFF2E5] to-[#FFE2CC]'}`}
     >
       <MarketplaceHeader />
-      <main className="flex-1 pb-20 pt-28 md:pt-32">{children}</main>
+      <main className="flex-1 pb-20 pt-24">{children}</main>
       <MarketplaceFooter />
       <Toast />
     </div>
@@ -63,7 +63,7 @@ const FOOTER = [
     title: 'Khám Phá Suite',
     links: [
       { label: 'Chợ Đồ Chơi', to: '/' },
-      { label: 'Tất cả vật phẩm', to: '/products' },
+      { label: 'Tất cả vật phẩm', to: '/' },
       { label: 'AI Studio', href: '/ai/' },
       { label: '3D Studio', href: '/studio/' },
     ],

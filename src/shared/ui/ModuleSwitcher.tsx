@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import { MODULES, HOME_HREF, type ModuleId } from '../config/modules'
+import { PodNavigationGuard } from './PodNavigationGuard'
 
 /**
  * Thanh chuyển module dùng chung cho header của AI Studio / 3D Studio / Marketplace / POD.
@@ -19,14 +20,17 @@ export function ModuleSwitcher({ current, theme = 'dark', compact = false }: { c
     background: active ? (dark ? 'linear-gradient(135deg,#72D6F7,#A78BFA)' : '#202027') : 'transparent',
   })
   return (
-    <nav aria-label="Chuyển module 3DWorld" style={wrap}>
-      <a href={HOME_HREF} style={item(false)} title="Trang chủ 3DWorld">⌂</a>
-      {MODULES.map((m) => (
-        <a key={m.id} href={m.href} style={item(m.id === current)} aria-current={m.id === current ? 'page' : undefined}
-          title={m.ready ? m.label : `${m.label} · sắp ra mắt`}>
-          {compact ? m.short : m.label}
-        </a>
-      ))}
-    </nav>
+    <>
+      <nav aria-label="Chuyển module 3DWorld" style={wrap}>
+        <a href={HOME_HREF} style={item(false)} title="Trang chủ 3DWorld">⌂</a>
+        {MODULES.map((m) => (
+          <a key={m.id} href={m.href} style={item(m.id === current)} aria-current={m.id === current ? 'page' : undefined}
+            title={m.ready ? m.label : `${m.label} · sắp ra mắt`}>
+            {compact ? m.short : m.label}
+          </a>
+        ))}
+      </nav>
+      <PodNavigationGuard />
+    </>
   )
 }

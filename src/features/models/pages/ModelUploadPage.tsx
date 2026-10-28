@@ -34,7 +34,7 @@ function validateFile(file: File) {
   return ''
 }
 
-/** CR-007 · Tải Lên Mô Hình 3D (POST /api/models/uploads, multipart). */
+/** CR-007 · Tải Lên Mô Hình 3D (POST /api/models/create, multipart part `file`). */
 export function ModelUploadPage() {
   const uid = useId()
   const navigate = useNavigate()
@@ -194,19 +194,24 @@ export function ModelUploadPage() {
             <input
               id={`${uid}-name`}
               aria-invalid={!!errors.modelName}
-              className={inputClass}
+              readOnly
+              className={`${inputClass} cursor-default`}
               {...register('modelName')}
             />
           </Field>
-          <Field id={`${uid}-desc`} label="Mô tả" error={errors.description?.message}>
+          <Field id={`${uid}-desc`} label="Mô tả (backend chưa hỗ trợ khi tải tệp)" error={errors.description?.message}>
             <textarea
               id={`${uid}-desc`}
               rows={5}
               className={inputClass}
               placeholder="Chất liệu dự kiến, tỉ lệ, ghi chú in…"
+              disabled
               {...register('description')}
             />
           </Field>
+          <p className="rounded-2xl bg-peach/60 p-3 text-xs text-orange-deep">
+            API hiện lấy tên mô hình từ tên tệp và chưa nhận metadata/mô tả. Muốn sửa tên hoặc mô tả sau khi tải lên cần Backend bổ sung endpoint cập nhật mô hình.
+          </p>
           <FormError message={errors.root?.message} />
           <SubmitButton busy={upload.isPending} className="w-full">
             Tải lên thư viện

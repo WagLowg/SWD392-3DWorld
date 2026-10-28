@@ -8,7 +8,6 @@ import {
   notifications,
   policies,
   refunds,
-  reports,
   reviews,
   sessions,
   transactions,
@@ -50,11 +49,14 @@ export const buyerService = {
     return mockResponse(r)
   },
 
-  reports: () => mockResponse(reports),
-  report: (id: string) => mockFind(reports, (r) => r.id === id, 'Báo cáo'),
+  /** Backend chưa có GET báo cáo thuộc người dùng hiện tại; không dùng fixture thay thế. */
+  reports: async () => [] as ViolationReport[],
+  report: async (_id: string): Promise<ViolationReport> => {
+    throw Object.assign(new Error('Backend chưa có API xem chi tiết báo cáo dành cho người gửi.'), { status: 501 })
+  },
   /**
    * API thật: POST /api/reports (productId hoặc reportedUserId + reason + bằng chứng).
-   * Chưa có API "báo cáo của tôi" nên bản ghi vừa gửi được lưu tạm vào danh sách mẫu để xem lại.
+   * Backend hiện chỉ hỗ trợ tạo báo cáo; chưa có API "báo cáo của tôi".
    */
   async createReport(
     input: Pick<ViolationReport, 'targetType' | 'target' | 'reason' | 'description'> & {
@@ -87,7 +89,6 @@ export const buyerService = {
       evidence: res.evidenceKey ? [res.evidenceKey] : [],
       audit: [{ at: res.createdAt ?? nowIso(), actor: 'Bạn', action: 'Gửi báo cáo vi phạm', tone: 'violet' }],
     }
-    reports.unshift(created)
     return created
   },
 

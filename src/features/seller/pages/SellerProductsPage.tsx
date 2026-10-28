@@ -1,7 +1,7 @@
 import { Boxes, Eye, EyeOff, Pencil, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { formatDateTime, formatVnd } from '../../../shared/lib/format'
-import { Btn, CellTitle, DataTable, FilterTabs, Hero, MockNotice, SearchInput, StatusPill, Toolbar } from '../../../shared/ui/kit'
+import { Btn, CellTitle, DataTable, FilterTabs, Hero, SearchInput, StatusPill, Toolbar } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { categoryLabel, resolveMediaUrl } from '../../marketplace/lib/format'
 import type { ProductStatus } from '../data/seller.fixtures'
@@ -25,7 +25,6 @@ export function SellerProductsPage() {
 
   return (
     <>
-      <MockNotice partial="Cột “Đã bán”" api="salesCount trong ProductView" />
       <Hero
         code="MP 042"
         eyebrow="Kho hàng chế tác"
@@ -84,7 +83,6 @@ export function SellerProductsPage() {
               },
             },
             { key: 'stock', header: 'Kho khả dụng', render: (p) => p.variants.reduce((s, v) => s + v.stock - v.reserved, 0) },
-            { key: 'sold', header: 'Đã bán', render: (p) => p.sold },
             {
               key: 'status',
               header: 'Trạng thái',

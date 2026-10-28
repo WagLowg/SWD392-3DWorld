@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMockAction } from '../../../shared/mock/useMockAction'
 import type { ProductStatus, SellerApplication, SellerProduct, Storefront } from '../data/seller.fixtures'
-import { sellerService } from '../services/seller.service'
+import { sellerService, type PendingProductMedia } from '../services/seller.service'
 
 export const sellerKeys = {
   all: ['seller'] as const,
@@ -23,7 +23,6 @@ export const useStorefront = () => useQuery({ queryKey: sellerKeys.storefront, q
 export const useSellerProducts = () => useQuery({ queryKey: sellerKeys.products, queryFn: sellerService.products })
 export const useSellerProduct = (id: number) =>
   useQuery({ queryKey: sellerKeys.product(id), queryFn: () => sellerService.product(id), enabled: Number.isFinite(id) })
-export const useInventoryLogs = () => useQuery({ queryKey: sellerKeys.inventory, queryFn: sellerService.inventoryLogs })
 export const useDisputes = () => useQuery({ queryKey: sellerKeys.disputes, queryFn: sellerService.disputes })
 export const useDispute = (id: string) => useQuery({ queryKey: sellerKeys.dispute(id), queryFn: () => sellerService.dispute(id) })
 export const useEarnings = () => useQuery({ queryKey: sellerKeys.earnings, queryFn: sellerService.earnings })
@@ -48,11 +47,11 @@ export const useCreateStorefront = () =>
     'Đã tạo gian hàng — thanh toán gói để kích hoạt.',
   )
 export const useRenew = () =>
-  useMockAction((planId: string) => sellerService.renew(planId), ALL, 'Đang chuyển sang ZaloPay để thanh toán gói…')
+  useMockAction(() => sellerService.renew(), ALL, 'Đang chuyển sang ZaloPay để thanh toán gói…')
 export const useUploadProductMedia = () =>
   useMockAction(
-    ({ productId, file, sortOrder }: { productId: number; file: File; sortOrder?: number }) =>
-      sellerService.uploadMedia(productId, file, sortOrder),
+    ({ productId, file, sortOrder, variantId }: { productId: number; file: File; sortOrder?: number; variantId?: number }) =>
+      sellerService.uploadMedia(productId, file, sortOrder, variantId),
     ALL,
     'Đã tải ảnh lên — sản phẩm cần nộp duyệt lại.',
   )
@@ -66,7 +65,11 @@ export const useUpdateStorefront = () =>
   useMockAction((patch: Partial<Storefront>) => sellerService.updateStorefront(patch), ALL, 'Đã lưu hồ sơ gian hàng.')
 export const useSaveProduct = () =>
   useMockAction(
-    ({ input, submit }: { input: Parameters<typeof sellerService.saveProduct>[0]; submit: boolean }) => sellerService.saveProduct(input, submit),
+    ({ input, submit, pendingMedia = [] }: {
+      input: Parameters<typeof sellerService.saveProduct>[0]
+      submit: boolean
+      pendingMedia?: PendingProductMedia[]
+    }) => sellerService.saveProduct(input, submit, pendingMedia),
     ALL,
     (p: SellerProduct) => (p.status === 'PENDING_REVIEW' ? 'Đã gửi duyệt sản phẩm.' : 'Đã lưu sản phẩm.'),
   )
@@ -84,9 +87,15 @@ export const useAdjustStock = () =>
   )
 export const useChangePrice = () =>
   useMockAction(
-    ({ variantId, price, reason }: { variantId: number; price: number; reason: string }) => sellerService.changePrice(variantId, price, reason),
+    ({ variantId, price }: { variantId: number; price: number }) => sellerService.changePrice(variantId, price),
     ALL,
-    'Đã cập nhật giá & ghi log.',
+    'Đã cập nhật giá.',
+  )
+export const useRequestPayout = () =>
+  useMockAction(
+    (input: { amount: number; bankAccountId: number; reason: string }) => sellerService.requestPayout(input),
+    [sellerKeys.earnings],
+    'Đã gửi yêu cầu rút tiền để quản trị viên duyệt.',
   )
 export const useRespondDispute = () =>
   useMockAction(

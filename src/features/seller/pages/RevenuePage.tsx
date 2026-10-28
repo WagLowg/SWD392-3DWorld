@@ -1,11 +1,11 @@
-import { Download, Lock, ShieldCheck, Wallet } from 'lucide-react'
+import { Lock, ShieldCheck, Wallet } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { formatVnd } from '../../../shared/lib/format'
-import { Btn, CellTitle, DataTable, FilterTabs, Hero, MockNotice, RuleBox, StatCard, StatGrid, StatusPill, Toolbar } from '../../../shared/ui/kit'
+import { Btn, CellTitle, DataTable, FilterTabs, Hero, RuleBox, StatCard, StatGrid, StatusPill, Toolbar } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
-import type { EarningStatus } from '../../../features/seller/data/seller.fixtures'
-import { useEarnings } from '../../../features/seller/hooks/useSeller'
-import { EARNING_STATUS } from '../../../features/seller/lib/status'
+import type { EarningStatus } from '../data/seller.fixtures'
+import { useEarnings } from '../hooks/useSeller'
+import { EARNING_STATUS } from '../lib/status'
 
 /** MP 053 · Quản Lý Doanh Thu Người Bán */
 export function RevenuePage() {
@@ -16,10 +16,10 @@ export function RevenuePage() {
   }, [])
   const all = q.data?.earnings ?? []
   const w = q.data?.wallet
+  const commission = all.reduce((sum, e) => sum + e.gross * e.feeRate, 0)
 
   return (
     <>
-      <MockNotice api="/api/seller/earnings" />
       <Hero
         code="MP 053"
         eyebrow="Doanh thu & dòng tiền"
@@ -27,11 +27,11 @@ export function RevenuePage() {
         accent="Ký Quỹ 72h & Đối Soát Giải Ngân."
         actions={
           <>
-            <Btn variant="white" icon={Download}>
-              Xuất sao kê CSV
-            </Btn>
-            <Btn to="/wallet/payouts/new" variant="primary" icon={Wallet}>
+            <Btn to="/seller/payouts/new" variant="primary" icon={Wallet}>
               Rút tiền
+            </Btn>
+            <Btn to="/bank-accounts" variant="white" icon={Wallet}>
+              Tài khoản nhận tiền
             </Btn>
           </>
         }
@@ -40,7 +40,7 @@ export function RevenuePage() {
         <StatCard label="Khả dụng" value={w ? formatVnd(w.available) : '—'} icon={Wallet} tone="green" hint="Có thể rút" />
         <StatCard label="Chờ mở khoá" value={w ? formatVnd(w.pending) : '—'} icon={ShieldCheck} tone="orange" hint="Cửa sổ 72h" />
         <StatCard label="Tạm giữ" value={w ? formatVnd(w.held) : '—'} icon={Lock} tone="danger" hint="Do tranh chấp" />
-        <StatCard label="Phí sàn" value="5%" tone="violet" hint="Gói Maker Pro" />
+        <StatCard label="Phí sàn đã ghi nhận" value={formatVnd(commission)} tone="violet" hint="Theo snapshot từng đơn" />
       </StatGrid>
       <Toolbar>
         <FilterTabs

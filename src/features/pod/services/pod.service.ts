@@ -1,5 +1,17 @@
 import { http, type ApiEnvelope } from '../../../shared/api'
-import type { PodAddress, PodProfile, PrintMaterial, PrintRequest } from '../types'
+import type {
+  PodAddress,
+  PodPayment,
+  PodPaymentStatus,
+  PodProfile,
+  PrintFileVersion,
+  PrintMaterial,
+  PrintQuote,
+  PrintRequest,
+  PrintSpecificationVersion,
+  PrintStatusHistory,
+  UpdatePrintSpecificationInput,
+} from '../types'
 
 type PageLike<T> = {
   content?: T[]
@@ -67,7 +79,7 @@ export const podService = {
   async replaceRequestFile(printRequestId: string, expectedCurrentFileVersion: number, file: File) {
     const form = new FormData()
     form.append('file', file)
-    const response = await http.post<ApiEnvelope<PrintRequest>, FormData>(
+    const response = await http.post<ApiEnvelope<PrintFileVersion>, FormData>(
       `/api/print/requests/getId/${printRequestId}/file/versions/create`,
       form,
       { params: { expectedCurrentFileVersion } },
@@ -127,6 +139,123 @@ export const podService = {
       request = await podService.getRequest(String(request.printRequestId)).catch(() => request)
     }
     return request
+  },
+
+  async listFileVersions(printRequestId: string, signal?: AbortSignal) {
+    const response = await http.get<ApiEnvelope<PrintFileVersion[]>>(
+      `/api/print/requests/getId/${printRequestId}/file/versions/getAll`,
+      { signal },
+    )
+    return dataOf(response)
+  },
+
+  async downloadFileVersion(printRequestId: string, version: number) {
+    return http.get<Blob>(
+      `/api/print/requests/getId/${printRequestId}/file/versions/${version}/download`,
+      { responseType: 'blob' },
+    )
+  },
+
+  async updateSpecification(printRequestId: string, input: UpdatePrintSpecificationInput) {
+    const response = await http.patch<ApiEnvelope<PrintSpecificationVersion>>(
+      `/api/print/requests/getId/${printRequestId}/updateSpecification`,
+      input,
+    )
+    return dataOf(response)
+  },
+
+  async listSpecificationVersions(printRequestId: string, signal?: AbortSignal) {
+    const response = await http.get<ApiEnvelope<PrintSpecificationVersion[]>>(
+      `/api/print/requests/getId/${printRequestId}/specifications/versions/getAll`,
+      { signal },
+    )
+    return dataOf(response)
+  },
+
+  async confirmPreview(printRequestId: string, expectedFileVersion: number, expectedSpecVersion: number) {
+    const response = await http.post<ApiEnvelope<unknown>>(
+      `/api/print/requests/getId/${printRequestId}/preview/confirm`,
+      { expectedFileVersion, expectedSpecVersion },
+    )
+    return dataOf(response)
+  },
+
+  async submitRequest(printRequestId: string, expectedFileVersion: number, expectedSpecVersion: number) {
+    const response = await http.post<ApiEnvelope<unknown>>(
+      `/api/print/requests/getId/${printRequestId}/submit`,
+      { expectedFileVersion, expectedSpecVersion },
+    )
+    return dataOf(response)
+  },
+
+  async cancelRequest(printRequestId: string, reason: string) {
+    const response = await http.post<ApiEnvelope<unknown>>(
+      `/api/print/requests/getId/${printRequestId}/cancel`,
+      { reason },
+    )
+    return dataOf(response)
+  },
+
+  async listStatusHistory(printRequestId: string, signal?: AbortSignal) {
+    const response = await http.get<ApiEnvelope<PrintStatusHistory[]>>(
+      `/api/print/requests/getId/${printRequestId}/status-history/getAll`,
+      { signal },
+    )
+    return dataOf(response)
+  },
+
+  async listQuotes(printRequestId: string, signal?: AbortSignal) {
+    const response = await http.get<ApiEnvelope<PrintQuote[]>>(
+      `/api/print/requests/getId/${printRequestId}/quotes/getAll`,
+      { signal },
+    )
+    return dataOf(response)
+  },
+
+  async acceptQuote(printRequestId: string, quoteId: number) {
+    const response = await http.post<ApiEnvelope<PrintQuote>>(
+      `/api/print/requests/getId/${printRequestId}/quotes/${quoteId}/accept`,
+    )
+    return dataOf(response)
+  },
+
+  async requestQuoteRevision(
+    printRequestId: string,
+    quoteId: number,
+    input: { expectedFileVersion: number; expectedSpecVersion: number; reason: string },
+  ) {
+    const response = await http.post<ApiEnvelope<PrintQuote>>(
+      `/api/print/requests/getId/${printRequestId}/quotes/${quoteId}/request-revision`,
+      input,
+    )
+    return dataOf(response)
+  },
+
+  async createPodPayment(printRequestId: number) {
+    const response = await http.post<ApiEnvelope<PodPayment>>('/api/payments/zalopay', {
+      sourceType: 'PRINT_REQUEST',
+      sourceId: printRequestId,
+      stage: 'FULL',
+      description: `Thanh toán 100% yêu cầu in POD-${printRequestId}`,
+      idempotencyKey: crypto.randomUUID(),
+    })
+    return dataOf(response)
+  },
+
+  async getPodPaymentStatus(printRequestId: string, signal?: AbortSignal) {
+    const response = await http.get<ApiEnvelope<PodPaymentStatus>>(
+      `/api/payments/print-requests/${printRequestId}`,
+      { signal },
+    )
+    return dataOf(response)
+  },
+
+  async selectShippingAddress(printRequestId: string, addressId: number) {
+    const response = await http.patch<ApiEnvelope<{ printRequestId: number; shippingAddressId: number }>>(
+      `/api/print/requests/getId/${printRequestId}/updateShippingAddress`,
+      { addressId },
+    )
+    return dataOf(response)
   },
 
   async getProfile(signal?: AbortSignal) {

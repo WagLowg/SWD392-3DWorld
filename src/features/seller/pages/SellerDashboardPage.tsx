@@ -2,17 +2,16 @@ import { AlertTriangle, ArrowRight, Boxes, Hammer, Package, ShieldAlert, Store, 
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { formatVnd } from '../../../shared/lib/format'
-import { Btn, Hero, MockNotice, Pill, Section, StatCard, StatGrid, StatusPill } from '../../../shared/ui/kit'
+import { Btn, Hero, Pill, Section, StatCard, StatGrid, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { useSellerOrders } from '../../orders/hooks/useOrders'
-import { useDisputes, useEarnings, useSellerProducts, useStorefront, useSubscription } from '../hooks/useSeller'
+import { useEarnings, useSellerProducts, useStorefront, useSubscription } from '../hooks/useSeller'
 import { PRODUCT_STATUS, STOREFRONT_STATUS } from '../lib/status'
 
 /** MP 041 · Tổng Quan Kênh Người Bán */
 export function SellerDashboardPage() {
   const products = useSellerProducts()
   const earnings = useEarnings()
-  const disputes = useDisputes()
   const storefront = useStorefront()
   const sub = useSubscription()
   const orders = useSellerOrders()
@@ -22,13 +21,11 @@ export function SellerDashboardPage() {
   }, [])
 
   const waiting = (orders.data ?? []).filter((o) => o.status === 'PAID').length
-  const needResponse = (disputes.data ?? []).filter((d) => d.status === 'NEEDS_RESPONSE').length
   const lowStock = (products.data ?? []).flatMap((p) => p.variants).filter((v) => v.active && v.stock - v.reserved < 5)
   const w = earnings.data?.wallet
 
   return (
     <>
-      <MockNotice partial="Doanh thu, ví và tranh chấp" api="/api/seller/earnings, /api/seller/disputes" />
       <Hero
         code="MP 041"
         eyebrow="Kênh người bán"
@@ -40,18 +37,18 @@ export function SellerDashboardPage() {
             <Btn to="/seller/products/new" variant="primary" icon={Package}>
               Đăng sản phẩm
             </Btn>
-            <Btn to="/wallet/payouts/new" variant="white" icon={Wallet}>
-              Rút tiền
+            <Btn to="/bank-accounts" variant="white" icon={Wallet}>
+              Tài khoản nhận tiền
             </Btn>
           </>
         }
       />
 
-      {(waiting > 0 || needResponse > 0) && (
+      {waiting > 0 && (
         <div className="mt-6 flex flex-wrap items-center gap-3 rounded-[1.75rem] bg-peach/60 p-4 text-sm">
           <AlertTriangle size={18} className="text-orange-deep" />
           <span className="flex-1">
-            Có <strong>{waiting}</strong> đơn chờ tiếp nhận chế tác và <strong>{needResponse}</strong> tranh chấp cần phản hồi.
+            Có <strong>{waiting}</strong> đơn đã thanh toán đang chờ xưởng tiếp nhận chế tác.
           </span>
           <Btn to="/seller/orders?status=making" size="sm" variant="primary">
             Xử lý ngay
@@ -63,7 +60,7 @@ export function SellerDashboardPage() {
         <StatCard label="Khả dụng" value={w ? formatVnd(w.available) : '—'} hint="Có thể rút về ngân hàng" icon={Wallet} tone="green" to="/seller/revenue" />
         <StatCard label="Chờ mở khoá 72h" value={w ? formatVnd(w.pending) : '—'} hint="Sau cửa sổ khiếu nại" icon={ShieldAlert} tone="orange" />
         <StatCard label="Đơn chờ tiếp nhận" value={waiting} hint="Đơn đã thanh toán (API thật)" icon={Hammer} tone="violet" to="/seller/orders" />
-        <StatCard label="Tranh chấp cần phản hồi" value={needResponse} icon={AlertTriangle} tone="danger" to="/seller/disputes" />
+        <StatCard label="Tạm giữ / chờ chi" value={w ? formatVnd(w.held) : '—'} hint="Số dư payout hold từ backend" icon={AlertTriangle} tone="danger" to="/seller/revenue" />
       </StatGrid>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
@@ -78,7 +75,6 @@ export function SellerDashboardPage() {
                   <Link to={`/seller/products/${p.id}`} className="min-w-0 flex-1 truncate font-semibold hover:text-violet">
                     {p.title}
                   </Link>
-                  <span className="hidden text-xs text-ink-soft sm:block">Đã bán {p.sold}</span>
                   <StatusPill status={p.status} map={PRODUCT_STATUS} />
                 </li>
               ))}

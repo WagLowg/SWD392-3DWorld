@@ -28,7 +28,9 @@ export const authService = {
     tokenStore.clear()
     const response = await http.post<ApiEnvelope<LoginResponse>, LoginInput>('/api/auth/login', input)
     tokenStore.set(response.data.accessToken, response.data.expiresAt)
-    return mapUser(response.data.user)
+    const user = mapUser(response.data.user)
+    tokenStore.setUser(user)
+    return user
   },
 
   async register(input: RegisterInput) {

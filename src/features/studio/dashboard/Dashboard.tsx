@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ArrowLeft, Bell, Box, ChevronDown, LayoutGrid, LayoutTemplate, List, Pencil, Plus, SearchX, WifiOff,
+  ArrowLeft, Box, ChevronDown, LayoutGrid, LayoutTemplate, List, Pencil, Plus, SearchX, WifiOff,
 } from 'lucide-react';
 import { navigate, href, type Route } from '../router';
 import {
@@ -15,38 +15,13 @@ import { Toasts } from '../components/StatusBar';
 import { ActionMenu, ProjectCard, ShapeIcon, SkeletonGrid, type MenuItem } from './ProjectCard';
 import { CreateProjectDialog, DeleteDialog, RenameDialog } from './dialogs';
 import { sessionUser } from '../session';
-import { logout } from '../../../shared/session/session';
-import { ModuleSwitcher } from '../../../shared/ui/ModuleSwitcher';
+import StudioSidebar from '../components/StudioSidebar';
+import StudioGlobalHeader from '../components/StudioGlobalHeader';
 
 const USER = {
-  get full() { return sessionUser()?.name ?? 'Khách'; },
   get first() { return (sessionUser()?.name ?? '').trim().split(/\s+/).pop() || 'bạn'; },
 };
 const toast = (...a: Parameters<ReturnType<typeof useStudio.getState>['toast']>) => useStudio.getState().toast(...a);
-
-/* ---------------- header ---------------- */
-function Header({ route }: { route: Route }) {
-  const active = route.name === 'templates' || route.name === 'template' ? 'templates' : 'projects';
-  const soon = (what: string) => toast({ kind: 'info', title: `${what} sắp có`, text: 'Mục này chưa thuộc phạm vi MVP.' });
-  return (
-    <header className="dash-header">
-      <a className="brand" href={href({ name: 'welcome' })}><Box size={24} color="var(--primary)" strokeWidth={1.6} /> 3DWorld <small>STUDIO</small></a>
-      <nav className="dash-nav" aria-label="Điều hướng chính">
-        <a href={href({ name: 'projects' })} className={active === 'projects' ? 'on' : ''} aria-current={active === 'projects' ? 'page' : undefined}>Dự án</a>
-        <a href={href({ name: 'templates' })} className={active === 'templates' ? 'on' : ''} aria-current={active === 'templates' ? 'page' : undefined}>Thư viện mẫu</a>
-        <button onClick={() => soon('Tài nguyên')}>Tài nguyên</button>
-        <button onClick={() => soon('Trợ giúp')}>Trợ giúp</button>
-      </nav>
-      <div className="grow" />
-      <span className="dash-modules"><ModuleSwitcher current="studio" compact /></span>
-      <button className="btn ghost icon" aria-label="Thông báo" onClick={() => toast({ kind: 'info', title: 'Không có thông báo mới' })}><Bell size={17} /></button>
-      <button className="user-chip" aria-label="Tài khoản · đăng xuất" title="Đăng xuất"
-        onClick={() => { if (confirm(`Đăng xuất khỏi tài khoản ${sessionUser()?.email ?? ''}?`)) void logout('/'); }}>
-        <span className="avatar" aria-hidden /> {USER.full} <ChevronDown size={14} />
-      </button>
-    </header>
-  );
-}
 
 function PageHead({ title, sub, onNew }: { title: string; sub: string; onNew: () => void }) {
   return (
@@ -321,19 +296,25 @@ export default function Dashboard({ route }: { route: Exclude<Route, { name: 'st
 
   return (
     <div className="dash">
-      <Header route={route} />
-      <main className="dash-main">
-        {route.name === 'welcome' && <Welcome onNew={onNew} />}
-        {route.name === 'projects' && (
-          <>
-            <PageHead title="Dự án của tôi" sub="Không gian sáng tạo của bạn" onNew={() => onNew()} />
-            <ProjectsSection onNew={onNew} limitHint />
-          </>
-        )}
-        {route.name === 'templates' && <Templates onNew={onNew} />}
-        {route.name === 'template' && <TemplateDetail id={route.id} onNew={() => onNew()} onUse={useTemplate} />}
-      </main>
-      <footer className="dash-foot"><span>Create freely. Design precisely. Bring your ideas into reality.</span><span>3DWorld Studio · MVP</span></footer>
+      <StudioGlobalHeader />
+      <StudioSidebar
+        active={route.name === 'templates' || route.name === 'template' ? 'templates' : 'projects'}
+        onSoon={(what) => toast({ kind: 'info', title: `${what} sắp có`, text: 'Mục này chưa thuộc phạm vi MVP.' })}
+      />
+      <div className="dash-body">
+        <main className="dash-main">
+          {route.name === 'welcome' && <Welcome onNew={onNew} />}
+          {route.name === 'projects' && (
+            <>
+              <PageHead title="Dự án của tôi" sub="Không gian sáng tạo của bạn" onNew={() => onNew()} />
+              <ProjectsSection onNew={onNew} limitHint />
+            </>
+          )}
+          {route.name === 'templates' && <Templates onNew={onNew} />}
+          {route.name === 'template' && <TemplateDetail id={route.id} onNew={() => onNew()} onUse={useTemplate} />}
+        </main>
+        <footer className="dash-foot"><span>Create freely. Design precisely. Bring your ideas into reality.</span><span>3DWorld Studio · MVP</span></footer>
+      </div>
       {creating && (
         <CreateProjectDialog initialTemplate={creating.templateId} onClose={() => setCreating(null)}
           onCreated={(p) => { setCreating(null); navigate({ name: 'studio', id: p.id }); }} />

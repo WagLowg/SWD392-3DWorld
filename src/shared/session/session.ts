@@ -1,21 +1,10 @@
-import { type ApiEnvelope, http } from '../api'
+import { ApiClientError, type ApiEnvelope, http } from '../api'
 import { loginHref } from '../config/modules'
 import { tokenStore } from './token'
+import type { SessionUser } from './types'
 
-export type AuthUser = {
-  id: string
-  email: string
-  name: string
-  role: string
-  avatarUrl?: string | null
-  dateOfBirth?: string | null
-  phone?: string | null
-  emailVerified?: boolean
-  roles?: string[]
-  capabilities?: string[]
-}
-
-export type SessionUser = AuthUser
+export type { SessionUser } from './types'
+export type AuthUser = SessionUser
 
 /** UserResponse của Spring Boot. */
 export type BackendUserResponse = {
@@ -47,7 +36,9 @@ export function mapUser(user: BackendUserResponse): AuthUser {
 
 export async function fetchCurrentUser(signal?: AbortSignal) {
   const response = await http.get<ApiEnvelope<BackendUserResponse>>('/api/auth/me', { signal })
-  return mapUser(response.data)
+  const user = mapUser(response.data)
+  tokenStore.setUser(user)
+  return user
 }
 
 export async function logoutRequest() {
@@ -58,12 +49,23 @@ export async function logoutRequest() {
   }
 }
 
+/** Snapshot đồng bộ để header không nháy trạng thái guest giữa các Vite entry. */
+export function getCachedSessionUser(): SessionUser | null {
+  return tokenStore.getUser()
+}
+
 /** Người dùng hiện tại theo ApiResponse<UserResponse> của Spring Boot, null nếu chưa đăng nhập. */
 export async function fetchMe(signal?: AbortSignal): Promise<SessionUser | null> {
+  if (!tokenStore.get()) return null
   try {
     return await fetchCurrentUser(signal)
-  } catch {
-    return null
+  } catch (error) {
+    if (error instanceof ApiClientError && (error.status === 401 || error.status === 403)) {
+      tokenStore.expire()
+      return null
+    }
+    // Mạng/API tạm thời lỗi: giữ snapshot đã xác minh gần nhất thay vì làm header logout giả.
+    return tokenStore.getUser()
   }
 }
 
@@ -82,6 +84,12 @@ export function isSeller(user: SessionUser | null | undefined) {
     caps.includes('ORDER_PROCESS_EXISTING') ||
     roles.some((r) => /SELLER/i.test(r))
   )
+}
+
+export function isAdmin(user: SessionUser | null | undefined) {
+  if (!user) return false
+  const roles = user.roles ?? [user.role]
+  return roles.some((role) => /(?:^|_)ADMIN$/i.test(role))
 }
 
 export async function logout(redirectTo = '/') {

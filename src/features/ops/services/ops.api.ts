@@ -87,7 +87,9 @@ function productCase(p: ApiProduct): OpsCase {
 const REPORT_STATUS: Record<string, string> = { OPEN: 'PENDING', RESOLVED: 'ACTION_TAKEN', REJECTED: 'DISMISSED' }
 
 function reportCase(r: ApiReport): OpsCase {
-  const audit: AuditEntry[] = [{ at: r.createdAt, actor: 'Người báo cáo', action: 'Gửi báo cáo vi phạm', tone: 'violet' }]
+  const audit: AuditEntry[] = [
+    { at: r.createdAt, actor: 'Người báo cáo', action: 'Gửi báo cáo vi phạm', tone: 'violet' },
+  ]
   if (r.resolvedAt)
     audit.push({
       at: r.resolvedAt,
@@ -130,7 +132,9 @@ function verificationCase(v: ApiSellerVerification): OpsCase {
   const s = v.verification
   const ev = readEvidence(s?.evidenceReference)
   const submitted = s?.submittedAt ? new Date(s.submittedAt).toISOString() : new Date().toISOString()
-  const audit: AuditEntry[] = [{ at: submitted, actor: `Người dùng #${v.userId}`, action: 'Nộp hồ sơ xác thực', tone: 'violet' }]
+  const audit: AuditEntry[] = [
+    { at: submitted, actor: `Người dùng #${v.userId}`, action: 'Nộp hồ sơ xác thực', tone: 'violet' },
+  ]
   if (s?.reviewedAt)
     audit.push({
       at: new Date(s.reviewedAt).toISOString(),
@@ -149,6 +153,7 @@ function verificationCase(v: ApiSellerVerification): OpsCase {
     f: {
       owner: `Người dùng #${v.userId}`,
       ownerId: `USR-${v.userId}`,
+      bankAccountId: s?.bankAccountId ?? 0,
       bank: s?.bankAccountId ? `Tài khoản #${s.bankAccountId}` : '—',
       bankStatus: v.verifiedBankAvailable ? 'APPROVED' : 'PENDING',
       location: ev.address || '—',
@@ -196,10 +201,14 @@ export const adminUsersApi = {
   },
   /** Cấp / thu hồi vai trò (SELLER cần gian hàng đã trả phí). */
   async setRole(userId: number, role: AccountRole, active: boolean, reason: string) {
-    return (await http.put<ApiEnvelope<ApiAccount>>(`/api/admin/users/${userId}/roles/${role}`, { active, reason })).data
+    return (await http.put<ApiEnvelope<ApiAccount>>(`/api/admin/users/${userId}/roles/${role}`, { active, reason }))
+      .data
   },
   /** Xác thực SĐT thủ công (sandbox, không gửi SMS). */
-  async reviewPhone(userId: number, input: { phone: string; approved: boolean; evidenceReference: string; reason: string }) {
+  async reviewPhone(
+    userId: number,
+    input: { phone: string; approved: boolean; evidenceReference: string; reason: string },
+  ) {
     return (await http.patch<ApiEnvelope<ApiAccount>>(`/api/admin/users/${userId}/phone-verification`, input)).data
   },
 }
@@ -225,7 +234,9 @@ export const adminOpsApi = {
         ['OPEN', 'RESOLVED', 'REJECTED'].map((status) =>
           settle(
             http
-              .get<ApiEnvelope<ApiPage<ApiReport>>>(`/api/admin/reports${toQueryString({ status, page: 0, size: 100 })}`)
+              .get<ApiEnvelope<ApiPage<ApiReport>>>(
+                `/api/admin/reports${toQueryString({ status, page: 0, size: 100 })}`,
+              )
               .then((r) => r.data.items),
           ),
         ),
@@ -234,14 +245,12 @@ export const adminOpsApi = {
     }
     if (domain === 'storefront') {
       const lists = await Promise.all(
-        ['PENDING', 'APPROVED', 'REJECTED'].map((status) =>
-          settle(
-            http
-              .get<ApiEnvelope<SpringPage<ApiSellerVerification>>>(
-                `/api/admin/seller-verifications${toQueryString({ status, page: 0, size: 100 })}`,
-              )
-              .then((r) => r.data.content),
-          ),
+        ['PENDING', 'VERIFIED', 'REJECTED'].map((status) =>
+          http
+            .get<ApiEnvelope<SpringPage<ApiSellerVerification>>>(
+              `/api/admin/seller-verifications${toQueryString({ status, page: 0, size: 100 })}`,
+            )
+            .then((r) => r.data.content),
         ),
       )
       return lists.flat().map(verificationCase)

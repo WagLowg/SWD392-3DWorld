@@ -1,5 +1,5 @@
-import { Check, CreditCard, Crown } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { CalendarDays, CreditCard, Crown, Server } from 'lucide-react'
+import { useEffect } from 'react'
 import { formatDate, formatDateTime, formatVnd } from '../../../shared/lib/format'
 import { Btn, DataTable, Hero, RuleBox, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
@@ -10,7 +10,6 @@ import { PAYMENT_STATUS, STOREFRONT_STATUS } from '../lib/status'
 export function SubscriptionPage() {
   const q = useSubscription()
   const renew = useRenew()
-  const [selected, setSelected] = useState<string>()
 
   useEffect(() => {
     document.title = 'Gói đăng ký xưởng · 3DWorld'
@@ -28,9 +27,7 @@ export function SubscriptionPage() {
       <QueryState isLoading={q.isLoading} error={q.error}>
         {q.data &&
           (() => {
-            const { subscription: s, plans } = q.data
-            const current = plans.find((p) => p.id === s.planId)
-            const plan = plans.find((p) => p.id === (selected ?? s.planId)) ?? plans[0]
+            const { subscription: s, monthlyFee, hasPendingPayment } = q.data
             const daysLeft = Math.ceil((Date.parse(s.expiresAt) - Date.now()) / 86_400_000)
             return (
               <>
@@ -39,10 +36,9 @@ export function SubscriptionPage() {
                     <p className="flex items-center gap-2 font-label text-xs uppercase tracking-widest text-white/70">
                       <Crown size={14} /> Hồ sơ thuê bao hiện tại
                     </p>
-                    <p className="mt-2 font-display text-3xl font-bold">{current?.name}</p>
+                    <p className="mt-2 font-display text-3xl font-bold">Thuê gian hàng theo tháng</p>
                     <p className="mt-1 text-sm text-white/80">
                       Hết hạn {formatDate(s.expiresAt)} · {daysLeft > 0 ? `còn ${daysLeft} ngày` : 'đã hết hạn / chưa kích hoạt'}
-                      {current?.commission !== undefined && ` · phí sàn ${current.commission}%`}
                     </p>
                   </div>
                   <div className="self-center">
@@ -50,57 +46,36 @@ export function SubscriptionPage() {
                   </div>
                 </section>
 
-                <div className="mt-6 grid gap-4 md:grid-cols-3">
-                  {plans.map((p) => {
-                    const active = plan.id === p.id
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setSelected(p.id)}
-                        aria-pressed={active}
-                        className={`rounded-[2rem] bg-white/95 p-6 text-left shadow-soft transition ${active ? 'ring-2 ring-orange' : 'hover:-translate-y-0.5'}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <p className="font-display text-xl font-bold">{p.name}</p>
-                          {p.highlight && <span className="rounded-full bg-orange px-2.5 py-1 font-label text-[10px] font-semibold text-white">Phổ biến</span>}
-                        </div>
-                        <p className="mt-3 font-display text-3xl font-bold">
-                          {formatVnd(p.price)}
-                          <span className="text-sm font-normal text-ink-soft"> / {p.period}</span>
-                        </p>
-                        {p.commission !== undefined && <p className="mt-1 text-sm text-violet">Phí hoa hồng {p.commission}%</p>}
-                        <ul className="mt-4 space-y-1.5 text-sm">
-                          {p.perks.map((perk) => (
-                            <li key={perk} className="flex items-center gap-2">
-                              <Check size={14} className="text-teal" /> {perk}
-                            </li>
-                          ))}
-                        </ul>
-                      </button>
-                    )
-                  })}
-                </div>
+                <Section title="Gói đang được hệ thống áp dụng" className="mt-6">
+                  <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+                    <div>
+                      <div className="flex items-center gap-2 text-violet"><Server size={18} /><span className="font-label text-xs font-bold uppercase tracking-widest">Dữ liệu trực tiếp từ backend</span></div>
+                      <p className="mt-3 font-display text-3xl font-bold">{formatVnd(monthlyFee)} <span className="text-sm font-normal text-ink-soft">/ 30 ngày</span></p>
+                      <p className="mt-2 max-w-2xl text-sm text-ink-soft">Backend tạo một kỳ thuê bao chờ thanh toán. Gian hàng chỉ được kích hoạt hoặc gia hạn sau khi ZaloPay xác minh giao dịch thành công.</p>
+                    </div>
+                    <div className="rounded-2xl bg-surface-low px-4 py-3 text-sm text-ink-soft"><CalendarDays size={18} className="mb-2 text-orange" />Không tự động gia hạn<br />Không có gói giả trên frontend</div>
+                  </div>
+                </Section>
 
                 <Section title="Gia hạn sớm (+1 tháng)" className="mt-6">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <p className="text-sm text-ink-soft">
-                      Gia hạn <strong className="text-ink">{plan.name}</strong> — cộng thêm 1 tháng lịch sau khi ZaloPay xác nhận thanh toán.
+                      Thanh toán <strong className="text-ink">gói tháng do backend cấu hình</strong> — cộng thêm 30 ngày sau khi ZaloPay xác nhận giao dịch.
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {s.history.some((h) => h.status === 'PENDING') && (
+                      {hasPendingPayment && (
                         <Btn href="/marketplace/payment/result?type=subscription" variant="white">
                           Kiểm tra thanh toán đang chờ
                         </Btn>
                       )}
-                      <Btn variant="primary" icon={CreditCard} disabled={renew.isPending} onClick={() => renew.mutate(plan.id)}>
-                        Thanh toán gia hạn ({formatVnd(plan.price)})
+                      <Btn variant="primary" icon={CreditCard} disabled={renew.isPending || monthlyFee <= 0} onClick={() => renew.mutate()}>
+                        Thanh toán ({formatVnd(monthlyFee)})
                       </Btn>
                     </div>
                   </div>
                 </Section>
 
-                <h2 className="mt-8 font-display text-xl font-bold">Lịch sử thanh toán gói thuê bao</h2>
+                <h2 className="mt-8 font-display text-xl font-bold">Kỳ thuê bao gần nhất</h2>
                 <DataTable
                   rows={s.history}
                   rowKey={(r) => r.txnId}
@@ -109,15 +84,19 @@ export function SubscriptionPage() {
                     { key: 't', header: 'Mã giao dịch', render: (r) => <code className="text-xs">{r.txnId}</code> },
                     { key: 'a', header: 'Số tiền', render: (r) => <strong>{formatVnd(r.amount)}</strong> },
                     { key: 's', header: 'Trạng thái', render: (r) => <StatusPill status={r.status} map={PAYMENT_STATUS} /> },
-                    { key: 'd', header: 'Ngày thanh toán', render: (r) => formatDateTime(r.paidAt) },
+                    {
+                      key: 'd',
+                      header: 'Ngày thanh toán',
+                      render: (r) => (r.status === 'PENDING' ? 'Chưa thanh toán' : formatDateTime(r.paidAt)),
+                    },
                   ]}
                 />
                 <RuleBox
                   title="Cam kết không trừ tiền ngầm"
                   rules={[
                     'Không tự động gia hạn nếu bạn chưa bật — gian hàng chỉ tạm ẩn khi hết hạn, không xoá sản phẩm.',
-                    'Phí hoa hồng áp dụng theo gói tại thời điểm đơn được thanh toán.',
-                    'Biên lai VAT xuất cho mỗi kỳ thanh toán thành công.',
+                    'Mức phí hiển thị được đọc từ cấu hình nền tảng của backend.',
+                    'Frontend không tự kích hoạt gian hàng; chỉ callback/query đã xác minh từ ZaloPay mới có quyền kích hoạt.',
                     'Gói bị đình chỉ do vi phạm không được hoàn phí thuê bao.',
                   ]}
                 />

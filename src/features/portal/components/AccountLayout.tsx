@@ -1,51 +1,66 @@
 import { useQuery } from '@tanstack/react-query'
-import { Box, LogOut, ShoppingBag } from 'lucide-react'
+import {
+  BadgeCheck,
+  Box,
+  Boxes,
+  CircleDollarSign,
+  CircleUserRound,
+  ClipboardList,
+  CreditCard,
+  House,
+  Library,
+  LogOut,
+  MapPin,
+  PackageSearch,
+  PanelLeft,
+  ReceiptText,
+  RotateCcw,
+  ShieldCheck,
+  ShoppingBag,
+  Store,
+  Truck,
+  UserRoundCog,
+  WalletCards,
+} from 'lucide-react'
 import { type ReactNode, useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { hasStoredSession, isSeller, logout } from '../../../shared/session/session'
+import { hasStoredSession, isAdmin, isSeller, logout } from '../../../shared/session/session'
 import { http } from '../../../shared/api'
 import { loginHref } from '../../../shared/config/modules'
 import { useSession } from '../../../shared/session/useSession'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { LoginRequired } from '../../../shared/ui/LoginRequired'
 import { Toaster } from '../../../shared/ui/toast'
-
-const SITE_NAV = [
-  { label: 'AI Studio', href: '/ai/' },
-  { label: '3D Studio', href: '/studio/' },
-  { label: 'Chợ Đồ Chơi', href: '/marketplace/' },
-  { label: 'Đặt In 3D', href: '/pod/' },
-]
+import { ModuleSwitcher } from '../../../shared/ui/ModuleSwitcher'
 
 const BUYER_TABS = [
-  { to: '/orders', label: 'Đơn Hàng Của Tôi' },
-  { to: '/refunds', label: 'Hoàn Tiền' },
-  { to: '/models', label: 'Thư Viện 3D' },
-  { to: '/profile', label: 'Hồ Sơ' },
-  { to: '/addresses', label: 'Sổ Địa Chỉ' },
-  { to: '/bank-accounts', label: 'Tài Khoản Ngân Hàng' },
-  { to: '/reports', label: 'Báo Cáo Vi Phạm' },
+  { to: '/orders', label: 'Đơn hàng của tôi', icon: ClipboardList },
+  { to: '/refunds', label: 'Hoàn tiền', icon: RotateCcw },
+  { to: '/models', label: 'Thư viện 3D', icon: Library },
+  { to: '/profile', label: 'Hồ sơ', icon: CircleUserRound },
+  { to: '/addresses', label: 'Sổ địa chỉ', icon: MapPin },
+  { to: '/bank-accounts', label: 'Tài khoản ngân hàng', icon: WalletCards },
+  { to: '/reports', label: 'Báo cáo vi phạm', icon: ReceiptText },
 ]
 
 const SELLER_TABS = [
-  { to: '/seller', label: 'Tổng Quan', end: true },
-  { to: '/seller/products', label: 'Sản Phẩm' },
-  { to: '/seller/inventory', label: 'Tồn Kho' },
-  { to: '/seller/orders', label: 'Đơn Chế Tác' },
-  { to: '/seller/shipments', label: 'Vận Chuyển' },
-  { to: '/seller/storefront', label: 'Gian Hàng' },
-  { to: '/seller/subscription', label: 'Gói Thuê Bao' },
-  { to: '/seller/register', label: 'Xác Thực' },
+  { to: '/seller', label: 'Tổng quan bán hàng', icon: House, end: true },
+  { to: '/seller/products', label: 'Sản phẩm', icon: Boxes },
+  { to: '/seller/inventory', label: 'Tồn kho', icon: PackageSearch },
+  { to: '/seller/orders', label: 'Đơn chế tác', icon: ClipboardList },
+  { to: '/seller/shipments', label: 'Vận chuyển', icon: Truck },
+  { to: '/seller/storefront', label: 'Gian hàng', icon: Store },
+  { to: '/seller/subscription', label: 'Gói thuê gian hàng', icon: CreditCard },
+  { to: '/seller/revenue', label: 'Doanh thu & ví', icon: CircleDollarSign },
+  { to: '/seller/register', label: 'Xác thực người bán', icon: BadgeCheck },
 ]
 
 const OPS_TABS = [
-  { to: '/ops/products', label: 'Duyệt Sản Phẩm' },
-  { to: '/ops/reports', label: 'Báo Cáo Vi Phạm' },
-  { to: '/ops/storefronts', label: 'Xác Thực Người Bán' },
-  { to: '/ops/users', label: 'Người Dùng' },
+  { to: '/ops/products', label: 'Duyệt sản phẩm', icon: Boxes },
+  { to: '/ops/reports', label: 'Báo cáo vi phạm', icon: ShieldCheck },
+  { to: '/ops/storefronts', label: 'Xác thực người bán', icon: Store },
+  { to: '/ops/users', label: 'Người dùng', icon: UserRoundCog },
 ]
-
-const isAdmin = (roles: string[] | undefined) => !!roles?.some((r) => /ADMIN/i.test(r))
 
 /** Khung chung cho các màn tài khoản / đơn hàng / người bán (Stitch MP 010–050). */
 export function AccountLayout() {
@@ -96,69 +111,50 @@ export function AccountTabs() {
   const { data: user } = useSession()
   const { pathname } = useLocation()
   const seller = isSeller(user) || pathname.startsWith('/seller')
-  const admin = isAdmin(user?.roles) || pathname.startsWith('/ops')
+  const admin = isAdmin(user) || pathname.startsWith('/ops')
   const tab = ({ isActive }: { isActive: boolean }) =>
-    `shrink-0 rounded-full px-4 py-2 font-label text-xs font-semibold transition ${
-      isActive ? 'bg-orange text-white shadow-sm' : 'text-ink-soft hover:bg-white hover:text-ink'
+    `flex shrink-0 items-center gap-3 rounded-2xl px-3 py-2.5 font-label text-sm font-semibold transition ${
+      isActive ? 'bg-ink text-white shadow-sm' : 'text-ink-soft hover:bg-white hover:text-ink'
     }`
+  const links = admin && pathname.startsWith('/ops') ? OPS_TABS : seller ? SELLER_TABS : BUYER_TABS
+  const title =
+    admin && pathname.startsWith('/ops') ? 'Quản trị hệ thống' : seller ? 'Kênh người bán' : 'Tài khoản của tôi'
   return (
-    <nav
-      aria-label="Tài khoản"
-      className="mx-auto mb-8 flex max-w-[1320px] gap-1 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:px-8"
+    <aside
+      className="account-sidebar overflow-x-auto rounded-[1.75rem] bg-white/80 p-3 shadow-soft backdrop-blur-xl [scrollbar-width:none] lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto"
+      aria-label={title}
     >
-      <div className="flex gap-1 rounded-full bg-white/80 p-1 shadow-soft">
-        {BUYER_TABS.map((t) => (
-          <NavLink key={t.to} to={t.to} className={tab}>
-            {t.label}
-          </NavLink>
-        ))}
-        <a href="/marketplace/cart" className={tab({ isActive: false })}>
-          Giỏ Hàng
-        </a>
-        {!seller && (
-          <NavLink to="/seller/register" className={tab}>
-            Bán Hàng
-          </NavLink>
-        )}
+      <div className="mb-2 hidden items-center gap-2 px-3 py-2 font-label text-xs font-bold uppercase tracking-[.14em] text-ink-soft lg:flex">
+        <PanelLeft size={15} /> {title}
       </div>
-      {seller && (
-        <div className="ml-2 flex gap-1 rounded-full bg-ink/90 p-1 shadow-soft">
-          <span className="self-center px-3 font-label text-[10px] font-semibold uppercase tracking-widest text-white/60">
-            Người bán
-          </span>
-          {SELLER_TABS.map((t) => (
-            <NavLink
-              key={t.to}
-              to={t.to}
-              end={t.end}
-              className={({ isActive }) =>
-                `shrink-0 rounded-full px-4 py-2 font-label text-xs font-semibold ${isActive ? 'bg-orange text-white' : 'text-white/80 hover:text-white'}`
-              }
-            >
-              {t.label}
+      <nav className="flex gap-1 lg:grid">
+        {links.map((item) => {
+          const Icon = item.icon
+          return (
+            <NavLink key={item.to} to={item.to} end={item.to === '/seller'} className={tab}>
+              <Icon size={17} />
+              <span>{item.label}</span>
             </NavLink>
-          ))}
-        </div>
+          )
+        })}
+      </nav>
+      <div className="my-3 hidden h-px bg-line lg:block" />
+      {seller ? (
+        <NavLink to="/profile" className={tab}>
+          <CircleUserRound size={17} />
+          <span>Quay lại tài khoản</span>
+        </NavLink>
+      ) : (
+        <NavLink to="/seller/register" className={tab}>
+          <Store size={17} />
+          <span>Bắt đầu bán hàng</span>
+        </NavLink>
       )}
-      {admin && (
-        <div className="ml-2 flex gap-1 rounded-full bg-violet/90 p-1 shadow-soft">
-          <span className="self-center px-3 font-label text-[10px] font-semibold uppercase tracking-widest text-white/70">
-            Quản trị
-          </span>
-          {OPS_TABS.map((t) => (
-            <NavLink
-              key={t.to}
-              to={t.to}
-              className={({ isActive }) =>
-                `shrink-0 rounded-full px-4 py-2 font-label text-xs font-semibold ${isActive ? 'bg-orange text-white' : 'text-white/85 hover:text-white'}`
-              }
-            >
-              {t.label}
-            </NavLink>
-          ))}
-        </div>
-      )}
-    </nav>
+      <a href="/marketplace/cart" className={tab({ isActive: false })}>
+        <ShoppingBag size={17} />
+        <span>Giỏ hàng</span>
+      </a>
+    </aside>
   )
 }
 
@@ -185,20 +181,9 @@ function SiteHeader() {
             3D<span className="text-violet">World</span>
           </span>
         </a>
-        <nav
-          aria-label="Chuyển module 3DWorld"
-          className="hidden items-center gap-1 rounded-full bg-surface-low p-1 md:flex"
-        >
-          {SITE_NAV.map((n) => (
-            <a
-              key={n.href}
-              href={n.href}
-              className="rounded-full px-4 py-2 font-label text-sm font-semibold text-ink-soft transition-colors hover:text-ink"
-            >
-              {n.label}
-            </a>
-          ))}
-        </nav>
+        <div className="hidden md:block">
+          <ModuleSwitcher current="marketplace" theme="light" />
+        </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <a
             href="/marketplace/cart"

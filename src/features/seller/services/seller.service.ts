@@ -1,19 +1,17 @@
 import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
 import type { AuditEntry } from '../../../shared/ui/kit'
-import { bankAccountService } from '../../account/services/account.service'
+import { addressService, bankAccountService } from '../../account/services/account.service'
+import { formatStructuredAddress, isGhtkReadyAddress } from '../../account/lib/address'
 import { rememberPaymentAttempt } from '../../marketplace/lib/payment'
 import {
   disputes,
-  earnings,
-  inventoryLogs,
-  type Plan,
+  type Earning,
   type ProductStatus,
   type SellerApplication,
   type SellerProduct,
   type SellerVariant,
   type Storefront,
   type Subscription,
-  wallet,
 } from '../data/seller.fixtures'
 import {
   type ApiProduct,
@@ -22,6 +20,7 @@ import {
   type ApiSubscriptionOverview,
   type ApiVariant,
   sellerProductApi,
+  sellerWalletApi,
   sellerVerificationApi,
   storefrontOwnerApi,
   type VariantWrite,
@@ -60,6 +59,13 @@ function toVariant(v: ApiVariant): SellerVariant {
     stock: v.stock ?? 0,
     reserved: v.reserved ?? 0,
     active: v.active !== false,
+    fragile: v.fragile === true,
+    lowStockThreshold: v.lowStockThreshold ?? 5,
+    packingGroup: v.packingGroup ?? 'STANDARD',
+    weightGrams: v.weightGrams ?? 0,
+    lengthCm: Number(v.lengthCm) || 0,
+    widthCm: Number(v.widthCm) || 0,
+    heightCm: Number(v.heightCm) || 0,
   }
 }
 
@@ -74,21 +80,61 @@ function toProductStatus(status: string): ProductStatus {
   return 'DRAFT'
 }
 
-/** Polygon & manifold không có trường riêng → lưu dạng chữ dễ đọc trong `specifications`. */
+/** Đọc được cả JSON chuẩn mới và chuỗi tiếng Việt cũ để không làm hỏng dữ liệu đã tạo trước đây. */
 const POLY_RE = /Số polygon:\s*([\d.,]+)/i
 const MANIFOLD_RE = /Lưới kín \(manifold\):\s*(Có|Không)/i
 
-function buildSpecs(polygonCount: number, manifold: boolean) {
-  return `Số polygon: ${polygonCount.toLocaleString('vi-VN')}\nLưới kín (manifold): ${manifold ? 'Có' : 'Không'}`
+function parseSpecsObject(specs: string | null | undefined): Record<string, unknown> {
+  if (!specs) return {}
+  try {
+    const parsed: unknown = JSON.parse(specs)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, unknown>
+  } catch {
+    // Legacy specifications are plain text and are handled by the regex fallback below.
+  }
+  return {}
+}
+
+function buildSpecs(
+  polygonCount: number,
+  manifold: boolean,
+  variants: SellerVariant[],
+  previous?: string,
+) {
+  const first = variants.find((variant) => variant.active) ?? variants[0]
+  const dimensionsMm = first
+    ? [first.lengthCm, first.widthCm, first.heightCm].map((value) => Math.round(Number(value) * 10))
+    : undefined
+  return JSON.stringify({
+    ...parseSpecsObject(previous),
+    material: first?.material || undefined,
+    dimensionsMm,
+    polygonCount,
+    manifold,
+  })
 }
 
 function readSpecs(specs: string | null | undefined) {
+  const object = parseSpecsObject(specs)
   const poly = specs?.match(POLY_RE)?.[1]
   const manifold = specs?.match(MANIFOLD_RE)?.[1]
   return {
-    polygonCount: poly ? Number(poly.replace(/[.,]/g, '')) || 0 : 0,
-    manifold: manifold ? manifold.toLowerCase() === 'có' : true,
+    polygonCount:
+      typeof object.polygonCount === 'number'
+        ? object.polygonCount
+        : poly
+          ? Number(poly.replace(/[.,]/g, '')) || 0
+          : 0,
+    manifold: typeof object.manifold === 'boolean' ? object.manifold : manifold ? manifold.toLowerCase() === 'có' : true,
   }
+}
+
+function normalizeShippingClass(value: string | null | undefined) {
+  const normalized = value?.trim().toUpperCase()
+  if (!normalized || normalized === 'HỘP TIÊU CHUẨN') return 'STANDARD'
+  if (normalized === 'HỘP COLLECTOR CHỐNG SỐC') return 'FRAGILE'
+  if (normalized === 'KIỆN CỒNG KỀNH') return 'OVERSIZED'
+  return normalized
 }
 
 function toProduct(p: ApiProduct): SellerProduct {
@@ -109,7 +155,8 @@ function toProduct(p: ApiProduct): SellerProduct {
     category: p.category,
     status,
     description: p.description ?? '',
-    shippingClass: p.shippingClass ?? '',
+    shippingClass: normalizeShippingClass(p.shippingClass),
+    specifications: p.specifications ?? undefined,
     ...readSpecs(p.specifications),
     media: p.media?.length ?? 0,
     mediaItems: [...(p.media ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
@@ -122,10 +169,20 @@ function toProduct(p: ApiProduct): SellerProduct {
   }
 }
 
-function toVariantWrite(v: Pick<SellerVariant, 'sku' | 'material' | 'color' | 'size' | 'price'>): VariantWrite {
+function toVariantWrite(v: Pick<SellerVariant,
+  'sku' | 'material' | 'color' | 'size' | 'price' | 'active' | 'fragile' | 'lowStockThreshold' |
+  'packingGroup' | 'weightGrams' | 'lengthCm' | 'widthCm' | 'heightCm'>): VariantWrite {
   return {
     sku: v.sku,
     price: v.price,
+    active: v.active,
+    fragile: v.fragile,
+    lowStockThreshold: v.lowStockThreshold,
+    packingGroup: v.packingGroup,
+    weightGrams: v.weightGrams,
+    lengthCm: v.lengthCm,
+    widthCm: v.widthCm,
+    heightCm: v.heightCm,
     attributes: Object.fromEntries(
       Object.entries({ material: v.material, color: v.color, size: v.size }).filter(([, x]) => x),
     ),
@@ -136,8 +193,11 @@ function storefrontStatus(shop: ApiShop): Storefront['status'] {
   const s = shop.status?.toUpperCase()
   if (s === 'SUSPENDED' || s === 'BANNED') return 'SUSPENDED'
   if (!shop.expiresAt || Date.parse(shop.expiresAt) < Date.now()) return shop.expiresAt ? 'EXPIRED' : 'INACTIVE'
+  // `available` là kết quả canPublish() của BE (role + xác thực + trạng thái + hạn gói),
+  // vì vậy luôn ưu tiên chặn trước khi gắn nhãn sắp hết hạn.
+  if (shop.available === false) return 'INACTIVE'
   if (Date.parse(shop.expiresAt) - Date.now() < 7 * 86_400_000) return 'EXPIRING'
-  return shop.available === false ? 'INACTIVE' : 'ACTIVE'
+  return 'ACTIVE'
 }
 
 function toStorefront(shop: ApiShop): Storefront {
@@ -183,31 +243,21 @@ function subRow(s: ApiSubscription): Subscription['history'][number] {
   }
 }
 
-const MONTHLY_PLAN_ID = 'monthly'
-
-function toSubscription(o: ApiSubscriptionOverview): { subscription: Subscription; plans: Plan[] } {
+function toSubscription(o: ApiSubscriptionOverview): { subscription: Subscription; monthlyFee: number; hasPendingPayment: boolean } {
   const expiresAt = o.storefrontExpiresAt ?? o.latest?.endAt ?? null
   const left = expiresAt ? Date.parse(expiresAt) - Date.now() : -1
   const rows = [o.pending, o.latest].filter((s): s is ApiSubscription => !!s)
   return {
     subscription: {
-      planId: MONTHLY_PLAN_ID,
+      planId: 'monthly',
       status: left < 0 ? 'EXPIRED' : left < 7 * 86_400_000 ? 'EXPIRING' : 'ACTIVE',
       startedAt: o.latest?.startAt ?? nowIso(),
       expiresAt: expiresAt ?? nowIso(),
       autoRenew: false,
       history: rows.filter((s, i) => rows.findIndex((x) => x.id === s.id) === i).map(subRow),
     },
-    plans: [
-      {
-        id: MONTHLY_PLAN_ID,
-        name: 'Gói xưởng tháng',
-        price: Number(o.monthlyFee) || 0,
-        period: 'tháng',
-        perks: ['Mở bán sản phẩm trên Chợ Đồ Chơi', 'Kích hoạt 1 tháng lịch (UTC) sau khi thanh toán thành công'],
-        highlight: true,
-      },
-    ],
+    monthlyFee: Number(o.monthlyFee) || 0,
+    hasPendingPayment: !!o.pending,
   }
 }
 
@@ -268,26 +318,26 @@ async function findVariant(variantId: number) {
   throw new Error('Không tìm thấy biến thể.')
 }
 
-function logInventory(sku: string, change: number, reason: string, kind: 'IN' | 'OUT' | 'PRICE') {
-  inventoryLogs.unshift({ at: nowIso(), sku, change, reason, actor: 'Bạn', kind })
-}
-
 export type SaveProductInput = Omit<
   SellerProduct,
   'id' | 'status' | 'updatedAt' | 'sold' | 'audit' | 'media' | 'mediaItems' | 'storefrontId' | 'revision'
 > & { id?: number; media?: number }
 
+export type PendingProductMedia = { file: File; variantSku?: string }
+
 /* ------------------------------------------------------------- service */
 
 export const sellerService = {
   async application(): Promise<SellerApplication> {
-    const [v, banks, shop] = await Promise.all([
+    const [v, banks, shop, addresses] = await Promise.all([
       sellerVerificationApi.get(),
-      bankAccountService.list().catch(() => []),
-      storefrontOwnerApi.mine().catch(() => null),
+      bankAccountService.list(),
+      storefrontOwnerApi.mine(),
+      addressService.list(),
     ])
     const ver = v.verification
     const draft = readEvidence(ver?.evidenceReference)
+    const pickup = addresses.find((address) => address.isDefault)
     const bank =
       banks.find((b) => b.id === ver?.bankAccountId) ??
       banks.find((b) => b.isActive && isVerifiedBank(b.verificationStatus)) ??
@@ -309,7 +359,7 @@ export const sellerService = {
       status: VERIFICATION_STATUS[ver?.status?.toUpperCase() ?? ''] ?? 'DRAFT',
       storefrontName: shop?.name ?? draft.storefrontName,
       description: shop?.description ?? '',
-      address: draft.address,
+      address: pickup ? formatStructuredAddress(pickup) : draft.address,
       technologies: draft.technologies,
       emailVerified: v.emailVerified,
       phoneVerified: v.phoneVerified,
@@ -328,6 +378,8 @@ export const sellerService = {
       eligible: v.eligible,
       verifiedBankAvailable: v.verifiedBankAvailable,
       storefrontId: shop?.id,
+      storefrontStatus: shop ? storefrontStatus(shop) : undefined,
+      pickupAddressReady: isGhtkReadyAddress(pickup),
       audit,
     }
   },
@@ -336,9 +388,13 @@ export const sellerService = {
   async submitApplication(
     patch: Pick<SellerApplication, 'storefrontName' | 'description' | 'address' | 'technologies'> & { evidence?: string },
   ) {
-    const banks = await bankAccountService.list()
+    const [banks, addresses] = await Promise.all([bankAccountService.list(), addressService.list()])
     const bank = banks.find((b) => b.isActive && isVerifiedBank(b.verificationStatus))
     if (!bank) throw new Error('Cần một tài khoản ngân hàng đã được quản trị viên duyệt trước khi nộp hồ sơ.')
+    const pickup = addresses.find((address) => address.isDefault)
+    if (!isGhtkReadyAddress(pickup)) {
+      throw new Error('Cần một địa chỉ mặc định có đủ người liên hệ, số điện thoại, địa chỉ chi tiết, tỉnh/thành và phường/xã để GHTK lấy hàng.')
+    }
     await sellerVerificationApi.submit({ bankAccountId: bank.id, evidenceReference: buildEvidence(patch) })
     return sellerService.application()
   },
@@ -353,7 +409,7 @@ export const sellerService = {
   },
 
   /** Tạo/dùng lại kỳ chờ thanh toán rồi chuyển sang ZaloPay. */
-  async renew(_planId: string) {
+  async renew() {
     const overview = await storefrontOwnerApi.subscription()
     const sub = overview.pending ?? (await storefrontOwnerApi.subscribe(!!overview.storefrontExpiresAt))
     const payment = await storefrontOwnerApi.paySubscription(sub.id)
@@ -381,19 +437,19 @@ export const sellerService = {
   },
 
   /** Tạo / cập nhật sản phẩm và biến thể; submit = gửi duyệt, ngược lại giữ bản nháp. */
-  async saveProduct(input: SaveProductInput, submit: boolean) {
+  async saveProduct(input: SaveProductInput, submit: boolean, pendingMedia: PendingProductMedia[] = []) {
     const base = {
       title: input.title,
       description: input.description,
       category: input.category,
       shippingClass: input.shippingClass,
-      specifications: buildSpecs(input.polygonCount, input.manifold),
+      specifications: buildSpecs(input.polygonCount, input.manifold, input.variants, input.specifications),
     }
     let id = input.id
     if (!id) {
       const created = await sellerProductApi.create({
         ...base,
-        variants: input.variants.map((v) => ({ ...toVariantWrite(v), stock: v.stock, active: true })),
+        variants: input.variants.map((v) => ({ ...toVariantWrite(v), stock: v.stock })),
       })
       id = created.id
     } else {
@@ -408,18 +464,33 @@ export const sellerService = {
         }
         keep.add(old.id)
         const before = toVariant(old)
-        if (before.sku !== v.sku || before.material !== v.material || before.color !== v.color || before.size !== v.size || before.price !== v.price)
+        if (
+          before.sku !== v.sku || before.material !== v.material || before.color !== v.color || before.size !== v.size ||
+          before.price !== v.price || before.active !== v.active || before.fragile !== v.fragile ||
+          before.lowStockThreshold !== v.lowStockThreshold || before.packingGroup !== v.packingGroup ||
+          before.weightGrams !== v.weightGrams || before.lengthCm !== v.lengthCm ||
+          before.widthCm !== v.widthCm || before.heightCm !== v.heightCm
+        )
           await sellerProductApi.updateVariant(id, old.id, toVariantWrite(v))
         if (before.stock !== v.stock) await sellerProductApi.setStock(id, old.id, v.stock, 'Cập nhật từ trình sửa sản phẩm')
       }
       for (const old of existing.variants) if (old.active && !keep.has(old.id)) await sellerProductApi.removeVariant(id, old.id)
     }
-    const saved = submit ? await sellerProductApi.submit(id) : await sellerProductApi.get(id)
+    let saved = await sellerProductApi.get(id)
+    const startingMediaCount = saved.media.length
+    for (let index = 0; index < pendingMedia.length; index += 1) {
+      const item = pendingMedia[index]
+      const variantId = item.variantSku
+        ? saved.variants.find((variant) => variant.sku === item.variantSku)?.id
+        : undefined
+      saved = await sellerProductApi.uploadMedia(id, item.file, { variantId, sortOrder: startingMediaCount + index })
+    }
+    if (submit) saved = await sellerProductApi.submit(id)
     return toProduct(saved)
   },
 
-  async uploadMedia(productId: number, file: File, sortOrder = 0) {
-    return toProduct(await sellerProductApi.uploadMedia(productId, file, { sortOrder }))
+  async uploadMedia(productId: number, file: File, sortOrder = 0, variantId?: number) {
+    return toProduct(await sellerProductApi.uploadMedia(productId, file, { sortOrder, variantId }))
   },
 
   async removeMedia(productId: number, mediaId: number) {
@@ -436,23 +507,18 @@ export const sellerService = {
     return toProduct(await sellerProductApi.submit(id))
   },
 
-  /** Nhật ký tồn kho: chưa có API — chỉ ghi các thay đổi trong phiên làm việc này. */
-  inventoryLogs: () => mockResponse(inventoryLogs, 0),
-
   async adjustStock(variantId: number, delta: number, reason: string) {
     const { product, variant } = await findVariant(variantId)
     const next = variant.stock + delta
     if (next < variant.reserved) throw new Error('Tồn kho không được thấp hơn số đang giữ chỗ.')
     const saved = await sellerProductApi.setStock(product.id, variantId, next, reason)
-    logInventory(variant.sku, delta, reason, delta >= 0 ? 'IN' : 'OUT')
     return toVariant(saved.variants.find((v) => v.id === variantId) ?? { ...variant, stock: next })
   },
 
-  /** PATCH variant price (VariantPatch chưa có trường lý do — lý do chỉ ghi ở nhật ký phiên). */
-  async changePrice(variantId: number, price: number, reason: string) {
+  /** PATCH variant price; Backend hiện chưa nhận lý do thay đổi giá. */
+  async changePrice(variantId: number, price: number) {
     const { product, variant } = await findVariant(variantId)
     const saved = await sellerProductApi.updateVariant(product.id, variantId, { price })
-    logInventory(variant.sku, price - Number(variant.price), reason, 'PRICE')
     return toVariant(saved.variants.find((v) => v.id === variantId) ?? { ...variant, price })
   },
 
@@ -480,7 +546,53 @@ export const sellerService = {
     return mockResponse(d)
   },
 
-  earnings: () => mockResponse({ earnings, wallet }),
+  async earnings() {
+    const data = await sellerWalletApi.mine()
+    const earnings: Earning[] = (data.earnings ?? []).map((e) => {
+      const released = e.status?.toUpperCase() === 'RELEASED'
+      const pending = ['PENDING', 'AWAITING_FUNDS'].includes(e.status?.toUpperCase())
+      const status: Earning['status'] = released ? 'RELEASED' : pending ? 'PENDING' : 'HELD'
+      return {
+        id: `ERN-${e.orderId}`,
+        orderId: e.orderId,
+        product: `Đơn hàng #${e.orderId}`,
+        sku: 'Tổng hợp theo đơn',
+        gross: Number(e.grossAmount) || 0,
+        feeRate: Number(e.commissionRate) || 0,
+        status,
+        releaseAt: e.releasedAt ?? e.eligibleAt ?? undefined,
+        blocker: status === 'PENDING' ? `Dự kiến mở khoá ${e.eligibleAt ? new Date(e.eligibleAt).toLocaleString('vi-VN') : 'sau khi đủ điều kiện'}.` : status === 'HELD' ? `Backend ghi nhận trạng thái ${e.status}.` : undefined,
+        ledger: [
+          {
+            id: `earning-${e.orderId}`,
+            at: e.releasedAt ?? e.eligibleAt ?? nowIso(),
+            type: released ? 'Giải ngân doanh thu' : 'Ghi nhận doanh thu người bán',
+            amount: Number(e.netAmount) || 0,
+            bucket: released ? 'available' : status === 'HELD' ? 'held' : 'pending',
+            status: released ? 'POSTED' : 'PENDING',
+          },
+        ],
+      }
+    })
+    return {
+      earnings,
+      wallet: {
+        available: Number(data.availableBalance) || 0,
+        pending: Number(data.pendingBalance) || 0,
+        held: Number(data.payoutHold) || 0,
+        returnShippingDebt: Number(data.returnShippingDebt) || 0,
+      },
+    }
+  },
 
-  earning: (id: string) => mockFind(earnings, (e) => e.id === id, 'Khoản thu nhập'),
+  async earning(id: string) {
+    const data = await sellerService.earnings()
+    const earning = data.earnings.find((e) => e.id === id)
+    if (!earning) throw Object.assign(new Error('Không tìm thấy khoản thu nhập.'), { status: 404 })
+    return earning
+  },
+
+  requestPayout(input: { amount: number; bankAccountId: number; reason: string }) {
+    return sellerWalletApi.requestPayout(input)
+  },
 }

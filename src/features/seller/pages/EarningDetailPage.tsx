@@ -1,11 +1,11 @@
-import { Download, LifeBuoy, Wallet } from 'lucide-react'
+import { Wallet } from 'lucide-react'
 import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { formatDateTime, formatVnd } from '../../../shared/lib/format'
-import { Btn, DataTable, DetailLayout, Hero, KeyValues, MockNotice, MoneyRows, Pill, Section, StatusPill } from '../../../shared/ui/kit'
+import { Btn, DataTable, DetailLayout, Hero, KeyValues, MoneyRows, Pill, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
-import { useEarning, useEarnings } from '../../../features/seller/hooks/useSeller'
-import { EARNING_STATUS } from '../../../features/seller/lib/status'
+import { useEarning, useEarnings } from '../hooks/useSeller'
+import { EARNING_STATUS } from '../lib/status'
 
 const BUCKET = { pending: 'Chờ (pending)', available: 'Khả dụng', held: 'Tạm giữ (held)' }
 
@@ -20,7 +20,6 @@ export function EarningDetailPage() {
 
   return (
     <>
-      <MockNotice api="/api/seller/earnings/{id}" />
       <QueryState isLoading={q.isLoading} error={q.error}>
         {q.data &&
           (() => {
@@ -39,16 +38,6 @@ export function EarningDetailPage() {
                   eyebrow="Chi tiết khoản thu nhập"
                   title={`Khoản Thu #${e.id}`}
                   accent={e.product}
-                  actions={
-                    <>
-                      <Btn variant="white" icon={Download}>
-                        Biên lai quyết toán PDF
-                      </Btn>
-                      <Btn variant="white" icon={LifeBuoy} to="/help">
-                        Hỗ trợ ký quỹ
-                      </Btn>
-                    </>
-                  }
                 />
                 <DetailLayout
                   main={
@@ -73,7 +62,7 @@ export function EarningDetailPage() {
                           ))}
                         </ol>
                       </Section>
-                      <Section title="Nhật ký sổ cái kép bất biến">
+                      <Section title="Dòng tiền khoản thu">
                         <DataTable
                           rows={e.ledger}
                           rowKey={(l) => l.id}
@@ -110,8 +99,8 @@ export function EarningDetailPage() {
                             ]}
                           />
                           <div className="mt-3">
-                            <Btn to="/wallet/payouts/new" variant="primary" size="sm" icon={Wallet}>
-                              Rút tiền
+                            <Btn to="/bank-accounts" variant="primary" size="sm" icon={Wallet}>
+                              Tài khoản nhận tiền
                             </Btn>
                           </div>
                         </Section>

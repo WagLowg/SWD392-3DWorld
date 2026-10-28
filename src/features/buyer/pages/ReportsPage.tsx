@@ -1,8 +1,9 @@
 import { Flag, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { formatDateTime } from '../../../shared/lib/format'
-import { Btn, FilterTabs, Hero, MockNotice, Pill, RuleBox, StatusPill, Toolbar } from '../../../shared/ui/kit'
+import { Btn, FilterTabs, Hero, Pill, RuleBox, StatusPill, Toolbar } from '../../../shared/ui/kit'
+import { ApiNote } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import type { ReportStatus } from '../data/buyer.fixtures'
@@ -12,6 +13,8 @@ import { REPORT_STATUS, TARGET_TYPE } from '../lib/status'
 /** MP 034 · Danh Sách Báo Cáo Vi Phạm */
 export function ReportsPage() {
   const q = useReports()
+  const [params] = useSearchParams()
+  const submitted = params.get('submitted')
   const [tab, setTab] = useState<ReportStatus | ''>('')
   useEffect(() => {
     document.title = 'Báo cáo vi phạm · 3DWorld'
@@ -20,7 +23,6 @@ export function ReportsPage() {
   const rows = all.filter((r) => !tab || r.status === tab)
   return (
     <>
-      <MockNotice api="GET /api/reports/mine" />
       <Hero
         code="MP 034"
         eyebrow="Báo cáo vi phạm"
@@ -32,6 +34,14 @@ export function ReportsPage() {
           </Btn>
         }
       />
+      {submitted && (
+        <p className="mt-6 rounded-2xl bg-mint p-4 text-sm text-[#0f5132]">
+          Đã gửi báo cáo #{submitted} thành công. Bộ phận kiểm duyệt đã tiếp nhận dữ liệu từ API.
+        </p>
+      )}
+      <ApiNote className="mt-4">
+        Backend hiện có POST /api/reports để gửi báo cáo nhưng chưa có GET /api/reports/mine hoặc GET /api/reports/&#123;id&#125; cho người gửi. Danh sách bên dưới không dùng dữ liệu mẫu và sẽ trống cho tới khi backend bổ sung API đọc.
+      </ApiNote>
       <Toolbar>
         <FilterTabs
           value={tab}

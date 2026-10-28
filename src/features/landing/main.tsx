@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { AppProviders } from '../../app/providers/AppProviders'
 import './landing.css'
 import App from './App'
 
@@ -9,7 +10,9 @@ if (/^\/payment-result\/?$/.test(location.pathname)) {
 } else {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      <AppProviders>
+        <App />
+      </AppProviders>
     </StrictMode>,
   )
 }

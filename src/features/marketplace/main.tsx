@@ -1,11 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppProviders } from '../../app/providers/AppProviders'
 import { StatusBlock } from '../../shared/ui/StatusBlock'
 import { MarketplaceLayout } from './components/MarketplaceLayout'
 import { CartPage } from './pages/CartPage'
-import { CatalogPage } from './pages/CatalogPage'
 import { CheckoutPage } from './pages/CheckoutPage'
 import { HomePage } from './pages/HomePage'
 import { PaymentResultPage } from './pages/PaymentResultPage'
@@ -19,7 +18,7 @@ if (!rootElement) throw new Error('Không tìm thấy phần tử #root để kh
 /**
  * Route (basename /marketplace — xem moduleFallback trong vite.config.ts):
  *   /            MP 001 Trang chủ Chợ Đồ Chơi
- *   /products    MP 002 Danh sách + bộ lọc
+ *   /products    Đường dẫn cũ, chuyển về trang Marketplace hợp nhất
  *   /:productId  MP 003 Chi tiết sản phẩm
  *   /cart        MP 020 Giỏ hàng vật lý
  *   /checkout    MP 021 Đặt hàng & thanh toán đa xưởng (?items=1,2)
@@ -33,7 +32,7 @@ createRoot(rootElement).render(
         <MarketplaceLayout>
           <Routes>
             <Route index element={<HomePage />} />
-            <Route path="products" element={<CatalogPage />} />
+            <Route path="products" element={<LegacyCatalogRedirect />} />
             <Route path="cart" element={<CartPage />} />
             <Route path="checkout" element={<CheckoutPage />} />
             <Route path="shop/:storefrontId" element={<StorefrontPage />} />
@@ -65,3 +64,9 @@ createRoot(rootElement).render(
     </AppProviders>
   </StrictMode>,
 )
+
+/** Giữ bookmark/link cũ và chuyển nguyên query bộ lọc về trang Marketplace hợp nhất. */
+function LegacyCatalogRedirect() {
+  const { search } = useLocation()
+  return <Navigate replace to={{ pathname: '/', search, hash: '#catalog' }} />
+}

@@ -31,8 +31,7 @@ export const modelService = {
   },
 
   async version(modelId: string, versionId: number | string, signal?: AbortSignal) {
-    return (await http.get<ApiEnvelope<VersionDetail>>(`/api/models/getId/${modelId}/versions/getId/${versionId}`, { signal }))
-      .data
+    return (await http.get<ApiEnvelope<VersionDetail>>(`/api/models/getId/${modelId}/versions/getId/${versionId}`, { signal })).data
   },
 
   /** Tải tệp có kiểm tra quyền (cần Bearer token) → trả Blob để lưu xuống máy. */
@@ -41,17 +40,10 @@ export const modelService = {
   },
 
   /**
-   * POST /api/models/create — multipart `file` (OpenAPI chỉ khai báo `file`; part `metadata` gửi kèm để Backend
-   * dùng tên/mô tả nếu hỗ trợ). Backend chấp nhận .glb .stl .obj .3mf, tối đa 50.000.000 byte.
+   * Backend hiện nhận duy nhất multipart part `file`; tên mô hình lấy từ tên tệp.
    */
   async upload(input: UploadInput, onProgress?: (percent: number) => void) {
     const form = new FormData()
-    form.append(
-      'metadata',
-      new Blob([JSON.stringify({ modelName: input.modelName, description: input.description || null })], {
-        type: 'application/json',
-      }),
-    )
     form.append('file', input.file)
     return (
       await http.post<ApiEnvelope<UploadResult>, FormData>('/api/models/create', form, {

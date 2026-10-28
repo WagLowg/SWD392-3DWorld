@@ -1,11 +1,11 @@
 import { Minus, Plus, Tag } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
-import { formatDateTime, formatVnd } from '../../../shared/lib/format'
+import { formatVnd } from '../../../shared/lib/format'
 import { inputClass } from '../../../shared/ui/form'
-import { Btn, CellTitle, DataTable, FilterTabs, Hero, MockNotice, Pill, RuleBox, Section, Toolbar } from '../../../shared/ui/kit'
+import { Btn, CellTitle, DataTable, FilterTabs, Hero, Pill, RuleBox, Section, Toolbar } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import type { SellerVariant } from '../data/seller.fixtures'
-import { useAdjustStock, useChangePrice, useInventoryLogs, useSellerProducts } from '../hooks/useSeller'
+import { useAdjustStock, useChangePrice, useSellerProducts } from '../hooks/useSeller'
 
 type Row = SellerVariant & { productTitle: string; productId: number }
 type Editing = { row: Row; mode: 'stock' | 'price' } | null
@@ -13,7 +13,6 @@ type Editing = { row: Row; mode: 'stock' | 'price' } | null
 /** MP 046 · Quản Lý Tồn Kho Biến Thể */
 export function InventoryPage() {
   const products = useSellerProducts()
-  const logs = useInventoryLogs()
   const [tab, setTab] = useState<'' | 'low' | 'reserved' | 'hidden'>('')
   const [editing, setEditing] = useState<Editing>(null)
 
@@ -28,8 +27,7 @@ export function InventoryPage() {
 
   return (
     <>
-      <MockNotice partial="Nhật ký biến động tồn kho (chỉ hiện thay đổi trong phiên này)" api="GET /api/seller/inventory-logs" />
-      <Hero code="MP 046" eyebrow="Tồn kho biến thể" title="Quản Lý Tồn Kho Phôi Đúc" accent="Kho Sẵn, Giữ Chỗ & Audit Log." />
+      <Hero code="MP 046" eyebrow="Tồn kho biến thể" title="Quản Lý Tồn Kho Phôi Đúc" accent="Kho Sẵn & Số Lượng Đang Giữ Chỗ." />
       <Toolbar>
         <FilterTabs
           value={tab}
@@ -75,27 +73,16 @@ export function InventoryPage() {
       </QueryState>
 
       <Section title="Nhật ký biến động gần nhất (audit trail)" className="mt-6">
-        <ul className="space-y-2">
-          {(logs.data ?? []).map((l) => (
-            <li key={`${l.at}-${l.sku}-${l.change}`} className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface-low px-4 py-3 text-sm">
-              <code className="text-xs">{l.sku}</code>
-              <Pill tone={l.kind === 'IN' ? 'green' : l.kind === 'OUT' ? 'danger' : l.kind === 'PRICE' ? 'violet' : 'orange'}>
-                {l.kind === 'PRICE' ? `Giá ${l.change >= 0 ? '+' : ''}${formatVnd(l.change)}` : `${l.change >= 0 ? '+' : ''}${l.change}`}
-              </Pill>
-              <span className="flex-1 text-ink-soft">{l.reason}</span>
-              <span className="text-xs text-ink-soft">
-                {l.actor} · {formatDateTime(l.at)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <p className="rounded-2xl bg-peach/60 p-4 text-sm text-orange-deep">
+          Backend đã nhận và lưu lý do khi chỉnh số lượng kho nhưng chưa có endpoint đọc lịch sử biến động. Vì vậy frontend không hiển thị dữ liệu mẫu. Cần bổ sung GET /api/seller/inventory-logs để mở phần audit trail này.
+        </p>
       </Section>
 
       <RuleBox
         title="Ràng buộc nghiệp vụ tồn kho"
         rules={[
           'Tồn kho không được giảm xuống dưới số lượng đang giữ chỗ cho đơn chờ thanh toán.',
-          'Mỗi lần điều chỉnh kho hoặc giá bắt buộc ghi lý do vào audit log.',
+          'Điều chỉnh số lượng kho bắt buộc gửi lý do cho backend; API sửa giá hiện chưa nhận trường lý do.',
           'Giữ chỗ tự giải phóng sau 15 phút nếu đơn chưa thanh toán.',
           'Đổi giá không ảnh hưởng đơn đã đặt — đơn giá được khoá tại thời điểm đặt.',
         ]}
@@ -113,11 +100,11 @@ function AdjustPanel({ editing, onClose }: { editing: NonNullable<Editing>; onCl
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
   const n = Number(amount)
-  const ok = reason.trim().length >= 10 && n > 0
+  const ok = n > 0 && (mode === 'price' || reason.trim().length >= 10)
 
   const confirm = () => {
     if (mode === 'stock') adjust.mutate({ variantId: row.id, delta: dir * n, reason: reason.trim() }, { onSuccess: onClose })
-    else price.mutate({ variantId: row.id, price: n, reason: reason.trim() }, { onSuccess: onClose })
+    else price.mutate({ variantId: row.id, price: n }, { onSuccess: onClose })
   }
 
   return (
@@ -139,15 +126,19 @@ function AdjustPanel({ editing, onClose }: { editing: NonNullable<Editing>; onCl
           <span className="mb-1 block font-label text-xs font-semibold text-ink-soft">{mode === 'stock' ? 'Số lượng thay đổi' : 'Đơn giá mới (₫)'}</span>
           <input id={`${uid}-n`} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))} className={inputClass} />
         </label>
-        <label htmlFor={`${uid}-r`} className="block">
-          <span className="mb-1 block font-label text-xs font-semibold text-ink-soft">Lý do (bắt buộc, ≥ 10 ký tự)</span>
-          <input id={`${uid}-r`} value={reason} onChange={(e) => setReason(e.target.value)} className={inputClass} />
-        </label>
+        {mode === 'stock' ? (
+          <label htmlFor={`${uid}-r`} className="block">
+            <span className="mb-1 block font-label text-xs font-semibold text-ink-soft">Lý do (bắt buộc, ≥ 10 ký tự)</span>
+            <input id={`${uid}-r`} value={reason} onChange={(e) => setReason(e.target.value)} className={inputClass} />
+          </label>
+        ) : (
+          <p className="self-center text-xs text-ink-soft">API cập nhật giá hiện chưa hỗ trợ lưu lý do thay đổi.</p>
+        )}
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <Btn onClick={onClose}>Huỷ</Btn>
         <Btn variant="primary" disabled={!ok || adjust.isPending || price.isPending} onClick={confirm}>
-          Xác nhận & ghi log
+          Xác nhận cập nhật
         </Btn>
       </div>
     </Section>

@@ -2,7 +2,7 @@ import { Camera, Download } from 'lucide-react'
 import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { formatDateTime } from '../../../shared/lib/format'
-import { AuditTimeline, Btn, DetailLayout, Hero, KeyValues, MediaTile, MockNotice, Section, StatusPill } from '../../../shared/ui/kit'
+import { AuditTimeline, Btn, DetailLayout, Hero, KeyValues, MediaTile, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { useReport } from '../hooks/useBuyer'
 import { REPORT_STATUS, TARGET_TYPE } from '../lib/status'
@@ -16,7 +16,6 @@ export function ReportDetailPage() {
   }, [id])
   return (
     <>
-      <MockNotice api="GET /api/reports/{id}" />
       <QueryState isLoading={q.isLoading} error={q.error}>
         {q.data &&
           (() => {
