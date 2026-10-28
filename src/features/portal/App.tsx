@@ -34,6 +34,15 @@ import { SellerOrderDetailPage } from '../orders/pages/SellerOrderDetailPage'
 import { SellerOrdersPage } from '../orders/pages/SellerOrdersPage'
 import { SellerShipmentDetailPage } from '../orders/pages/SellerShipmentDetailPage'
 import { SellerShipmentsPage } from '../orders/pages/SellerShipmentsPage'
+import {
+  StaffAccessGate,
+  StaffDashboardPage,
+  StaffLayout,
+  StaffRefundDetailPage,
+  StaffRefundListPage,
+  StaffShippingDetailPage,
+  StaffShippingListPage,
+} from '../staff/StaffApp'
 import { ErrorScreen } from '../../shared/ui/ErrorScreen'
 import { AccountLayout, AccountTabs, RequireUser } from './components/AccountLayout'
 import { PortalShell } from './components/PortalShell'
@@ -121,6 +130,21 @@ export function App() {
         <Route path="error/session-expired" element={<ErrorScreen kind="session" />} />
         <Route path="cart" element={<Redirect to="/marketplace/cart" />} />
         <Route path="checkout" element={<Redirect to="/marketplace/checkout" />} />
+        {/* Phân hệ Quản trị Staff (UI Prototype) */}
+        <Route
+          path="staff"
+          element={
+            <StaffAccessGate>
+              <StaffLayout />
+            </StaffAccessGate>
+          }
+        >
+          <Route index element={<StaffDashboardPage />} />
+          <Route path="shipments" element={<StaffShippingListPage />} />
+          <Route path="shipments/:shipmentId" element={<StaffShippingDetailPage />} />
+          <Route path="refunds" element={<StaffRefundListPage />} />
+          <Route path="refunds/:refundId" element={<StaffRefundDetailPage />} />
+        </Route>
       </Route>
 
       {/* Bản đồ FRD cho các nghiệp vụ còn lại */}

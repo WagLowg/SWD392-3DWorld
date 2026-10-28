@@ -21,6 +21,38 @@ function getReferrerPath() {
   return `${referrer.pathname}${referrer.search}${referrer.hash}`
 }
 
+function resolvePostLoginDestination(
+  user: { role?: string; roles?: string[] } | null | undefined,
+  explicitNextParam: string | null,
+  referrerPath: string | null,
+): string {
+  const roles = user?.roles ?? (user?.role ? [user.role] : [])
+  const isPrintStaff = roles.includes('PRINT_STAFF')
+
+  // Nếu là tài khoản PRINT_STAFF: ưu tiên đích đến Staff Dashboard (/portal/staff).
+  // Chỉ cho phép tham số next nếu nó trỏ đến một route nội bộ Staff hợp lệ (/portal/staff hoặc /portal/staff/*).
+  if (isPrintStaff) {
+    if (explicitNextParam) {
+      const validatedNext = safeNext(explicitNextParam, '')
+      if (
+        validatedNext === '/portal/staff' ||
+        validatedNext.startsWith('/portal/staff/') ||
+        validatedNext.startsWith('/portal/staff?')
+      ) {
+        return validatedNext
+      }
+    }
+    return '/portal/staff'
+  }
+
+  // Đối với các vai trò khác (Customer, Seller, Admin): giữ nguyên logic điều hướng hiện tại
+  if (explicitNextParam) {
+    const validatedNext = safeNext(explicitNextParam, '')
+    if (validatedNext) return validatedNext
+  }
+  return safeNext(referrerPath ?? explicitNextParam)
+}
+
 /** MP 007 · Đăng nhập */
 export function LoginPage() {
   const uid = useId()
@@ -50,7 +82,7 @@ export function LoginPage() {
     let active = true
     fetchMe().then((u) => {
       if (!active) return
-      if (u) location.replace(next)
+      if (u) location.replace(resolvePostLoginDestination(u, params.get('next'), getReferrerPath()))
       else setChecking(false)
     })
     return () => {
@@ -61,8 +93,8 @@ export function LoginPage() {
   const submit = handleSubmit(async (values) => {
     setUnverified(false)
     try {
-      await authService.login(values)
-      location.replace(next)
+      const user = await authService.login(values)
+      location.replace(resolvePostLoginDestination(user, params.get('next'), getReferrerPath()))
     } catch (e) {
       const message = e instanceof ApiClientError ? e.message : 'Không đăng nhập được. Vui lòng thử lại.'
       if (/verif|xác (thực|minh)/i.test(message)) setUnverified(true)
