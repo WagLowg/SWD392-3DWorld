@@ -4,27 +4,28 @@ import { Link, useParams } from 'react-router-dom'
 import { formatDateTime } from '../../../shared/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { Breadcrumbs } from '../../../shared/ui/primitives'
-import { PackagesPanel } from '../components/PackagesPanel'
-import { ShippingAddressSnapshot } from '../components/ShippingAddressSnapshot'
 import { QueryState } from '../../../shared/ui/QueryState'
 import {
+  displayOrderCode,
   OrderItemRow,
   OrderMoney,
   OrderStatusBadge,
   OrderTimeline,
-  displayOrderCode,
   orderCode,
   ShipmentStatusBadge,
   StorefrontLabel,
 } from '../components/OrderParts'
-import { SellerOrderActions, ShipmentEventActions } from '../components/SellerActions'
-import { useOrder, useSellerShipments } from '../hooks/useOrders'
+import { PackagesPanel } from '../components/PackagesPanel'
+import { SellerOrderActions } from '../components/SellerActions'
+import { ShippingAddressSnapshot } from '../components/ShippingAddressSnapshot'
+import { useOrder, useOrderHistory, useSellerShipments } from '../hooks/useOrders'
 
 /** MP 048 · Chi Tiết Đơn Chế Tác & Vận Chuyển (người bán) — GET /api/orders/{id}. */
 export function SellerOrderDetailPage() {
   const orderId = Number(useParams().orderId)
   const orders = useOrder(orderId)
   const order = orders.data
+  const history = useOrderHistory(order ? orderId : undefined)
   const shipments = useSellerShipments(order ? orderId : undefined)
 
   useEffect(() => {
@@ -74,7 +75,12 @@ export function SellerOrderDetailPage() {
               <SellerOrderActions order={order} />
             </div>
             <div className="mt-6">
-              <OrderTimeline order={order} />
+              <OrderTimeline
+                order={order}
+                history={history.data}
+                historyLoading={history.isLoading}
+                historyError={history.isError}
+              />
             </div>
           </section>
 
@@ -117,14 +123,12 @@ export function SellerOrderDetailPage() {
                             </span>
                             <ShipmentStatusBadge status={s.status} />
                           </div>
-                          <ShipmentEventActions shipment={s} orderId={order.id} />
                         </li>
                       ))}
                     </ul>
                   ) : (
                     <p className="mt-4 rounded-2xl bg-surface-low p-4 text-sm text-ink-soft">
-                      Chưa có vận đơn. Khi đơn đã thanh toán hoặc đang chế tác, bấm “Tạo vận đơn bưu tá” để bàn giao
-                      kiện hàng.
+                      Hệ thống đang khởi tạo vận đơn GHTK. Seller không cần tạo vận đơn thủ công.
                     </p>
                   )}
                 </QueryState>

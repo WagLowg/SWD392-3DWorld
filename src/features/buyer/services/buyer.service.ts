@@ -1,7 +1,7 @@
-import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
 import { type ApiEnvelope, http } from '../../../shared/api'
-import { buyerOrderService } from '../../orders/services/order.service'
+import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
 import type { ApiReport } from '../../ops/services/ops.api'
+import { buyerOrderService } from '../../orders/services/order.service'
 import {
   faqs,
   helpTopics,
@@ -27,15 +27,20 @@ export const buyerService = {
 
   sessions: () => mockResponse(sessions),
   revokeSession(id?: string) {
-    for (let i = sessions.length - 1; i >= 0; i--) if (!sessions[i].current && (!id || sessions[i].id === id)) sessions.splice(i, 1)
+    for (let i = sessions.length - 1; i >= 0; i--)
+      if (!sessions[i].current && (!id || sessions[i].id === id)) sessions.splice(i, 1)
     return mockResponse(true)
   },
   /** Đổi mật khẩu chưa có API (chỉ có reset qua email). */
   changePassword: (_current: string, _next: string) => mockResponse(true, 600),
 
   help: () => mockResponse({ topics: helpTopics, faqs }),
-  policy: (slug: string) => (policies[slug] ? mockResponse(policies[slug]) : Promise.reject(Object.assign(new Error('Không tìm thấy chính sách.'), { status: 404 }))),
-  submitTicket: (_input: { orderId?: string; topic: string; detail: string }) => mockResponse({ ticketId: `TCK-${Date.now().toString().slice(-6)}` }, 500),
+  policy: (slug: string) =>
+    policies[slug]
+      ? mockResponse(policies[slug])
+      : Promise.reject(Object.assign(new Error('Không tìm thấy chính sách.'), { status: 404 })),
+  submitTicket: (_input: { orderId?: string; topic: string; detail: string }) =>
+    mockResponse({ ticketId: `TCK-${Date.now().toString().slice(-6)}` }, 500),
 
   refunds: () => mockResponse(refunds),
   refund: (id: string) => mockFind(refunds, (r) => r.id === id, 'Yêu cầu hoàn tiền'),
@@ -105,9 +110,6 @@ export const buyerService = {
     const order = await buyerOrderService.cancel(orderId, reason)
     return { requestId: order.orderCode || `#${order.id}`, order }
   },
-  /** API thật: POST /api/orders/{id}/confirm-received (ghi chú chưa được Backend lưu). */
-  confirmReceived: (orderId: number, _note: string) => buyerOrderService.confirmReceived(orderId),
-
   transactions: () => mockResponse(transactions),
   transaction: (id: string) => mockFind(transactions, (t) => t.id === id, 'Giao dịch'),
 }

@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, PackageX, Search, Timer, Truck } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Search, Timer, Truck } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDateTime } from '../../../shared/format'
@@ -9,12 +9,14 @@ import { OrderStatusBadge, orderCode, ShipmentStatusBadge } from '../components/
 import { useSellerOrders, useSellerShipmentsFor } from '../hooks/useOrders'
 import type { Order, Shipment } from '../types/order.types'
 
-const SHIPPING_STATES = ['PROCESSING', 'SHIPPED', 'DELIVERED', 'RECEIVED', 'RETURNED']
+const SHIPPING_STATES = ['CREATED', 'PAID', 'PROCESSING', 'SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'RECEIVED', 'RETURNED']
+const PENDING_HANDOVER = ['CREATED', 'PENDING', 'PENDING_PICKUP']
 
 const TABS = [
   { value: '', label: 'Tất cả' },
-  { value: 'waiting', label: 'Chờ tạo vận đơn' },
-  { value: 'SHIPPED', label: 'Đang vận chuyển' },
+  { value: 'waiting', label: 'Chờ bàn giao' },
+  { value: 'SHIPPED', label: 'Đã bàn giao' },
+  { value: 'IN_TRANSIT', label: 'Đang vận chuyển' },
   { value: 'DELIVERED', label: 'Giao thành công' },
   { value: 'FAILED', label: 'Giao thất bại' },
   { value: 'RETURNED', label: 'Hoàn trả' },
@@ -43,7 +45,8 @@ export function SellerShipmentsPage() {
   })
   const loadingShipments = shipmentQueries.some((s) => s.isLoading)
   const match = (r: Row) =>
-    !tab || (tab === 'waiting' ? !r.shipment && r.order.status === 'PROCESSING' : r.shipment?.status === tab)
+    !tab ||
+    (tab === 'waiting' ? !r.shipment || PENDING_HANDOVER.includes(r.shipment.status) : r.shipment?.status === tab)
   const term = q.trim().toLowerCase()
   const visible = rows.filter(
     (r) =>
@@ -53,7 +56,7 @@ export function SellerShipmentsPage() {
         r.shipment?.trackingNumber.toLowerCase().includes(term) ||
         r.shipment?.carrierName.toLowerCase().includes(term)),
   )
-  const n = (s: string) => rows.filter((r) => r.shipment?.status === s).length
+  const n = (...statuses: string[]) => rows.filter((r) => r.shipment && statuses.includes(r.shipment.status)).length
 
   return (
     <>
@@ -61,23 +64,23 @@ export function SellerShipmentsPage() {
         eyebrow="Seller shipments · vận đơn xưởng"
         title="Quản Lý Vận Chuyển"
         accent="Bàn Giao & Theo Dõi Kiện Hàng."
-        description="Theo dõi vận đơn của từng đơn con, cập nhật kết quả giao hàng và xử lý kiện giao thất bại hoặc hoàn trả."
+        description="Vận đơn GHTK được hệ thống tạo tự động. Seller chỉ soạn hàng và xác nhận bàn giao; Staff cập nhật hành trình sau đó."
       />
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi
           icon={Timer}
           tone="bg-peach text-orange-deep"
-          label="Chờ tạo vận đơn"
-          value={rows.filter((r) => !r.shipment && r.order.status === 'PROCESSING').length}
+          label="Chờ bàn giao"
+          value={rows.filter((r) => !r.shipment || PENDING_HANDOVER.includes(r.shipment.status)).length}
         />
-        <Kpi icon={Truck} tone="bg-teal-soft text-teal" label="Đang vận chuyển" value={n('SHIPPED')} />
-        <Kpi icon={CheckCircle2} tone="bg-mint text-[#0f5132]" label="Giao thành công" value={n('DELIVERED')} />
+        <Kpi icon={Truck} tone="bg-violet-soft text-violet" label="Đã bàn giao" value={n('SHIPPED')} />
+        <Kpi icon={Truck} tone="bg-teal-soft text-teal" label="Đang vận chuyển" value={n('IN_TRANSIT')} />
         <Kpi
-          icon={PackageX}
-          tone="bg-[#ffdad6] text-danger"
-          label="Thất bại / hoàn trả"
-          value={n('FAILED') + n('RETURNED')}
+          icon={CheckCircle2}
+          tone="bg-mint text-[#0f5132]"
+          label="Đã giao / hoàn"
+          value={n('DELIVERED', 'RECEIVED', 'FAILED', 'RETURNED')}
         />
       </div>
 
@@ -116,7 +119,7 @@ export function SellerShipmentsPage() {
             <StatusBlock
               tone="empty"
               title="Không có vận đơn"
-              body="Vận đơn xuất hiện khi bạn tạo vận đơn cho đơn đang chế tác."
+              body="Vận đơn sẽ được hệ thống tự động tạo khi đơn đủ điều kiện."
             />
           ) : (
             <div className="overflow-x-auto rounded-[2rem] bg-white/95 shadow-soft">
@@ -144,7 +147,7 @@ export function SellerShipmentsPage() {
                             <p className="font-mono text-xs text-violet">{shipment.trackingNumber}</p>
                           </>
                         ) : (
-                          <span className="text-ink-soft">Chưa tạo vận đơn</span>
+                          <span className="text-ink-soft">Hệ thống đang tạo vận đơn</span>
                         )}
                       </td>
                       <td className="px-5 py-4">{shipment ? <ShipmentStatusBadge status={shipment.status} /> : '—'}</td>
@@ -163,7 +166,7 @@ export function SellerShipmentsPage() {
                           to={shipment ? `/seller/shipments/${order.id}` : `/seller/orders/${order.id}`}
                           className="inline-flex items-center gap-1 rounded-full bg-ink px-4 py-2 font-label text-xs font-semibold text-white hover:bg-violet"
                         >
-                          {shipment ? 'Chi tiết vận đơn' : 'Tạo vận đơn'} <ArrowRight size={13} />
+                          {shipment ? 'Chi tiết vận đơn' : 'Xem đơn hàng'} <ArrowRight size={13} />
                         </Link>
                       </td>
                     </tr>

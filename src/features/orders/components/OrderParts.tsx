@@ -1,10 +1,10 @@
 import { Check, Package, Store, X } from 'lucide-react'
 import { formatDateTime, formatVnd } from '../../../shared/format'
-import { formatAttributes } from '../../marketplace/lib/format'
 import { ProductMedia } from '../../marketplace/components/ProductMedia'
+import { formatAttributes } from '../../marketplace/lib/format'
 import { useVariantIndexStore } from '../../marketplace/stores/variant-index.store'
-import { ORDER_FLOW, flowIndex, shipmentMeta, statusMeta, TONE_CLASS } from '../lib/status'
-import type { Order, OrderItem } from '../types/order.types'
+import { ORDER_FLOW, shipmentMeta, statusMeta, TONE_CLASS } from '../lib/status'
+import type { Order, OrderHistoryEntry, OrderItem, OrderStatus } from '../types/order.types'
 
 export function orderCode(id: number) {
   return `#ORD-${String(id).padStart(5, '0')}`
@@ -84,17 +84,47 @@ export function StorefrontLabel({ id }: { id: number }) {
   )
 }
 
-/** Tiến trình đơn: Chờ thanh toán → Đã thanh toán → Chế tác → Vận chuyển → Đã giao → Đã nhận. */
-export function OrderTimeline({ order }: { order: Order }) {
+/** Tiến trình đơn online có bước thanh toán; COD đi thẳng từ CREATED sang PROCESSING. */
+export function OrderTimeline({
+  order,
+  history = [],
+  historyLoading = false,
+  historyError = false,
+}: {
+  order: Order
+  history?: OrderHistoryEntry[]
+  historyLoading?: boolean
+  historyError?: boolean
+}) {
   const closed = order.status === 'CANCELLED' || order.status === 'RETURNED'
-  const current = flowIndex(order.status)
+  const isCod = order.paymentMethod === 'COD' || order.onlinePaymentRequired === false
+  const flow: OrderStatus[] = isCod ? ['CREATED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'RECEIVED'] : ORDER_FLOW
+  const normalizedStatus = (order.status === 'IN_TRANSIT' ? 'SHIPPED' : order.status) as OrderStatus
+  const current = flow.indexOf(normalizedStatus)
+  const changedAtByStatus = new Map<string, string>()
+
+  for (const entry of [...history].sort((a, b) => new Date(a.changedAt).getTime() - new Date(b.changedAt).getTime())) {
+    if (!changedAtByStatus.has(entry.toStatus)) changedAtByStatus.set(entry.toStatus, entry.changedAt)
+  }
+
+  const stepTime = (status: string) => {
+    const value =
+      changedAtByStatus.get(status) ??
+      (status === 'CREATED' || status === 'PENDING_PAYMENT' ? order.createdAt : undefined)
+    if (value) return { value, label: formatDateTime(value) }
+    if (historyLoading) return { value: undefined, label: 'Đang tải…' }
+    if (historyError) return { value: undefined, label: 'Không tải được' }
+    return { value: undefined, label: 'Chưa cập nhật' }
+  }
+
   return (
     <div>
-      <ol className="grid grid-cols-3 gap-y-6 sm:grid-cols-6">
-        {ORDER_FLOW.map((s, i) => {
+      <ol className={`grid grid-cols-3 gap-y-6 ${isCod ? 'sm:grid-cols-5' : 'sm:grid-cols-6'}`}>
+        {flow.map((s, i) => {
           const done = !closed && current >= i
           const active = !closed && current === i
           const m = statusMeta(s)
+          const time = stepTime(s)
           return (
             <li key={s} className="relative flex flex-col items-center text-center">
               {i > 0 && (
@@ -114,6 +144,12 @@ export function OrderTimeline({ order }: { order: Order }) {
                 {done && !active ? <Check size={16} /> : i + 1}
               </span>
               <span className={`mt-2 font-label text-xs font-semibold ${done ? '' : 'text-ink-soft'}`}>{m.label}</span>
+              <time
+                dateTime={time.value}
+                className={`mt-1 max-w-24 font-label text-[10px] leading-tight ${time.value ? 'text-ink-soft' : 'text-ink-soft/60'}`}
+              >
+                {time.label}
+              </time>
             </li>
           )
         })}
@@ -156,4 +192,4 @@ export function OrderMoney({ order }: { order: Order }) {
 }
 
 /** Trạng thái cho phép yêu cầu hoàn tiền (đã thanh toán). */
-export const REFUNDABLE = ['PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'RECEIVED', 'RETURNED']
+export const REFUNDABLE = ['PAID', 'PROCESSING', 'SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'RECEIVED', 'RETURNED']

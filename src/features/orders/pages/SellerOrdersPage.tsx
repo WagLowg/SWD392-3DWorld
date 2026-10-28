@@ -11,7 +11,7 @@ import { useSellerOrders } from '../hooks/useOrders'
 import { STATUS_FILTERS } from '../lib/status'
 import type { Order } from '../types/order.types'
 
-const EARNING = ['PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'RECEIVED']
+const EARNING = ['PAID', 'PROCESSING', 'SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'RECEIVED']
 
 /** MP 047 · Danh Sách Đơn Chế Tác (người bán). */
 export function SellerOrdersPage() {
@@ -45,8 +45,8 @@ export function SellerOrdersPage() {
       <PageHeading
         eyebrow="Seller orders · đơn chế tác xưởng"
         title="Quản Lý Đơn Chế Tác"
-        accent="Tiếp Nhận, Đóng Gói & Xuất Xưởng."
-        description="Điều phối đơn theo xưởng: tiếp nhận đơn đã thanh toán, chế tác, tạo vận đơn và cập nhật kết quả giao hàng."
+        accent="Tiếp Nhận, Đóng Gói & Bàn Giao."
+        description="Seller tiếp nhận, soạn hàng và xác nhận bàn giao. Hệ thống tự tạo vận đơn GHTK; Staff phụ trách các trạng thái vận chuyển tiếp theo."
       />
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -58,15 +58,15 @@ export function SellerOrdersPage() {
           hint="Đơn đã thanh toán"
         />
         <Kpi
-          label="Đang chế tác"
+          label="Đang soạn hàng"
           value={count(['PROCESSING'])}
           icon={Hammer}
           tone="bg-violet-soft text-violet"
-          hint="Cần tạo vận đơn"
+          hint="Cần đóng gói và bàn giao"
         />
         <Kpi
-          label="Đang vận chuyển"
-          value={count(['SHIPPED'])}
+          label="Đã bàn giao / đang giao"
+          value={count(['SHIPPED', 'IN_TRANSIT'])}
           icon={Truck}
           tone="bg-teal-soft text-teal"
           hint="Chờ kết quả giao"
@@ -179,7 +179,7 @@ function SellerOrderCard({ order: o }: { order: Order }) {
           ))}
         </ul>
         <div className="flex flex-col justify-between gap-3 rounded-2xl bg-surface-low p-4 text-sm">
-          <ApiNote>OrderResponse chưa có tên, SĐT và địa chỉ người nhận.</ApiNote>
+          <ApiNote>Vận đơn GHTK được hệ thống tự tạo; Seller không nhập hãng hoặc mã vận đơn thủ công.</ApiNote>
           <dl className="space-y-1">
             <div className="flex justify-between">
               <dt className="text-ink-soft">Phí ship xưởng</dt>

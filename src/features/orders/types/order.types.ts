@@ -40,6 +40,8 @@ export type Order = {
   autoConfirmDueAt?: string | null
   shippingPackageCount?: number | null
   shippingWeightGrams?: number | null
+  paymentMethod?: string | null
+  onlinePaymentRequired?: boolean
 }
 
 export type OrderHistoryEntry = {
@@ -85,6 +87,7 @@ export type SavePackagesInput = {
  * Máy trạng thái theo PhysicalOrder.transition (Backend):
  * CREATED → PENDING_PAYMENT → PAID → PROCESSING → SHIPPED → DELIVERED → RECEIVED
  * Nhánh thoát: CANCELLED (trước khi gửi), RETURNED (sau khi gửi).
+ * IN_TRANSIT chỉ được giữ để tương thích dữ liệu cũ; luồng mới lưu nó trong Shipment.
  */
 export type OrderStatus =
   | 'CREATED'
@@ -92,6 +95,7 @@ export type OrderStatus =
   | 'PAID'
   | 'PROCESSING'
   | 'SHIPPED'
+  | 'IN_TRANSIT'
   | 'DELIVERED'
   | 'RECEIVED'
   | 'CANCELLED'
@@ -102,14 +106,12 @@ export type Shipment = {
   physicalOrderId: number
   carrierName: string
   trackingNumber: string
-  /** Vd. SHIPPED | DELIVERED | FAILED | RETURNED */
+  /** Vd. PENDING_PICKUP | SHIPPED | IN_TRANSIT | DELIVERED | FAILED | RETURNED */
   status: string
   shippedAt?: string | null
   deliveredAt?: string | null
   createdAt: string
 }
-
-export type ShipmentEvent = 'DELIVERED' | 'FAILED' | 'RETURNED'
 
 export type Payment = {
   transactionId: number

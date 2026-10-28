@@ -135,7 +135,7 @@ export function MyOrdersPage() {
 }
 
 function OrderCard({ order: o }: { order: Order }) {
-  const shipped = ['SHIPPED', 'DELIVERED', 'RECEIVED', 'RETURNED'].includes(o.status)
+  const shipped = ['SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'RECEIVED', 'RETURNED'].includes(o.status)
   return (
     <article className="rounded-[2rem] bg-white/95 p-5 shadow-soft sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -163,7 +163,7 @@ function OrderCard({ order: o }: { order: Order }) {
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-peach/50 p-4 text-sm">
           <CheckCircle2 size={18} className="text-orange-deep" />
           <span className="flex-1">Kiện hàng đã giao. Kiểm tra sản phẩm và gửi yêu cầu hoàn tiền nếu có sự cố.</span>
-          <ApiNote>Chưa có API để người mua tự xác nhận "Đã nhận hàng" (RECEIVED).</ApiNote>
+          <ApiNote>Staff sẽ đối soát GHTK và cập nhật trạng thái xác nhận nhận hàng.</ApiNote>
         </div>
       )}
       <footer className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">

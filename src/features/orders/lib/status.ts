@@ -10,10 +10,15 @@ export const ORDER_STATUS: Record<OrderStatus, { label: string; tone: Tone; hint
     hint: 'Đơn đang giữ chỗ tồn kho, chờ thanh toán. Đơn quá hạn sẽ tự huỷ.',
   },
   PAID: { label: 'Đã thanh toán', tone: 'violet', hint: 'Đang chờ xưởng tiếp nhận và chế tác.' },
-  PROCESSING: { label: 'Đang chế tác', tone: 'violet', hint: 'Xưởng đang in, hoàn thiện và đóng gói.' },
-  SHIPPED: { label: 'Đang vận chuyển', tone: 'teal', hint: 'Kiện hàng đã giao cho đơn vị vận chuyển.' },
+  PROCESSING: { label: 'Đang soạn hàng', tone: 'violet', hint: 'Xưởng đang chế tác, kiểm tra và đóng gói.' },
+  SHIPPED: {
+    label: 'Đã bàn giao vận chuyển',
+    tone: 'teal',
+    hint: 'Seller đã đưa kiện hàng cho đơn vị vận chuyển; chờ Staff cập nhật hành trình.',
+  },
+  IN_TRANSIT: { label: 'Đang vận chuyển', tone: 'teal', hint: 'Staff xác nhận kiện hàng đang được vận chuyển.' },
   DELIVERED: { label: 'Đã giao hàng', tone: 'green', hint: 'Bưu tá đã giao kiện hàng thành công.' },
-  RECEIVED: { label: 'Đã nhận hàng', tone: 'green', hint: 'Người mua đã xác nhận nhận hàng.' },
+  RECEIVED: { label: 'Đã nhận hàng', tone: 'green', hint: 'Staff đã đối soát và xác nhận người mua nhận hàng.' },
   CANCELLED: { label: 'Đã huỷ', tone: 'danger', hint: 'Đơn đã huỷ, tồn kho được giải phóng.' },
   RETURNED: { label: 'Hoàn trả', tone: 'danger', hint: 'Kiện hàng bị hoàn trả về xưởng.' },
 }
@@ -43,17 +48,22 @@ export function flowIndex(status: string) {
 export const STATUS_FILTERS: { value: string; label: string; match: string[] }[] = [
   { value: '', label: 'Tất cả', match: [] },
   { value: 'pending', label: 'Chờ thanh toán', match: ['CREATED', 'PENDING_PAYMENT'] },
-  { value: 'making', label: 'Đang chế tác', match: ['PAID', 'PROCESSING'] },
-  { value: 'shipping', label: 'Đang vận chuyển', match: ['SHIPPED'] },
+  { value: 'making', label: 'Đang soạn hàng', match: ['PAID', 'PROCESSING'] },
+  { value: 'shipping', label: 'Vận chuyển', match: ['SHIPPED', 'IN_TRANSIT'] },
   { value: 'done', label: 'Đã giao / nhận', match: ['DELIVERED', 'RECEIVED'] },
   { value: 'closed', label: 'Huỷ / hoàn trả', match: ['CANCELLED', 'RETURNED'] },
 ]
 
 export const SHIPMENT_STATUS: Record<string, { label: string; tone: Tone }> = {
-  CREATED: { label: 'Đã tạo vận đơn', tone: 'neutral' },
-  SHIPPED: { label: 'Đang vận chuyển', tone: 'teal' },
+  CREATED: { label: 'Đã tạo vận đơn tự động', tone: 'neutral' },
+  PREPARING: { label: 'Chờ Seller bàn giao', tone: 'orange' },
+  PENDING: { label: 'Chờ Seller bàn giao', tone: 'orange' },
+  PENDING_PICKUP: { label: 'Chờ Seller bàn giao', tone: 'orange' },
+  SHIPPED: { label: 'Seller đã bàn giao', tone: 'violet' },
   IN_TRANSIT: { label: 'Đang vận chuyển', tone: 'teal' },
+  ARRIVED_AT_DESTINATION: { label: 'Đã đến điểm giao', tone: 'teal' },
   DELIVERED: { label: 'Giao thành công', tone: 'green' },
+  RECEIVED: { label: 'Đã nhận hàng', tone: 'green' },
   FAILED: { label: 'Giao thất bại', tone: 'danger' },
   RETURNED: { label: 'Hoàn trả', tone: 'danger' },
 }

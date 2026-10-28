@@ -1,17 +1,18 @@
-import { ArrowLeft, Boxes, History, MapPin, Truck, Undo2, XCircle } from 'lucide-react'
+import { ArrowLeft, Boxes, CheckCircle2, History, MapPin, Truck, Undo2, XCircle } from 'lucide-react'
 import { type ReactNode, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ApiClientError } from '../../../shared/api'
 import { formatDateTime } from '../../../shared/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { Breadcrumbs } from '../../../shared/ui/primitives'
-import { ConfirmReceivedButton } from '../../buyer/components/ConfirmReceivedDialog'
 import { QueryState } from '../../../shared/ui/QueryState'
+import { useToast } from '../../../shared/ui/toast'
 import {
+  displayOrderCode,
   OrderItemRow,
   OrderMoney,
   OrderStatusBadge,
   OrderTimeline,
-  displayOrderCode,
   orderCode,
   REFUNDABLE,
   ShipmentStatusBadge,
@@ -19,7 +20,7 @@ import {
 } from '../components/OrderParts'
 import { PayOrderButton } from '../components/PayOrderButton'
 import { ShippingAddressSnapshot } from '../components/ShippingAddressSnapshot'
-import { useBuyerShipments, useOrder, useOrderHistory, useOrderPackages } from '../hooks/useOrders'
+import { useBuyerShipments, useConfirmReceived, useOrder, useOrderHistory, useOrderPackages } from '../hooks/useOrders'
 import { statusMeta } from '../lib/status'
 import { useOrderPaymentsStore } from '../stores/order-payments.store'
 
@@ -32,6 +33,8 @@ export function OrderDetailPage() {
   const history = useOrderHistory(order ? orderId : undefined)
   const packages = useOrderPackages(order ? orderId : undefined)
   const payment = useOrderPaymentsStore((s) => s.byOrder[orderId])
+  const confirmReceived = useConfirmReceived()
+  const toast = useToast()
 
   useEffect(() => {
     document.title = `Đơn ${orderCode(orderId)} · 3DWorld`
@@ -78,7 +81,12 @@ export function OrderDetailPage() {
           <section className="mt-6 rounded-[2rem] bg-white/95 p-6 shadow-soft sm:p-8">
             <h2 className="font-display text-xl font-bold">Tiến Trình Đơn Hàng</h2>
             <div className="mt-6">
-              <OrderTimeline order={order} />
+              <OrderTimeline
+                order={order}
+                history={history.data}
+                historyLoading={history.isLoading}
+                historyError={history.isError}
+              />
             </div>
           </section>
 
@@ -123,7 +131,7 @@ export function OrderDetailPage() {
                   </ul>
                 ) : (
                   <p className="mt-4 rounded-2xl bg-surface-low p-4 text-sm text-ink-soft">
-                    Xưởng chưa tạo vận đơn. Vận đơn xuất hiện khi kiện hàng được bàn giao cho đơn vị vận chuyển.
+                    Hệ thống đang khởi tạo vận đơn. Hành trình sẽ xuất hiện sau khi xưởng bàn giao kiện hàng.
                   </p>
                 )}
               </section>
@@ -220,7 +228,27 @@ export function OrderDetailPage() {
                   {order.status === 'PENDING_PAYMENT' && (
                     <PayOrderButton orderId={order.id} amount={order.totalAmount} className="justify-center" />
                   )}
-                  {order.status === 'DELIVERED' && <ConfirmReceivedButton orderId={order.id} />}
+                  {order.status === 'DELIVERED' && (
+                    <button
+                      type="button"
+                      disabled={confirmReceived.isPending}
+                      onClick={() =>
+                        confirmReceived
+                          .mutateAsync({ orderId: order.id })
+                          .catch((e) =>
+                            toast(e instanceof ApiClientError ? e.message : 'Không xác nhận nhận hàng được.', 'error'),
+                          )
+                      }
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-mint px-5 py-2.5 font-label text-sm font-semibold text-[#0f5132] hover:opacity-95 disabled:opacity-50"
+                    >
+                      <CheckCircle2 size={15} /> Xác nhận đã nhận hàng
+                    </button>
+                  )}
+                  {order.status === 'DELIVERED' && (
+                    <span className="rounded-full bg-surface-low px-5 py-2.5 text-center font-label text-sm font-semibold text-ink-soft">
+                      Staff đang đối soát xác nhận nhận hàng
+                    </span>
+                  )}
                   {['CREATED', 'PENDING_PAYMENT'].includes(order.status) && (
                     <Link
                       to={`/orders/${order.id}/cancel`}

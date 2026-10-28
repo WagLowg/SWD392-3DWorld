@@ -110,7 +110,10 @@ export function RequireUser({ children }: { children: ReactNode }) {
 export function AccountTabs() {
   const { data: user } = useSession()
   const { pathname } = useLocation()
-  const seller = isSeller(user) || pathname.startsWith('/seller')
+  const buyerArea = ['/profile', '/orders', '/refunds', '/addresses', '/bank-accounts', '/reports', '/models'].some((p) =>
+    pathname === p || pathname.startsWith(`${p}/`),
+  )
+  const seller = (isSeller(user) || pathname.startsWith('/seller')) && !buyerArea
   const admin = isAdmin(user) || pathname.startsWith('/ops')
   const tab = ({ isActive }: { isActive: boolean }) =>
     `flex shrink-0 items-center gap-3 rounded-2xl px-3 py-2.5 font-label text-sm font-semibold transition ${
