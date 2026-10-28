@@ -19,6 +19,7 @@ import {
   StorefrontLabel,
 } from '../components/OrderParts'
 import { PayOrderButton } from '../components/PayOrderButton'
+import { CodPaymentPanel } from '../components/CodPaymentPanel'
 import { ShippingAddressSnapshot } from '../components/ShippingAddressSnapshot'
 import { useBuyerShipments, useConfirmReceived, useOrder, useOrderHistory, useOrderPackages } from '../hooks/useOrders'
 import { statusMeta } from '../lib/status'
@@ -198,14 +199,19 @@ export function OrderDetailPage() {
                 <div className="mt-4">
                   <OrderMoney order={order} />
                 </div>
+                <div className="mt-4">
+                  <CodPaymentPanel orderId={order.id} paymentMethod={order.paymentMethod} orderStatus={order.status} />
+                </div>
                 {payment && (
                   <p className="mt-3 rounded-xl bg-surface-low px-3 py-2 font-mono text-[11px] text-ink-soft">
                     Giao dịch ZaloPay #{payment.transactionId}
                   </p>
                 )}
-                {order.reservationExpiresAt && order.status === 'PENDING_PAYMENT' && (
+                {order.reservationExpiresAt &&
+                  (order.status === 'PENDING_PAYMENT' || (order.paymentMethod === 'COD' && order.status === 'CREATED')) && (
                   <p className="mt-3 rounded-xl bg-peach/50 px-3 py-2 text-xs text-orange-deep">
-                    Giữ chỗ tồn kho đến {formatDateTime(order.reservationExpiresAt)}
+                    {order.paymentMethod === 'COD' ? 'Người bán cần nhận đơn trước' : 'Giữ chỗ tồn kho đến'}{' '}
+                    {formatDateTime(order.reservationExpiresAt)}
                   </p>
                 )}
                 {order.autoConfirmDueAt && order.status === 'DELIVERED' && (
@@ -225,7 +231,9 @@ export function OrderDetailPage() {
                   </p>
                 )}
                 <div className="mt-5 grid gap-2">
-                  {order.status === 'PENDING_PAYMENT' && (
+                  {order.status === 'PENDING_PAYMENT' &&
+                    order.paymentMethod !== 'COD' &&
+                    order.onlinePaymentRequired !== false && (
                     <PayOrderButton orderId={order.id} amount={order.totalAmount} className="justify-center" />
                   )}
                   {order.status === 'DELIVERED' && (
@@ -235,6 +243,7 @@ export function OrderDetailPage() {
                       onClick={() =>
                         confirmReceived
                           .mutateAsync({ orderId: order.id })
+                          .then(() => toast('Đã xác nhận nhận hàng. Thời hạn yêu cầu hoàn tiền đã bắt đầu.'))
                           .catch((e) =>
                             toast(e instanceof ApiClientError ? e.message : 'Không xác nhận nhận hàng được.', 'error'),
                           )
@@ -246,10 +255,13 @@ export function OrderDetailPage() {
                   )}
                   {order.status === 'DELIVERED' && (
                     <span className="rounded-full bg-surface-low px-5 py-2.5 text-center font-label text-sm font-semibold text-ink-soft">
-                      Staff đang đối soát xác nhận nhận hàng
+                      {order.autoConfirmDueAt
+                        ? `Nếu chưa xác nhận, hệ thống sẽ tự xác nhận lúc ${formatDateTime(order.autoConfirmDueAt)}`
+                        : 'Nếu chưa xác nhận trong 24 giờ, hệ thống sẽ tự xác nhận nhận hàng'}
                     </span>
                   )}
-                  {['CREATED', 'PENDING_PAYMENT'].includes(order.status) && (
+                  {((order.paymentMethod === 'COD' && order.status === 'CREATED') ||
+                    (order.paymentMethod !== 'COD' && ['CREATED', 'PENDING_PAYMENT'].includes(order.status))) && (
                     <Link
                       to={`/orders/${order.id}/cancel`}
                       className="inline-flex items-center justify-center gap-2 rounded-full bg-surface-low px-5 py-2.5 font-label text-sm font-semibold text-danger hover:bg-surface-high"
@@ -259,7 +271,7 @@ export function OrderDetailPage() {
                   )}
                   {REFUNDABLE.includes(order.status) && (
                     <Link
-                      to={`/refunds/new?orderId=${order.id}`}
+                      to={`/refunds?orderId=${order.id}`}
                       className="inline-flex items-center justify-center gap-2 rounded-full bg-surface-low px-5 py-2.5 font-label text-sm font-semibold hover:bg-surface-high"
                     >
                       <Undo2 size={15} /> Yêu cầu hoàn tiền

@@ -10,6 +10,32 @@ export type OrderItem = {
   attributes?: string | null
 }
 
+export type PaymentMethod = 'COD' | 'GATEWAY'
+
+export type CodCollectionStatus = 'PENDING_COLLECTION' | 'PENDING_SETTLEMENT' | 'SETTLED' | 'CANCELLED' | string
+
+export type CodPayment = {
+  orderId: number
+  transactionId: number
+  paymentMethod: 'COD'
+  status: string
+  collectionStatus: CodCollectionStatus
+  expectedAmount: number
+  amountToCollect: number
+  collectedAt: string | null
+  settledAt: string | null
+  collectionReference: string | null
+  settlementReference: string | null
+}
+
+export type CodRecordInput = {
+  amount: number
+  reference: string
+  evidenceKey: string
+  reason: string
+  occurredAt: string
+}
+
 /** Đơn con vật lý — mỗi xưởng (storefront) một đơn. */
 export type Order = {
   id: number
@@ -40,7 +66,7 @@ export type Order = {
   autoConfirmDueAt?: string | null
   shippingPackageCount?: number | null
   shippingWeightGrams?: number | null
-  paymentMethod?: string | null
+  paymentMethod?: PaymentMethod | null
   onlinePaymentRequired?: boolean
 }
 

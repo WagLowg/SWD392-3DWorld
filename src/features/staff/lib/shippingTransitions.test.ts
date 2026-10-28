@@ -45,8 +45,9 @@ describe('shippingTransitions', () => {
     expect(isValidShipmentTransition('IN_TRANSIT', 'HANDED_TO_CARRIER')).toBe(false)
   })
 
-  it('allows DELIVERED to close out with RECEIVED and treats terminal states as terminal', () => {
-    expect(isValidShipmentTransition('DELIVERED', 'RECEIVED')).toBe(true)
+  it('does not let Staff confirm receipt on behalf of the buyer', () => {
+    expect(isValidShipmentTransition('DELIVERED', 'RECEIVED')).toBe(false)
+    expect(isValidShipmentTransition('DELIVERED', 'RETURNED')).toBe(true)
     expect(VALID_SHIPMENT_TRANSITIONS.RECEIVED).toEqual([])
     expect(VALID_SHIPMENT_TRANSITIONS.RETURNED).toEqual([])
     expect(isValidShipmentTransition('DELIVERED', 'HANDED_TO_CARRIER')).toBe(false)

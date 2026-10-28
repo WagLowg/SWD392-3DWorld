@@ -1,14 +1,10 @@
 import {
-  ChevronRight,
-  ClipboardList,
   Flame,
   LayoutDashboard,
   LogOut,
-  Package,
   RotateCcw,
   ShieldCheck,
   Truck,
-  Users,
 } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { logout } from '../../auth/services/session'
@@ -18,6 +14,7 @@ import { useStaffRefunds, useStaffShipments } from '../services/staff.service'
 export function StaffSidebar() {
   const { pathname } = useLocation()
   const { data: user } = useSession()
+  const role = user?.roles?.includes('ADMIN') ? 'ADMIN' : 'PRINT_STAFF'
   const { shipments } = useStaffShipments()
   const { refunds } = useStaffRefunds()
 
@@ -183,7 +180,7 @@ export function StaffSidebar() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-bold text-ink">{user?.name ?? 'Nhân viên vận hành'}</p>
-            <p className="truncate font-mono text-[10px] font-semibold text-teal">Role: PRINT_STAFF</p>
+            <p className="truncate font-mono text-[10px] font-semibold text-teal">Role: {role}</p>
           </div>
         </div>
 

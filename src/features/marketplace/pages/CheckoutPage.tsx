@@ -9,40 +9,45 @@ import {
   ExternalLink,
   MapPin,
   Plus,
+  RefreshCw,
   ShieldCheck,
   Tag,
   Truck,
   Wallet,
 } from 'lucide-react'
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
-import { useSession } from '../../../shared/session/useSession'
 import { LoginRequired } from '../../../shared/ui/LoginRequired'
-import { ApiNote, PageHeading } from '../../../shared/ui/primitives'
-import { StatusBlock } from '../../../shared/ui/StatusBlock'
-import { useOrderPaymentsStore } from '../../orders/stores/order-payments.store'
-import { AddressForm } from '../components/AddressForm'
 import { ProductMedia } from '../components/ProductMedia'
+import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { StorefrontBadge } from '../components/StorefrontBadge'
-import { useCart } from '../hooks/useCart'
-import { useAddresses, useCheckout, useZaloPayPayment } from '../hooks/useCheckout'
+import { ApiNote, PageHeading, QuantityStepper } from '../../../shared/ui/primitives'
+import { cartKey, useCart, useUpdateCartItem } from '../hooks/useCart'
+import { addressKey, useAddresses, useCheckout, useShippingQuote, useZaloPayPayment } from '../hooks/useCheckout'
+import { useSession } from '../../../shared/session/useSession'
 import { groupByStorefront, storefrontName } from '../lib/cart'
 import { formatAttributes, formatVnd } from '../lib/format'
 import { paymentResultUrl } from '../lib/payment'
+import { ordersRequiringGatewayPayment } from '../lib/checkoutPayment'
+import { isShippingQuoteUsable, SHIPPING_QUOTE_EXPIRY_BUFFER_MS } from '../lib/shipping'
 import { useVariantIndexStore } from '../stores/variant-index.store'
-import type { Address, Order, Payment } from '../types/catalog.types'
-
-type PaymentMethod = 'zalopay' | 'cod'
+import { useOrderPaymentsStore } from '../../orders/stores/order-payments.store'
+import { goLogin } from '../../auth/services/session'
+import {
+  clearPendingCheckout,
+  loadPendingCheckout,
+  savePendingCheckout,
+  type PendingCheckoutAttempt,
+} from '../lib/checkoutAttempt'
+import type { Address, CheckoutInput, Order, Payment, PaymentMethod, ShippingQuoteInput } from '../types/catalog.types'
+import { AddressForm } from '../components/AddressForm'
 
 type PaymentState = { orderId: number; payment?: Payment; error?: string }
 
 function addressLine(a: Address) {
   return [a.addressLine, a.ward, a.district, a.province || a.city].filter(Boolean).join(', ')
-}
-
-function addressSnapshot(a: Address) {
-  return [a.recipientName, a.phone, addressLine(a)].filter(Boolean).join(' | ')
 }
 
 function formatTime(iso: string) {
@@ -65,7 +70,8 @@ export function CheckoutPage() {
   const [params] = useSearchParams()
   const [orders, setOrders] = useState<Order[] | null>(null)
   const [payments, setPayments] = useState<PaymentState[]>([])
-  const [method, setMethod] = useState<PaymentMethod>('zalopay')
+  const [pendingAttempt, setPendingAttempt] = useState<PendingCheckoutAttempt | null>(() => loadPendingCheckout())
+  const [method, setMethod] = useState<PaymentMethod>(() => pendingAttempt?.payload.paymentMethod ?? 'GATEWAY')
 
   useEffect(() => {
     document.title = 'Đặt Hàng & Thanh Toán · 3DWorld'
@@ -104,7 +110,7 @@ export function CheckoutPage() {
           <LoginRequired title="Đăng nhập để đặt hàng" body="Bạn cần đăng nhập để chọn địa chỉ và thanh toán." />
         ) : done ? (
           <OrderResult orders={orders} payments={payments} method={method} onPaymentsChange={setPayments} />
-        ) : !items.length ? (
+        ) : !items.length && !pendingAttempt ? (
           <StatusBlock
             tone="empty"
             title="Chưa có vật phẩm để đặt"
@@ -120,6 +126,8 @@ export function CheckoutPage() {
             items={items}
             method={method}
             onMethodChange={setMethod}
+            pendingAttempt={pendingAttempt}
+            onPendingAttemptChange={setPendingAttempt}
             onPlaced={(placed, paid) => {
               setOrders(placed)
               setPayments(paid)
@@ -173,22 +181,29 @@ function CheckoutForm({
   items,
   method,
   onMethodChange,
+  pendingAttempt,
+  onPendingAttemptChange,
   onPlaced,
 }: {
   items: NonNullable<ReturnType<typeof useCart>['data']>['items']
   method: PaymentMethod
   onMethodChange: (m: PaymentMethod) => void
+  pendingAttempt: PendingCheckoutAttempt | null
+  onPendingAttemptChange: (attempt: PendingCheckoutAttempt | null) => void
   onPlaced: (orders: Order[], payments: PaymentState[]) => void
 }) {
+  const queryClient = useQueryClient()
   const index = useVariantIndexStore((s) => s.variants)
   const addresses = useAddresses()
   const checkout = useCheckout()
   const pay = useZaloPayPayment()
+  const updateCartItem = useUpdateCartItem()
   const [addressId, setAddressId] = useState<number>()
   const [adding, setAdding] = useState(false)
   const [agree, setAgree] = useState(false)
   const [error, setError] = useState('')
-  const idempotencyKey = useRef(newKey())
+  const [quoteRefreshKey, setQuoteRefreshKey] = useState(0)
+  const [expiryTick, setExpiryTick] = useState(() => Date.now())
   const rememberPayment = useOrderPaymentsStore((s) => s.remember)
 
   const list = addresses.data ?? []
@@ -199,24 +214,93 @@ function CheckoutForm({
 
   const groups = groupByStorefront(items, index)
   const subtotal = items.reduce((s, i) => s + (Number(i.lineTotal) || 0), 0)
-  const busy = checkout.isPending || pay.isPending
+  const cartItemIds = useMemo(() => [...items.map((item) => item.itemId)].sort((a, b) => a - b), [items])
+  const hasDuplicateIds = new Set(cartItemIds).size !== cartItemIds.length
+  const invalidCartSelection = hasDuplicateIds || cartItemIds.length > 100
+  const cartFingerprint = useMemo(
+    () =>
+      [...items]
+        .sort((a, b) => a.itemId - b.itemId)
+        .map((item) => `${item.itemId}:${item.quantity}:${item.unitPrice}:${item.lineTotal}`)
+        .join('|'),
+    [items],
+  )
+  const quoteInput = useMemo<ShippingQuoteInput | null>(
+    () =>
+      addressId && cartItemIds.length && !invalidCartSelection
+        ? { cartItemIds, shippingAddressId: addressId }
+        : null,
+    [addressId, cartItemIds, invalidCartSelection],
+  )
+  const shippingQuote = useShippingQuote(quoteInput, cartFingerprint, quoteRefreshKey)
+  const quote = shippingQuote.data
+  const quoteUsable = isShippingQuoteUsable(quote, Math.max(expiryTick, Date.now()))
+  const quoteExpired = !!quote && !quoteUsable
+  const shippingQuoteLoading = shippingQuote.isDebouncing || shippingQuote.isFetching
+  const shippingQuoteError = invalidCartSelection
+    ? hasDuplicateIds
+      ? 'Danh sách sản phẩm có ID trùng lặp.'
+      : 'Mỗi lần checkout chỉ hỗ trợ tối đa 100 sản phẩm trong giỏ.'
+    : shippingQuote.error instanceof ApiClientError
+      ? shippingQuote.error.message
+      : shippingQuote.error
+        ? 'Không tính được phí vận chuyển.'
+        : ''
+  const grandTotal = subtotal + (quoteUsable ? Number(quote?.totalShippingFee) || 0 : 0)
+  const shopFees = useMemo(
+    () => new Map((quote?.shops ?? []).map((shop) => [shop.storefrontId, Number(shop.selected.shippingFee) || 0])),
+    [quote],
+  )
+  const busy = checkout.isPending || pay.isPending || updateCartItem.isPending
   const priceChanged = items.filter((i) => i.priceChanged)
 
-  const submit = async () => {
-    if (!address) return setError('Vui lòng chọn hoặc thêm địa chỉ nhận hàng.')
-    if (priceChanged.length) return setError('Có món đã đổi giá — vui lòng chấp nhận giá mới trong giỏ hàng.')
+  useEffect(() => {
+    if (!quote) return
+    const delay = Math.max(0, quote.expiresAt - SHIPPING_QUOTE_EXPIRY_BUFFER_MS - Date.now())
+    const timer = window.setTimeout(() => setExpiryTick((value) => value + 1), delay + 20)
+    return () => window.clearTimeout(timer)
+  }, [quote])
+
+  useEffect(() => {
+    if (shippingQuote.error instanceof ApiClientError && [401, 403].includes(shippingQuote.error.status)) goLogin()
+  }, [shippingQuote.error])
+
+  const refreshShippingQuote = () => {
     setError('')
-    try {
-      const placed = await checkout.mutateAsync({
-        cartItemIds: items.map((i) => i.itemId),
-        shippingAddressSnapshot: addressSnapshot(address),
+    setQuoteRefreshKey((value) => value + 1)
+  }
+
+  const submit = async () => {
+    if (!pendingAttempt && !address) return setError('Vui lòng chọn hoặc thêm địa chỉ nhận hàng.')
+    if (!pendingAttempt && priceChanged.length)
+      return setError('Có món đã đổi giá — vui lòng chấp nhận giá mới trong giỏ hàng.')
+    if (!pendingAttempt && !isShippingQuoteUsable(quote))
+      return setError('Phí vận chuyển chưa sẵn sàng hoặc đã hết hạn. Vui lòng lấy phí lại.')
+    setError('')
+
+    let payload: CheckoutInput
+    if (pendingAttempt) {
+      payload = pendingAttempt.payload
+    } else {
+      if (!address || !quote) return setError('Phí vận chuyển chưa sẵn sàng. Vui lòng lấy phí lại.')
+      payload = {
+        cartItemIds,
         shippingAddressId: address.id,
-        idempotencyKey: idempotencyKey.current,
-      })
-      idempotencyKey.current = newKey()
+        idempotencyKey: newKey(),
+        shippingQuoteToken: quote.quoteToken,
+        paymentMethod: method,
+      }
+    }
+    const attempt = pendingAttempt ?? savePendingCheckout(payload)
+    if (!pendingAttempt) onPendingAttemptChange(attempt)
+
+    try {
+      const placed = await checkout.mutateAsync(payload)
+      clearPendingCheckout(payload.idempotencyKey)
+      onPendingAttemptChange(null)
       const paid: PaymentState[] = []
-      if (method === 'zalopay') {
-        for (const order of placed) {
+      if (payload.paymentMethod === 'GATEWAY') {
+        for (const order of ordersRequiringGatewayPayment(placed, payload.paymentMethod)) {
           try {
             const payment = await pay.mutateAsync(order.id)
             rememberPayment(order.id, { transactionId: payment.transactionId, amount: payment.amount })
@@ -231,7 +315,31 @@ function CheckoutForm({
       }
       onPlaced(placed, paid)
     } catch (e) {
-      setError(e instanceof ApiClientError ? e.message : 'Không đặt được hàng. Vui lòng thử lại.')
+      if (e instanceof ApiClientError && e.status > 0) {
+        clearPendingCheckout(payload.idempotencyKey)
+        onPendingAttemptChange(null)
+
+        if (e.status === 409) {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: cartKey }),
+            queryClient.invalidateQueries({ queryKey: addressKey }),
+          ])
+          refreshShippingQuote()
+        } else if (e.status === 400 || e.status === 422 || e.status === 503) {
+          refreshShippingQuote()
+        }
+
+        if (e.status === 401 || e.status === 403) return goLogin()
+      }
+
+      const message = e instanceof ApiClientError ? e.message : 'Không đặt được hàng. Vui lòng thử lại.'
+      setError(
+        e instanceof ApiClientError && e.status === 409
+          ? `${message} Giỏ hàng và phí vận chuyển đang được cập nhật; vui lòng xác nhận lại.`
+          : e instanceof ApiClientError && e.status === 0
+            ? `${message} Yêu cầu trước chưa rõ kết quả; lần thử lại sẽ dùng đúng mã và payload cũ.`
+            : message,
+      )
     }
   }
 
@@ -272,6 +380,7 @@ function CheckoutForm({
                     type="radio"
                     name="address"
                     checked={a.id === addressId}
+                    disabled={checkout.isPending}
                     onChange={() => setAddressId(a.id)}
                     className="mt-1 accent-violet"
                   />
@@ -335,7 +444,7 @@ function CheckoutForm({
               {g.items.map((item) => {
                 const info = index[item.variantId]
                 return (
-                  <li key={item.itemId} className="flex items-center gap-4 py-4">
+                  <li key={item.itemId} className="flex flex-wrap items-center gap-4 py-4 sm:flex-nowrap">
                     <ProductMedia
                       src={item.thumbnailUrl ?? info?.image}
                       alt=""
@@ -347,11 +456,17 @@ function CheckoutForm({
                       {info && <p className="text-xs text-ink-soft">{formatAttributes(info.attributes)}</p>}
                       <p className="font-mono text-[11px] text-violet">Mã kho: {item.sku}</p>
                     </div>
+                    <div className="text-center">
+                      <p className="mb-1 font-label text-[10px] font-semibold uppercase text-ink-soft">Số lượng</p>
+                      <QuantityStepper
+                        size="sm"
+                        value={item.quantity}
+                        disabled={busy || !!pendingAttempt}
+                        onChange={(quantity) => updateCartItem.mutate({ itemId: item.itemId, quantity })}
+                      />
+                    </div>
                     <div className="text-right">
-                      <p className="text-xs text-ink-soft">
-                        Số lượng: <strong className="text-ink">x{item.quantity}</strong>
-                        {item.quantity > 1 && ` (${formatVnd(item.unitPrice)}/sp)`}
-                      </p>
+                      <p className="text-xs text-ink-soft">{formatVnd(item.unitPrice)}/sản phẩm</p>
                       <p className="font-display text-lg font-bold">{formatVnd(item.lineTotal)}</p>
                     </div>
                   </li>
@@ -366,40 +481,53 @@ function CheckoutForm({
                 <input type="radio" checked readOnly className="mt-1 accent-orange" />
                 <span>
                   <span className="block text-sm font-semibold">Giao tiêu chuẩn của xưởng</span>
-                  <span className="block text-xs text-ink-soft">Phí vận chuyển do xưởng tính khi tạo đơn con</span>
+                  <span className="block text-xs text-ink-soft">
+                    {shippingQuoteLoading
+                      ? 'Đang tính phí vận chuyển…'
+                      : quoteUsable && g.storefrontId !== null && shopFees.has(g.storefrontId)
+                        ? `Phí vận chuyển: ${formatVnd(shopFees.get(g.storefrontId) ?? 0)}`
+                        : shippingQuoteError
+                          ? 'Chưa tính được phí vận chuyển'
+                          : quoteExpired
+                            ? 'Báo giá vận chuyển đã hết hạn'
+                            : 'Chờ địa chỉ nhận hàng'}
+                  </span>
                 </span>
               </label>
-              <ApiNote className="mt-2">
-                CheckoutRequest chưa có lựa chọn đơn vị vận chuyển — phí ship trả về trong đơn con sau khi đặt.
-              </ApiNote>
             </div>
             <div className="mt-4 flex flex-wrap items-baseline justify-between gap-2 text-sm">
               <span className="text-ink-soft">
                 Tạm tính {storefrontName(g.storefrontId).toLowerCase()}:{' '}
-                <strong className="text-ink">{formatVnd(g.subtotal)}</strong> + phí ship
+                <strong className="text-ink">{formatVnd(g.subtotal)}</strong>
               </span>
-              <span className="font-display text-xl font-bold">Tạm tính: {formatVnd(g.subtotal)}</span>
+              <span className="font-display text-xl font-bold">
+                {quoteUsable && g.storefrontId !== null && shopFees.has(g.storefrontId)
+                  ? `Gồm ship: ${formatVnd(g.subtotal + (shopFees.get(g.storefrontId) ?? 0))}`
+                  : `Tạm tính: ${formatVnd(g.subtotal)}`}
+              </span>
             </div>
           </section>
         ))}
 
         {/* 3. Thanh toán */}
-        <Section n={3} icon={<Wallet size={18} />} title="Phương Thức Thanh Toán" tag="ZaloPay sandbox">
+        <Section n={3} icon={<Wallet size={18} />} title="Phương Thức Thanh Toán">
           <div className="space-y-3">
             <PayOption
-              active={method === 'zalopay'}
-              onSelect={() => onMethodChange('zalopay')}
+              active={method === 'GATEWAY'}
+              disabled={!!pendingAttempt}
+              onSelect={() => onMethodChange('GATEWAY')}
               icon={<CreditCard size={18} />}
               title="Cổng thanh toán ZaloPay"
               badge="Khuyên dùng"
               body="Sau khi tạo đơn, mỗi đơn con có một liên kết ZaloPay để thanh toán (ATM, thẻ quốc tế, ví ZaloPay)."
             />
             <PayOption
-              active={method === 'cod'}
-              onSelect={() => onMethodChange('cod')}
+              active={method === 'COD'}
+              disabled={!!pendingAttempt}
+              onSelect={() => onMethodChange('COD')}
               icon={<Banknote size={18} />}
               title="Thanh toán khi nhận hàng (COD)"
-              body="Trả tiền mặt cho nhân viên giao hàng khi nhận từng kiện."
+              body="Thanh toán toàn bộ tiền hàng và phí vận chuyển cho đơn vị giao hàng khi nhận từng kiện."
             />
             <PayOption
               disabled
@@ -408,10 +536,7 @@ function CheckoutForm({
               badge="Sắp có"
               body="Thanh toán bằng số dư ví, tiền được giữ an toàn đến khi bạn nhận hàng."
             />
-            <ApiNote>
-              CheckoutRequest chưa có trường phương thức thanh toán: COD = chỉ tạo đơn; ZaloPay = tạo đơn rồi gọi
-              /api/payments/zalopay (PHYSICAL_ORDER · FULL) cho từng đơn con. Số dư ví chưa có API.
-            </ApiNote>
+            <ApiNote>COD không tạo giao dịch ZaloPay. Báo giá vận chuyển GHTK vẫn bắt buộc cho cả hai phương thức.</ApiNote>
           </div>
         </Section>
       </div>
@@ -425,7 +550,18 @@ function CheckoutForm({
           <h2 className="font-display text-2xl font-bold">Tổng Kết Đơn Hàng</h2>
           <dl className="mt-5 space-y-3 text-sm">
             <SummaryRow label={`Tổng tiền hàng (${groups.length} xưởng):`} value={formatVnd(subtotal)} />
-            <SummaryRow label={`Phí vận chuyển (${groups.length} kiện riêng):`} value="Tính khi tạo đơn" />
+            <SummaryRow
+              label={`Phí vận chuyển (${groups.length} xưởng):`}
+              value={
+                shippingQuoteLoading
+                  ? 'Đang tính…'
+                  : quoteUsable
+                    ? formatVnd(quote?.totalShippingFee ?? 0)
+                    : quoteExpired
+                      ? 'Đã hết hạn'
+                      : 'Chưa có'
+              }
+            />
             <SummaryRow label="Khấu trừ voucher ưu đãi:" value="0₫" />
           </dl>
           <div className="mt-4 flex items-center justify-between rounded-xl bg-surface-low px-3 py-2.5 font-label text-xs text-ink-soft">
@@ -435,10 +571,14 @@ function CheckoutForm({
             <span>Chưa hỗ trợ</span>
           </div>
           <div className="mt-5 flex items-end justify-between border-t border-line pt-5">
-            <span className="font-label text-xs font-semibold uppercase tracking-wider">Tạm tính thanh toán</span>
-            <span className="font-display text-3xl font-bold text-orange-deep">{formatVnd(subtotal)}</span>
+            <span className="font-label text-xs font-semibold uppercase tracking-wider">Tổng thanh toán</span>
+            <span className="font-display text-3xl font-bold text-orange-deep">
+              {quoteUsable ? formatVnd(grandTotal) : '—'}
+            </span>
           </div>
-          <p className="text-right font-label text-[11px] text-ink-soft">Chưa gồm phí vận chuyển từng xưởng</p>
+          <p className="text-right font-label text-[11px] text-ink-soft">
+            {quoteUsable ? 'Đã gồm phí vận chuyển GHTK' : 'Cần phí vận chuyển hợp lệ trước khi đặt hàng'}
+          </p>
 
           <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl bg-peach/40 p-4 text-sm">
             <input
@@ -462,17 +602,56 @@ function CheckoutForm({
             </p>
           )}
 
+          {pendingAttempt && (
+            <p className="mt-3 rounded-xl bg-butter/70 px-4 py-3 text-sm text-ink">
+              Yêu cầu đặt hàng trước chưa nhận được kết quả. Lần xác nhận tiếp theo sẽ kiểm tra lại bằng đúng mã và
+              payload cũ để tránh tạo đơn trùng.
+            </p>
+          )}
+
+          {!pendingAttempt && (shippingQuoteError || quoteExpired) && (
+            <div className="mt-3 rounded-xl bg-[#ffdad6] px-4 py-3 text-sm text-danger">
+              <p>{shippingQuoteError || 'Báo giá vận chuyển đã hết hạn. Vui lòng lấy phí lại.'}</p>
+              <button
+                type="button"
+                onClick={refreshShippingQuote}
+                disabled={shippingQuoteLoading || !quoteInput}
+                className="mt-2 inline-flex items-center gap-1.5 font-label text-xs font-semibold underline disabled:opacity-50"
+              >
+                <RefreshCw size={13} className={shippingQuoteLoading ? 'animate-spin' : ''} /> Thử lại
+              </button>
+            </div>
+          )}
+
           {error && <p className="mt-3 rounded-xl bg-[#ffdad6] px-4 py-3 text-sm text-danger">{error}</p>}
 
           <button
             type="button"
             onClick={submit}
-            disabled={!agree || !address || busy || priceChanged.length > 0}
+            disabled={
+              !agree ||
+              busy ||
+              (!pendingAttempt &&
+                (!address ||
+                  !items.length ||
+                  priceChanged.length > 0 ||
+                  shippingQuoteLoading ||
+                  !!shippingQuoteError ||
+                  !quoteUsable))
+            }
             className="mt-5 flex w-full items-center justify-between gap-3 rounded-full bg-ink py-2.5 pl-6 pr-2.5 font-label text-sm font-semibold text-white transition hover:bg-violet disabled:opacity-40"
           >
-            <span>{busy ? 'Đang xử lý…' : method === 'cod' ? 'Xác Nhận Đặt Hàng' : 'Xác Nhận Thanh Toán'}</span>
+            <span>
+              {busy
+                ? 'Đang xử lý…'
+                : pendingAttempt
+                  ? 'Kiểm Tra Lại Yêu Cầu'
+                  : method === 'COD'
+                    ? 'Xác Nhận Đặt Hàng'
+                    : 'Xác Nhận Thanh Toán'}
+            </span>
             <span className="inline-flex items-center gap-2 font-display text-base">
-              {formatVnd(subtotal)}
+              {pendingAttempt ? 'Retry' : quoteUsable ? formatVnd(grandTotal) : '—'}
               <span className="grid h-9 w-9 place-items-center rounded-full bg-orange">
                 <ArrowRight size={16} />
               </span>
@@ -511,6 +690,7 @@ function OrderResult({
   const pay = useZaloPayPayment()
   const rememberPayment = useOrderPaymentsStore((s) => s.remember)
   const total = orders.reduce((s, o) => s + (Number(o.totalAmount) || 0), 0)
+  const gatewayOrders = ordersRequiringGatewayPayment(orders, method)
 
   const retry = async (orderId: number) => {
     try {
@@ -533,9 +713,9 @@ function OrderResult({
           <h2 className="font-display text-2xl font-bold">Đã tạo {orders.length} đơn con thành công</h2>
           <p className="text-sm text-ink-soft">
             Tồn kho đã được giữ chỗ.{' '}
-            {method === 'zalopay'
+            {method === 'GATEWAY'
               ? 'Thanh toán từng đơn con qua ZaloPay bên dưới.'
-              : 'Bạn sẽ thanh toán khi nhận từng kiện hàng.'}
+              : 'Đặt hàng COD thành công, đang chờ người bán xác nhận.'}
           </p>
         </div>
         <div className="text-right">
@@ -560,7 +740,8 @@ function OrderResult({
               </div>
               {order.reservationExpiresAt && (
                 <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-peach/50 px-3 py-1 font-label text-[11px] font-semibold text-orange-deep">
-                  <Clock size={12} /> Giữ chỗ tồn kho đến {formatTime(order.reservationExpiresAt)}
+                  <Clock size={12} /> {method === 'COD' ? 'Người bán nhận đơn trước' : 'Giữ chỗ tồn kho đến'}{' '}
+                  {formatTime(order.reservationExpiresAt)}
                 </p>
               )}
               <ul className="mt-4 space-y-1.5 text-sm">
@@ -581,7 +762,7 @@ function OrderResult({
                   value={<strong className="font-display text-lg">{formatVnd(order.totalAmount)}</strong>}
                 />
               </dl>
-              {method === 'zalopay' && (
+              {method === 'GATEWAY' && order.onlinePaymentRequired !== false && order.paymentMethod !== 'COD' && (
                 <div className="mt-4">
                   {p?.payment?.orderUrl ? (
                     <a
@@ -611,11 +792,11 @@ function OrderResult({
       </div>
 
       <div className="flex flex-wrap justify-center gap-3">
-        {method === 'zalopay' && (
+        {gatewayOrders.length > 0 && (
           <Link
             to={paymentResultUrl(
               'order',
-              orders.map((o) => o.id),
+              gatewayOrders.map((o) => o.id),
             ).replace('/marketplace', '')}
             className="rounded-full bg-[#0068ff] px-6 py-3 font-label text-sm font-semibold text-white hover:opacity-90"
           >

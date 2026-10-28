@@ -166,6 +166,11 @@ function SellerOrderCard({ order: o }: { order: Order }) {
             {orderCode(o.id)}
           </Link>
           <StorefrontLabel id={o.storefrontId} />
+          {o.paymentMethod === 'COD' && (
+            <span className="rounded-full bg-peach px-2.5 py-1 font-label text-[10px] font-semibold text-orange-deep">
+              COD
+            </span>
+          )}
           <OrderStatusBadge status={o.status} />
         </div>
         <span className="inline-flex items-center gap-1 font-label text-xs text-ink-soft">

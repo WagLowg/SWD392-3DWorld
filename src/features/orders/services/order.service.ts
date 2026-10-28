@@ -1,6 +1,8 @@
 import { type ApiEnvelope, http } from '../../../shared/api'
 import { rememberPaymentAttempt } from '../../marketplace/lib/payment'
 import type {
+  CodPayment,
+  CodRecordInput,
   Order,
   OrderHistoryEntry,
   PackagingProfile,
@@ -26,6 +28,24 @@ export const orderService = {
   async packages(orderId: number, signal?: AbortSignal) {
     return (await http.get<ApiEnvelope<ShippingPackage[]>>(`/api/orders/${orderId}/packages`, { signal })).data ?? []
   },
+
+  async codPayment(orderId: number, signal?: AbortSignal) {
+    return (await http.get<ApiEnvelope<CodPayment>>(`/api/orders/${orderId}/cod-payment`, { signal })).data
+  },
+}
+
+export const codAdminService = {
+  async recordCollection(orderId: number, input: CodRecordInput) {
+    return (
+      await http.post<ApiEnvelope<CodPayment>, CodRecordInput>(`/api/admin/orders/${orderId}/cod/collection`, input)
+    ).data
+  },
+
+  async recordSettlement(orderId: number, input: CodRecordInput) {
+    return (
+      await http.post<ApiEnvelope<CodPayment>, CodRecordInput>(`/api/admin/orders/${orderId}/cod/settlement`, input)
+    ).data
+  },
 }
 
 export const buyerOrderService = {
@@ -40,9 +60,7 @@ export const buyerOrderService = {
 
   /** Người mua xác nhận đã nhận hàng sau khi Staff cập nhật DELIVERED. */
   async confirmReceived(orderId: number) {
-    return (await http.patch<ApiEnvelope<Order>, { status: 'RECEIVED' }>(`/api/orders/${orderId}/status`, {
-      status: 'RECEIVED',
-    })).data
+    return (await http.post<ApiEnvelope<Order>>(`/api/orders/${orderId}/confirm-received`)).data
   },
 
   /** Hành trình vận chuyển mà người mua được xem. */

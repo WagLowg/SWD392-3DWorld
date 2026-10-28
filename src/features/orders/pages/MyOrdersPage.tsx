@@ -144,6 +144,11 @@ function OrderCard({ order: o }: { order: Order }) {
             {orderCode(o.id)}
           </Link>
           <StorefrontLabel id={o.storefrontId} />
+          {o.paymentMethod === 'COD' && (
+            <span className="rounded-full bg-peach px-2.5 py-1 font-label text-[10px] font-semibold text-orange-deep">
+              COD
+            </span>
+          )}
         </div>
         <OrderStatusBadge status={o.status} />
       </header>
@@ -169,7 +174,7 @@ function OrderCard({ order: o }: { order: Order }) {
       <footer className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
         {REFUNDABLE.includes(o.status) && (
           <Link
-            to={`/refunds/new?orderId=${o.id}`}
+            to={`/refunds?orderId=${o.id}`}
             className="inline-flex items-center gap-1.5 rounded-full bg-surface-low px-4 py-2.5 font-label text-xs font-semibold hover:bg-surface-high"
           >
             <Undo2 size={14} /> Yêu cầu hoàn tiền
@@ -183,7 +188,9 @@ function OrderCard({ order: o }: { order: Order }) {
             <Truck size={14} /> Tra cứu kiện hàng
           </Link>
         )}
-        {o.status === 'PENDING_PAYMENT' && <PayOrderButton orderId={o.id} amount={o.totalAmount} />}
+        {o.status === 'PENDING_PAYMENT' && o.paymentMethod !== 'COD' && o.onlinePaymentRequired !== false && (
+          <PayOrderButton orderId={o.id} amount={o.totalAmount} />
+        )}
         <Link
           to={`/orders/${o.id}`}
           className="inline-flex items-center gap-2 rounded-full bg-ink py-1.5 pl-4 pr-1.5 font-label text-xs font-semibold text-white hover:bg-violet"

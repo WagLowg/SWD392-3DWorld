@@ -1,6 +1,15 @@
 import { http } from '../../../shared/api'
 import { rememberPaymentAttempt } from '../lib/payment'
-import type { Address, AddressInput, ApiEnvelope, CheckoutInput, Order, Payment } from '../types/catalog.types'
+import type {
+  Address,
+  AddressInput,
+  ApiEnvelope,
+  CheckoutInput,
+  Order,
+  Payment,
+  ShippingQuote,
+  ShippingQuoteInput,
+} from '../types/catalog.types'
 
 export const addressService = {
   async list(signal?: AbortSignal) {
@@ -13,14 +22,18 @@ export const addressService = {
   },
 }
 
+export const shippingService = {
+  async quote(input: ShippingQuoteInput, signal?: AbortSignal) {
+    return (
+      await http.post<ApiEnvelope<ShippingQuote>, ShippingQuoteInput>('/api/shipping/quote', input, { signal })
+    ).data
+  },
+}
+
 export const orderService = {
   /** Tách các món đã chọn thành một đơn con cho mỗi xưởng và giữ chỗ tồn kho. */
   async checkout(input: CheckoutInput) {
-    return (
-      await http.post<ApiEnvelope<Order[]>, CheckoutInput>('/api/orders/checkout', input, {
-        idempotencyKey: input.idempotencyKey,
-      })
-    ).data
+    return (await http.post<ApiEnvelope<Order[]>, CheckoutInput>('/api/orders/checkout', input)).data
   },
 
   async mine(signal?: AbortSignal) {

@@ -96,6 +96,7 @@ export function OrderTrackingPage() {
                   onClick={() =>
                     confirmReceived
                       .mutateAsync({ orderId: order.id })
+                      .then(() => toast('Đã xác nhận nhận hàng. Thời hạn yêu cầu hoàn tiền đã bắt đầu.'))
                       .catch((e) =>
                         toast(e instanceof ApiClientError ? e.message : 'Không xác nhận nhận hàng được.', 'error'),
                       )
@@ -107,7 +108,7 @@ export function OrderTrackingPage() {
               )}
               {REFUNDABLE.includes(order.status) && (
                 <Link
-                  to={`/refunds/new?orderId=${order.id}`}
+                  to={`/refunds?orderId=${order.id}`}
                   className="inline-flex items-center gap-2 rounded-full bg-surface-low px-5 py-3 font-label text-sm font-semibold hover:bg-surface-high"
                 >
                   <Undo2 size={15} /> Yêu cầu hoàn tiền
@@ -115,8 +116,8 @@ export function OrderTrackingPage() {
               )}
             </div>
             <ApiNote className="w-full">
-              Trạng thái vận chuyển, xác nhận nhận hàng và hoàn hàng do Staff đối soát với GHTK rồi cập nhật. Người mua
-              chỉ theo dõi hành trình và gửi yêu cầu hoàn tiền khi có sự cố.
+              Khi kiện hàng đã giao, bạn có thể xác nhận đã nhận hàng. Nếu không thao tác trong 24 giờ, hệ thống sẽ tự
+              xác nhận theo thời hạn do máy chủ quản lý.
             </ApiNote>
           </section>
         </>
