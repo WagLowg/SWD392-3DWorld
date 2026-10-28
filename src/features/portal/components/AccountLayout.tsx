@@ -1,8 +1,30 @@
 import { useQuery } from '@tanstack/react-query'
-import { BadgeCheck, Box, Boxes, CircleDollarSign, CircleUserRound, ClipboardList, CreditCard, House, Library, LogOut, MapPin, PackageSearch, PanelLeft, ReceiptText, RotateCcw, ShieldCheck, ShoppingBag, Store, Truck, UserRoundCog, WalletCards } from 'lucide-react'
+import {
+  BadgeCheck,
+  Box,
+  Boxes,
+  CircleDollarSign,
+  CircleUserRound,
+  ClipboardList,
+  CreditCard,
+  House,
+  Library,
+  LogOut,
+  MapPin,
+  PackageSearch,
+  PanelLeft,
+  ReceiptText,
+  RotateCcw,
+  ShieldCheck,
+  ShoppingBag,
+  Store,
+  Truck,
+  UserRoundCog,
+  WalletCards,
+} from 'lucide-react'
 import { type ReactNode, useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { hasStoredSession, isSeller, logout } from '../../auth/services/session'
+import { hasStoredSession, isAdmin, isSeller, logout } from '../../auth/services/session'
 import { http } from '../../../shared/api'
 import { loginHref } from '../../../shared/modules'
 import { useSession } from '../../../shared/session/useSession'
@@ -39,8 +61,6 @@ const OPS_TABS = [
   { to: '/ops/storefronts', label: 'Xác thực người bán', icon: Store },
   { to: '/ops/users', label: 'Người dùng', icon: UserRoundCog },
 ]
-
-const isAdmin = (roles: string[] | undefined) => !!roles?.some((r) => /ADMIN/i.test(r))
 
 /** Khung chung cho các màn tài khoản / đơn hàng / người bán (Stitch MP 010–050). */
 export function AccountLayout() {
@@ -91,31 +111,49 @@ export function AccountTabs() {
   const { data: user } = useSession()
   const { pathname } = useLocation()
   const seller = isSeller(user) || pathname.startsWith('/seller')
-  const admin = isAdmin(user?.roles) || pathname.startsWith('/ops')
+  const admin = isAdmin(user) || pathname.startsWith('/ops')
   const tab = ({ isActive }: { isActive: boolean }) =>
     `flex shrink-0 items-center gap-3 rounded-2xl px-3 py-2.5 font-label text-sm font-semibold transition ${
       isActive ? 'bg-ink text-white shadow-sm' : 'text-ink-soft hover:bg-white hover:text-ink'
     }`
   const links = admin && pathname.startsWith('/ops') ? OPS_TABS : seller ? SELLER_TABS : BUYER_TABS
-  const title = admin && pathname.startsWith('/ops') ? 'Quản trị hệ thống' : seller ? 'Kênh người bán' : 'Tài khoản của tôi'
+  const title =
+    admin && pathname.startsWith('/ops') ? 'Quản trị hệ thống' : seller ? 'Kênh người bán' : 'Tài khoản của tôi'
   return (
-    <aside className="account-sidebar overflow-x-auto rounded-[1.75rem] bg-white/80 p-3 shadow-soft backdrop-blur-xl [scrollbar-width:none] lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto" aria-label={title}>
+    <aside
+      className="account-sidebar overflow-x-auto rounded-[1.75rem] bg-white/80 p-3 shadow-soft backdrop-blur-xl [scrollbar-width:none] lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto"
+      aria-label={title}
+    >
       <div className="mb-2 hidden items-center gap-2 px-3 py-2 font-label text-xs font-bold uppercase tracking-[.14em] text-ink-soft lg:flex">
         <PanelLeft size={15} /> {title}
       </div>
       <nav className="flex gap-1 lg:grid">
         {links.map((item) => {
           const Icon = item.icon
-          return <NavLink key={item.to} to={item.to} end={item.to === '/seller'} className={tab}><Icon size={17} /><span>{item.label}</span></NavLink>
+          return (
+            <NavLink key={item.to} to={item.to} end={item.to === '/seller'} className={tab}>
+              <Icon size={17} />
+              <span>{item.label}</span>
+            </NavLink>
+          )
         })}
       </nav>
       <div className="my-3 hidden h-px bg-line lg:block" />
       {seller ? (
-        <NavLink to="/profile" className={tab}><CircleUserRound size={17} /><span>Quay lại tài khoản</span></NavLink>
+        <NavLink to="/profile" className={tab}>
+          <CircleUserRound size={17} />
+          <span>Quay lại tài khoản</span>
+        </NavLink>
       ) : (
-        <NavLink to="/seller/register" className={tab}><Store size={17} /><span>Bắt đầu bán hàng</span></NavLink>
+        <NavLink to="/seller/register" className={tab}>
+          <Store size={17} />
+          <span>Bắt đầu bán hàng</span>
+        </NavLink>
       )}
-      <a href="/marketplace/cart" className={tab({ isActive: false })}><ShoppingBag size={17} /><span>Giỏ hàng</span></a>
+      <a href="/marketplace/cart" className={tab({ isActive: false })}>
+        <ShoppingBag size={17} />
+        <span>Giỏ hàng</span>
+      </a>
     </aside>
   )
 }
@@ -143,7 +181,9 @@ function SiteHeader() {
             3D<span className="text-violet">World</span>
           </span>
         </a>
-        <div className="hidden md:block"><ModuleSwitcher current="marketplace" theme="light" /></div>
+        <div className="hidden md:block">
+          <ModuleSwitcher current="marketplace" theme="light" />
+        </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <a
             href="/marketplace/cart"

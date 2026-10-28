@@ -7,7 +7,7 @@ import { ApiClientError } from '../../../shared/api'
 import { safeNext } from '../../../shared/modules'
 import { tokenStore } from '../../../shared/session/token'
 import { Field, FormError, inputClass, SubmitButton } from '../../../shared/ui/form'
-import { fetchMe } from '../../auth/services/session'
+import { fetchMe, isAdmin } from '../../auth/services/session'
 import { AuthLayout } from '../components/AuthLayout'
 import { PasswordInput } from '../components/PasswordInput'
 import { type LoginValues, loginSchema } from '../schemas/auth.schemas'
@@ -19,6 +19,10 @@ function getReferrerPath() {
   const referrer = new URL(document.referrer)
   if (referrer.origin !== location.origin) return null
   return `${referrer.pathname}${referrer.search}${referrer.hash}`
+}
+
+function destinationAfterLogin(user: Awaited<ReturnType<typeof fetchMe>>, next: string) {
+  return isAdmin(user) ? '/portal/admin/storefronts' : next
 }
 
 /** MP 007 · Đăng nhập */
@@ -50,7 +54,7 @@ export function LoginPage() {
     let active = true
     fetchMe().then((u) => {
       if (!active) return
-      if (u) location.replace(next)
+      if (u) location.replace(destinationAfterLogin(u, next))
       else setChecking(false)
     })
     return () => {
@@ -61,8 +65,8 @@ export function LoginPage() {
   const submit = handleSubmit(async (values) => {
     setUnverified(false)
     try {
-      await authService.login(values)
-      location.replace(next)
+      const user = await authService.login(values)
+      location.replace(destinationAfterLogin(user, next))
     } catch (e) {
       const message = e instanceof ApiClientError ? e.message : 'Không đăng nhập được. Vui lòng thử lại.'
       if (/verif|xác (thực|minh)/i.test(message)) setUnverified(true)
