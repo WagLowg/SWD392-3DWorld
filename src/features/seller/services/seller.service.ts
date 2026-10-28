@@ -59,6 +59,13 @@ function toVariant(v: ApiVariant): SellerVariant {
     stock: v.stock ?? 0,
     reserved: v.reserved ?? 0,
     active: v.active !== false,
+    fragile: v.fragile === true,
+    lowStockThreshold: v.lowStockThreshold ?? 5,
+    packingGroup: v.packingGroup ?? 'STANDARD',
+    weightGrams: v.weightGrams ?? 0,
+    lengthCm: Number(v.lengthCm) || 0,
+    widthCm: Number(v.widthCm) || 0,
+    heightCm: Number(v.heightCm) || 0,
   }
 }
 
@@ -73,21 +80,61 @@ function toProductStatus(status: string): ProductStatus {
   return 'DRAFT'
 }
 
-/** Polygon & manifold không có trường riêng → lưu dạng chữ dễ đọc trong `specifications`. */
+/** Đọc được cả JSON chuẩn mới và chuỗi tiếng Việt cũ để không làm hỏng dữ liệu đã tạo trước đây. */
 const POLY_RE = /Số polygon:\s*([\d.,]+)/i
 const MANIFOLD_RE = /Lưới kín \(manifold\):\s*(Có|Không)/i
 
-function buildSpecs(polygonCount: number, manifold: boolean) {
-  return `Số polygon: ${polygonCount.toLocaleString('vi-VN')}\nLưới kín (manifold): ${manifold ? 'Có' : 'Không'}`
+function parseSpecsObject(specs: string | null | undefined): Record<string, unknown> {
+  if (!specs) return {}
+  try {
+    const parsed: unknown = JSON.parse(specs)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, unknown>
+  } catch {
+    // Legacy specifications are plain text and are handled by the regex fallback below.
+  }
+  return {}
+}
+
+function buildSpecs(
+  polygonCount: number,
+  manifold: boolean,
+  variants: SellerVariant[],
+  previous?: string,
+) {
+  const first = variants.find((variant) => variant.active) ?? variants[0]
+  const dimensionsMm = first
+    ? [first.lengthCm, first.widthCm, first.heightCm].map((value) => Math.round(Number(value) * 10))
+    : undefined
+  return JSON.stringify({
+    ...parseSpecsObject(previous),
+    material: first?.material || undefined,
+    dimensionsMm,
+    polygonCount,
+    manifold,
+  })
 }
 
 function readSpecs(specs: string | null | undefined) {
+  const object = parseSpecsObject(specs)
   const poly = specs?.match(POLY_RE)?.[1]
   const manifold = specs?.match(MANIFOLD_RE)?.[1]
   return {
-    polygonCount: poly ? Number(poly.replace(/[.,]/g, '')) || 0 : 0,
-    manifold: manifold ? manifold.toLowerCase() === 'có' : true,
+    polygonCount:
+      typeof object.polygonCount === 'number'
+        ? object.polygonCount
+        : poly
+          ? Number(poly.replace(/[.,]/g, '')) || 0
+          : 0,
+    manifold: typeof object.manifold === 'boolean' ? object.manifold : manifold ? manifold.toLowerCase() === 'có' : true,
   }
+}
+
+function normalizeShippingClass(value: string | null | undefined) {
+  const normalized = value?.trim().toUpperCase()
+  if (!normalized || normalized === 'HỘP TIÊU CHUẨN') return 'STANDARD'
+  if (normalized === 'HỘP COLLECTOR CHỐNG SỐC') return 'FRAGILE'
+  if (normalized === 'KIỆN CỒNG KỀNH') return 'OVERSIZED'
+  return normalized
 }
 
 function toProduct(p: ApiProduct): SellerProduct {
@@ -108,7 +155,8 @@ function toProduct(p: ApiProduct): SellerProduct {
     category: p.category,
     status,
     description: p.description ?? '',
-    shippingClass: p.shippingClass ?? '',
+    shippingClass: normalizeShippingClass(p.shippingClass),
+    specifications: p.specifications ?? undefined,
     ...readSpecs(p.specifications),
     media: p.media?.length ?? 0,
     mediaItems: [...(p.media ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
@@ -121,10 +169,20 @@ function toProduct(p: ApiProduct): SellerProduct {
   }
 }
 
-function toVariantWrite(v: Pick<SellerVariant, 'sku' | 'material' | 'color' | 'size' | 'price'>): VariantWrite {
+function toVariantWrite(v: Pick<SellerVariant,
+  'sku' | 'material' | 'color' | 'size' | 'price' | 'active' | 'fragile' | 'lowStockThreshold' |
+  'packingGroup' | 'weightGrams' | 'lengthCm' | 'widthCm' | 'heightCm'>): VariantWrite {
   return {
     sku: v.sku,
     price: v.price,
+    active: v.active,
+    fragile: v.fragile,
+    lowStockThreshold: v.lowStockThreshold,
+    packingGroup: v.packingGroup,
+    weightGrams: v.weightGrams,
+    lengthCm: v.lengthCm,
+    widthCm: v.widthCm,
+    heightCm: v.heightCm,
     attributes: Object.fromEntries(
       Object.entries({ material: v.material, color: v.color, size: v.size }).filter(([, x]) => x),
     ),
@@ -265,6 +323,8 @@ export type SaveProductInput = Omit<
   'id' | 'status' | 'updatedAt' | 'sold' | 'audit' | 'media' | 'mediaItems' | 'storefrontId' | 'revision'
 > & { id?: number; media?: number }
 
+export type PendingProductMedia = { file: File; variantSku?: string }
+
 /* ------------------------------------------------------------- service */
 
 export const sellerService = {
@@ -377,19 +437,19 @@ export const sellerService = {
   },
 
   /** Tạo / cập nhật sản phẩm và biến thể; submit = gửi duyệt, ngược lại giữ bản nháp. */
-  async saveProduct(input: SaveProductInput, submit: boolean) {
+  async saveProduct(input: SaveProductInput, submit: boolean, pendingMedia: PendingProductMedia[] = []) {
     const base = {
       title: input.title,
       description: input.description,
       category: input.category,
       shippingClass: input.shippingClass,
-      specifications: buildSpecs(input.polygonCount, input.manifold),
+      specifications: buildSpecs(input.polygonCount, input.manifold, input.variants, input.specifications),
     }
     let id = input.id
     if (!id) {
       const created = await sellerProductApi.create({
         ...base,
-        variants: input.variants.map((v) => ({ ...toVariantWrite(v), stock: v.stock, active: true })),
+        variants: input.variants.map((v) => ({ ...toVariantWrite(v), stock: v.stock })),
       })
       id = created.id
     } else {
@@ -404,18 +464,33 @@ export const sellerService = {
         }
         keep.add(old.id)
         const before = toVariant(old)
-        if (before.sku !== v.sku || before.material !== v.material || before.color !== v.color || before.size !== v.size || before.price !== v.price)
+        if (
+          before.sku !== v.sku || before.material !== v.material || before.color !== v.color || before.size !== v.size ||
+          before.price !== v.price || before.active !== v.active || before.fragile !== v.fragile ||
+          before.lowStockThreshold !== v.lowStockThreshold || before.packingGroup !== v.packingGroup ||
+          before.weightGrams !== v.weightGrams || before.lengthCm !== v.lengthCm ||
+          before.widthCm !== v.widthCm || before.heightCm !== v.heightCm
+        )
           await sellerProductApi.updateVariant(id, old.id, toVariantWrite(v))
         if (before.stock !== v.stock) await sellerProductApi.setStock(id, old.id, v.stock, 'Cập nhật từ trình sửa sản phẩm')
       }
       for (const old of existing.variants) if (old.active && !keep.has(old.id)) await sellerProductApi.removeVariant(id, old.id)
     }
-    const saved = submit ? await sellerProductApi.submit(id) : await sellerProductApi.get(id)
+    let saved = await sellerProductApi.get(id)
+    const startingMediaCount = saved.media.length
+    for (let index = 0; index < pendingMedia.length; index += 1) {
+      const item = pendingMedia[index]
+      const variantId = item.variantSku
+        ? saved.variants.find((variant) => variant.sku === item.variantSku)?.id
+        : undefined
+      saved = await sellerProductApi.uploadMedia(id, item.file, { variantId, sortOrder: startingMediaCount + index })
+    }
+    if (submit) saved = await sellerProductApi.submit(id)
     return toProduct(saved)
   },
 
-  async uploadMedia(productId: number, file: File, sortOrder = 0) {
-    return toProduct(await sellerProductApi.uploadMedia(productId, file, { sortOrder }))
+  async uploadMedia(productId: number, file: File, sortOrder = 0, variantId?: number) {
+    return toProduct(await sellerProductApi.uploadMedia(productId, file, { sortOrder, variantId }))
   },
 
   async removeMedia(productId: number, mediaId: number) {
