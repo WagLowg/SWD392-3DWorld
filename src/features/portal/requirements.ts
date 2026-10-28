@@ -102,7 +102,7 @@ export const features: FeatureDefinition[] = [
       screen(
         'SCR-08',
         'Product Detail',
-        '/marketplace/products',
+        '/marketplace/',
         'existing',
         ['FR-CAT-03'],
         'Chi tiết sản phẩm, media, variant, stock, shipping và review.',

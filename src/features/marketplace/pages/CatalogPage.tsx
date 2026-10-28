@@ -1,14 +1,14 @@
-import { ArrowRight, Link2, PackageCheck, Search, ShieldCheck, Truck, X } from 'lucide-react'
+import { ArrowRight, Link2, Search, ShieldCheck, X } from 'lucide-react'
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
-import { goLogin } from '../../auth/services/session'
-import { Pagination } from '../../../shared/ui/Pagination'
-import { ProductCard, ProductCardSkeleton, SKELETON_KEYS } from '../components/ProductCard'
-import { StatusBlock } from '../../../shared/ui/StatusBlock'
-import { ApiNote, PageHeading } from '../../../shared/ui/primitives'
-import { useCatalog, useCategories } from '../hooks/useCatalog'
 import { useSession } from '../../../shared/session/useSession'
+import { Pagination } from '../../../shared/ui/Pagination'
+import { ApiNote } from '../../../shared/ui/primitives'
+import { StatusBlock } from '../../../shared/ui/StatusBlock'
+import { goLogin } from '../../auth/services/session'
+import { ProductCard, ProductCardSkeleton, SKELETON_KEYS } from '../components/ProductCard'
+import { useCatalog, useCategories } from '../hooks/useCatalog'
 import { categoryLabel, formatVnd } from '../lib/format'
 import type { CatalogSort, ProductSummary } from '../types/catalog.types'
 
@@ -30,8 +30,8 @@ const PRICE_PRESETS = [
   { label: 'Trên 600k', min: '600000', max: '' },
 ] as const
 
-/** MP 002 · Chợ Đồ Chơi (danh sách + bộ lọc) */
-export function CatalogPage() {
+/** Khối tìm kiếm, bộ lọc và danh sách của trang Marketplace hợp nhất. */
+export function CatalogSection() {
   const location = useLocation()
   const [params, setParams] = useSearchParams()
   const keyword = params.get('q') ?? ''
@@ -55,10 +55,6 @@ export function CatalogPage() {
   const categories = useCategories()
   const session = useSession()
   const items = catalog.data?.items ?? []
-
-  useEffect(() => {
-    document.title = 'Khám Phá Vật Phẩm · Chợ Đồ Chơi 3DWorld'
-  }, [])
 
   const update = (patch: Record<string, string>, resetPage = true) => {
     setParams((prev) => {
@@ -93,24 +89,6 @@ export function CatalogPage() {
 
   return (
     <div className="mx-auto max-w-[1320px] px-4 md:px-8">
-      <PageHeading
-        eyebrow="Danh mục sản phẩm · Hiện vật vật lý"
-        title="Khám Phá"
-        accent="Vật Phẩm Sáng Tạo."
-        description="Bộ sưu tập mô hình 3D, đồ chơi nghệ thuật, bàn phím cơ artisan và sinh vật bàn làm việc được chế tác tỉ mỉ từ các xưởng in uy tín trên 3DWorld."
-      />
-      <ul className="mt-5 flex flex-wrap gap-x-6 gap-y-2 font-label text-xs font-semibold text-ink-soft">
-        <li className="inline-flex items-center gap-1.5">
-          <ShieldCheck size={14} className="text-violet" /> Thanh toán ZaloPay / COD
-        </li>
-        <li className="inline-flex items-center gap-1.5">
-          <PackageCheck size={14} className="text-orange" /> Đóng gói chống sốc theo từng xưởng
-        </li>
-        <li className="inline-flex items-center gap-1.5">
-          <Truck size={14} className="text-teal" /> Theo dõi vận đơn từng kiện
-        </li>
-      </ul>
-
       <SearchRow
         keyword={keyword}
         category={category}
@@ -191,9 +169,7 @@ export function CatalogPage() {
           )}
         </div>
         {ready && (
-          <ApiNote>
-            "Còn hàng" đang lọc trên trang hiện tại — /api/catalog chưa có tham số lọc theo tồn kho.
-          </ApiNote>
+          <ApiNote>"Còn hàng" đang lọc trên trang hiện tại — /api/catalog chưa có tham số lọc theo tồn kho.</ApiNote>
         )}
       </div>
 

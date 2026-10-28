@@ -8,7 +8,7 @@ export const paths = {
   studio: '/studio/',
   marketplace: '/marketplace/',
   marketplaceProduct: (productId: string) => `/marketplace/${productId}`,
-  marketplaceCatalog: '/marketplace/products',
+  marketplaceCatalog: '/marketplace/',
   marketplaceCart: '/marketplace/cart',
   marketplaceCheckout: '/marketplace/checkout',
   pod: '/pod/',
