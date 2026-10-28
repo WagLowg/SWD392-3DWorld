@@ -19,7 +19,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
-import { AddressForm } from '../components/AddressForm'
 import { LoginRequired } from '../../../shared/ui/LoginRequired'
 import { ProductMedia } from '../components/ProductMedia'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
@@ -42,6 +41,7 @@ import {
   type PendingCheckoutAttempt,
 } from '../lib/checkoutAttempt'
 import type { Address, CheckoutInput, Order, Payment, ShippingQuoteInput } from '../types/catalog.types'
+import { AddressForm } from '../components/AddressForm'
 
 type PaymentMethod = 'zalopay' | 'cod'
 
@@ -394,9 +394,7 @@ function CheckoutForm({
                         </span>
                       )}
                     </span>
-                    <span className="mt-1 block text-sm text-ink-soft">
-                      {addressLine(a)}
-                    </span>
+                    <span className="mt-1 block text-sm text-ink-soft">{addressLine(a)}</span>
                   </span>
                 </label>
               ))}
@@ -795,7 +793,10 @@ function OrderResult({
       <div className="flex flex-wrap justify-center gap-3">
         {method === 'zalopay' && (
           <Link
-            to={paymentResultUrl('order', orders.map((o) => o.id)).replace('/marketplace', '')}
+            to={paymentResultUrl(
+              'order',
+              orders.map((o) => o.id),
+            ).replace('/marketplace', '')}
             className="rounded-full bg-[#0068ff] px-6 py-3 font-label text-sm font-semibold text-white hover:opacity-90"
           >
             Tôi đã thanh toán — kiểm tra kết quả
@@ -807,7 +808,7 @@ function OrderResult({
         >
           Xem đơn hàng của tôi
         </a>
-        <Link to="/products" className="rounded-full bg-white px-6 py-3 font-label text-sm font-semibold shadow-soft">
+        <Link to="/" className="rounded-full bg-white px-6 py-3 font-label text-sm font-semibold shadow-soft">
           Tiếp tục mua sắm
         </Link>
       </div>

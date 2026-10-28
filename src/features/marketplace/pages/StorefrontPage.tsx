@@ -60,7 +60,7 @@ export function StorefrontPage() {
           title="Không tìm thấy gian hàng"
           body="Gian hàng có thể đã đóng hoặc đường dẫn không đúng."
           action={
-            <Link to="/products" className="rounded-full bg-ink px-6 py-3 font-label text-sm font-semibold text-white">
+            <Link to="/" className="rounded-full bg-ink px-6 py-3 font-label text-sm font-semibold text-white">
               Về Chợ Đồ Chơi
             </Link>
           }
@@ -164,9 +164,7 @@ export function StorefrontPage() {
         ) : !products.data?.items.length ? (
           <StatusBlock tone="empty" title="Chưa có sản phẩm" body="Xưởng chưa có sản phẩm nào được duyệt mở bán." />
         ) : (
-          <div
-            className={`grid gap-5 sm:grid-cols-2 lg:grid-cols-3 ${products.isPlaceholderData ? 'opacity-60' : ''}`}
-          >
+          <div className={`grid gap-5 sm:grid-cols-2 lg:grid-cols-3 ${products.isPlaceholderData ? 'opacity-60' : ''}`}>
             {products.data.items.map((p, i) => (
               <ProductCard key={p.id} product={p} index={i} />
             ))}

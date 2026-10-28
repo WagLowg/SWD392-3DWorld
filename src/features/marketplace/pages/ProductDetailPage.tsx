@@ -16,10 +16,10 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
+import { Breadcrumbs, QuantityStepper, StockBar } from '../../../shared/ui/primitives'
+import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { ProductCard } from '../components/ProductCard'
 import { ProductMedia } from '../components/ProductMedia'
-import { StatusBlock } from '../../../shared/ui/StatusBlock'
-import { Breadcrumbs, QuantityStepper, StockBar } from '../../../shared/ui/primitives'
 import { VariantPicker } from '../components/VariantPicker'
 import { useAddToCart } from '../hooks/useCart'
 import { useCatalog, useProductDetail, useProductReviews } from '../hooks/useCatalog'
@@ -61,7 +61,7 @@ export function ProductDetailPage() {
             error instanceof ApiClientError ? error.message : 'Sản phẩm có thể đã ngừng bán hoặc đường dẫn không đúng.'
           }
           action={
-            <Link to="/products" className="rounded-full bg-ink px-6 py-3 font-label text-sm font-semibold text-white">
+            <Link to="/" className="rounded-full bg-ink px-6 py-3 font-label text-sm font-semibold text-white">
               Về Chợ Đồ Chơi
             </Link>
           }
@@ -149,7 +149,7 @@ function ProductView({ detail }: { detail: ProductDetail }) {
             {
               label: 'Chợ Đồ Chơi',
               render: (l) => (
-                <Link to="/products" className="hover:text-violet">
+                <Link to="/" className="hover:text-violet">
                   {l}
                 </Link>
               ),
@@ -160,7 +160,7 @@ function ProductView({ detail }: { detail: ProductDetail }) {
                     label: categoryLabel(product.category),
                     render: (l: string) => (
                       <Link
-                        to={`/products?category=${encodeURIComponent(product.category)}`}
+                        to={`/?category=${encodeURIComponent(product.category)}#catalog`}
                         className="hover:text-violet"
                       >
                         {l}
@@ -173,7 +173,7 @@ function ProductView({ detail }: { detail: ProductDetail }) {
           ]}
         />
         <Link
-          to="/products"
+          to="/"
           className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 font-label text-xs font-semibold shadow-soft hover:bg-surface-low"
         >
           <ArrowLeft size={14} /> Quay lại danh mục
@@ -668,7 +668,7 @@ function RelatedProducts({ category, excludeId }: { category: string; excludeId:
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h2 className="font-display text-3xl font-bold tracking-tight">Cùng danh mục {categoryLabel(category)}</h2>
         <Link
-          to={`/products?category=${encodeURIComponent(category)}`}
+          to={`/?category=${encodeURIComponent(category)}#catalog`}
           className="inline-flex items-center gap-1 font-label text-sm font-semibold text-violet"
         >
           Xem tất cả <ArrowRight size={15} />

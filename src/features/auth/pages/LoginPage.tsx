@@ -7,7 +7,7 @@ import { ApiClientError } from '../../../shared/api'
 import { safeNext } from '../../../shared/modules'
 import { tokenStore } from '../../../shared/session/token'
 import { Field, FormError, inputClass, SubmitButton } from '../../../shared/ui/form'
-import { fetchMe } from '../../auth/services/session'
+import { fetchMe, isAdmin } from '../../auth/services/session'
 import { AuthLayout } from '../components/AuthLayout'
 import { PasswordInput } from '../components/PasswordInput'
 import { type LoginValues, loginSchema } from '../schemas/auth.schemas'
@@ -20,6 +20,65 @@ function getReferrerPath() {
   if (referrer.origin !== location.origin) return null
   return `${referrer.pathname}${referrer.search}${referrer.hash}`
 }
+
+/**
+ * Điều hướng sau đăng nhập theo vai trò tài khoản:
+ * 1. Admin: chuyển hướng đến trang quản lý gian hàng (/portal/admin/storefronts) hoặc route admin hợp lệ.
+ * 2. Staff: chuyển hướng đến Staff Dashboard (/portal/staff) hoặc route staff hợp lệ.
+ * 3. Khách hàng / Người bán / Khác: chuyển hướng theo URL next hoặc fallback /marketplace/.
+ */
+function destinationAfterLogin(
+  user: Awaited<ReturnType<typeof fetchMe>> | { role?: string; roles?: string[] } | null | undefined,
+  explicitNextParam: string | null = null,
+  referrerPath: string | null = null,
+): string {
+  if (!user) return safeNext(explicitNextParam ?? referrerPath)
+
+  const roles = user.roles ?? (user.role ? [user.role] : [])
+  const isPrintStaff = roles.includes('PRINT_STAFF')
+  const isAdministrator = isAdmin(user as Parameters<typeof isAdmin>[0])
+
+  // 1. Phân quyền Admin: Ưu tiên trang quản trị Admin Storefronts (/portal/admin/storefronts)
+  if (isAdministrator) {
+    if (explicitNextParam) {
+      const validatedNext = safeNext(explicitNextParam, '')
+      if (
+        validatedNext === '/portal/admin' ||
+        validatedNext.startsWith('/portal/admin/') ||
+        validatedNext.startsWith('/admin/') ||
+        validatedNext === '/admin'
+      ) {
+        return validatedNext
+      }
+    }
+    return '/portal/admin/storefronts'
+  }
+
+  // 2. Phân quyền Staff: Ưu tiên trang Staff Dashboard (/portal/staff)
+  if (isPrintStaff) {
+    if (explicitNextParam) {
+      const validatedNext = safeNext(explicitNextParam, '')
+      if (
+        validatedNext === '/portal/staff' ||
+        validatedNext.startsWith('/portal/staff/') ||
+        validatedNext.startsWith('/portal/staff?')
+      ) {
+        return validatedNext
+      }
+    }
+    return '/portal/staff'
+  }
+
+  // 3. Đối với các vai trò khác (Customer, Seller): giữ nguyên logic điều hướng hiện tại
+  if (explicitNextParam) {
+    const validatedNext = safeNext(explicitNextParam, '')
+    if (validatedNext) return validatedNext
+  }
+  return safeNext(referrerPath ?? explicitNextParam)
+}
+
+/** Tương thích ngược với cả tên hàm cũ */
+const resolvePostLoginDestination = destinationAfterLogin
 
 /** MP 007 · Đăng nhập */
 export function LoginPage() {
@@ -50,7 +109,7 @@ export function LoginPage() {
     let active = true
     fetchMe().then((u) => {
       if (!active) return
-      if (u) location.replace(next)
+      if (u) location.replace(destinationAfterLogin(u, params.get('next'), getReferrerPath()))
       else setChecking(false)
     })
     return () => {
@@ -61,8 +120,8 @@ export function LoginPage() {
   const submit = handleSubmit(async (values) => {
     setUnverified(false)
     try {
-      await authService.login(values)
-      location.replace(next)
+      const user = await authService.login(values)
+      location.replace(destinationAfterLogin(user, params.get('next'), getReferrerPath()))
     } catch (e) {
       const message = e instanceof ApiClientError ? e.message : 'Không đăng nhập được. Vui lòng thử lại.'
       if (/verif|xác (thực|minh)/i.test(message)) setUnverified(true)

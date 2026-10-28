@@ -25,15 +25,15 @@ export function HeroSection({ featured }: { featured: ProductSummary[] }) {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center gap-3">
-          <Link
-            to="/products"
+          <a
+            href="#catalog"
             className="inline-flex items-center gap-2 rounded-full bg-ink py-2 pl-5 pr-2 font-label text-sm font-semibold text-white transition hover:bg-violet"
           >
             Khám Phá Chợ
             <span className="grid h-8 w-8 place-items-center rounded-full bg-orange">
               <ArrowRight size={16} />
             </span>
-          </Link>
+          </a>
           <a
             href="/pod/"
             className="inline-flex items-center gap-2 rounded-full px-4 py-3 font-label text-sm font-semibold hover:bg-white"
@@ -104,7 +104,9 @@ function FeaturedShowcase({ items }: { items: ProductSummary[] }) {
           )}
           <p className="mt-3 line-clamp-1 font-display text-xl font-bold">{current.title}</p>
           <div className="mt-4 flex items-center justify-between gap-3">
-            <p className="font-display text-2xl font-bold text-orange">{current.price != null ? formatVnd(current.price) : '—'}</p>
+            <p className="font-display text-2xl font-bold text-orange">
+              {current.price != null ? formatVnd(current.price) : '—'}
+            </p>
             <Link
               to={`/${current.id}`}
               className="inline-flex items-center gap-1 rounded-full bg-ink px-4 py-2 font-label text-xs font-semibold text-white hover:bg-violet"

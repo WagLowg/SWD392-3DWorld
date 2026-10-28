@@ -63,7 +63,7 @@ const FOOTER = [
     title: 'Khám Phá Suite',
     links: [
       { label: 'Chợ Đồ Chơi', to: '/' },
-      { label: 'Tất cả vật phẩm', to: '/products' },
+      { label: 'Tất cả vật phẩm', to: '/' },
       { label: 'AI Studio', href: '/ai/' },
       { label: '3D Studio', href: '/studio/' },
     ],

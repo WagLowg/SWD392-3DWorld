@@ -221,7 +221,11 @@ export function FilterTabs<T extends string>({
             aria-pressed={active}
             onClick={() => onChange(o.value)}
             className={`shrink-0 rounded-full px-4 py-2 font-label text-xs font-semibold transition ${
-              active ? (dark ? 'bg-ink text-white' : 'bg-orange text-white') : 'bg-surface-low text-ink-soft hover:bg-surface-high'
+              active
+                ? dark
+                  ? 'bg-ink text-white'
+                  : 'bg-orange text-white'
+                : 'bg-surface-low text-ink-soft hover:bg-surface-high'
             }`}
           >
             {o.label}
@@ -237,7 +241,15 @@ export function Toolbar({ children }: { children: ReactNode }) {
   return <div className="mt-6 space-y-3 rounded-[2rem] bg-white/90 p-4 shadow-soft sm:p-5">{children}</div>
 }
 
-export function SearchInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+export function SearchInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+}) {
   return (
     <input
       type="search"
@@ -373,13 +385,21 @@ export function KeyValues({ items, cols = 2 }: { items: { label: string; value: 
   )
 }
 
-export function MoneyRows({ rows, total }: { rows: { label: string; value: ReactNode; tone?: 'plus' | 'minus' }[]; total?: { label: string; value: ReactNode } }) {
+export function MoneyRows({
+  rows,
+  total,
+}: {
+  rows: { label: string; value: ReactNode; tone?: 'plus' | 'minus' }[]
+  total?: { label: string; value: ReactNode }
+}) {
   return (
     <dl className="space-y-2 text-sm">
       {rows.map((r) => (
         <div key={r.label} className="flex items-baseline justify-between gap-3">
           <dt className="text-ink-soft">{r.label}</dt>
-          <dd className={`font-semibold ${r.tone === 'plus' ? 'text-teal' : r.tone === 'minus' ? 'text-danger' : ''}`}>{r.value}</dd>
+          <dd className={`font-semibold ${r.tone === 'plus' ? 'text-teal' : r.tone === 'minus' ? 'text-danger' : ''}`}>
+            {r.value}
+          </dd>
         </div>
       ))}
       {total && (
@@ -402,7 +422,9 @@ export function RuleBox({ title, rules, tone = 'violet' }: { title: string; rule
         {rules.map((r, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: danh sách tĩnh
           <li key={i} className="flex gap-3 rounded-2xl bg-surface-low p-4 text-sm text-ink-soft">
-            <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full font-display text-xs font-bold ${TONE[tone]}`}>
+            <span
+              className={`grid h-7 w-7 shrink-0 place-items-center rounded-full font-display text-xs font-bold ${TONE[tone]}`}
+            >
               {i + 1}
             </span>
             <span>{r}</span>
@@ -429,7 +451,9 @@ export function AuditTimeline({ entries, title = 'Sổ ký audit logs' }: { entr
           .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
           .map((e) => (
             <li key={`${e.at}-${e.action}`} className="flex gap-3">
-              <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${e.tone ? TONE[e.tone].split(' ')[0] : 'bg-line'} ring-2 ring-white`} />
+              <span
+                className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${e.tone ? TONE[e.tone].split(' ')[0] : 'bg-line'} ring-2 ring-white`}
+              />
               <div className="min-w-0">
                 <p className="font-mono text-[11px] text-ink-soft">{formatDateTime(e.at)}</p>
                 <p className="text-sm font-semibold">{e.action}</p>
@@ -496,7 +520,11 @@ export function DecisionForm({
             aria-pressed={decision === o.value}
             onClick={() => setDecision(o.value)}
             className={`rounded-full px-4 py-2.5 font-label text-sm font-semibold transition ${
-              decision === o.value ? (o.tone === 'danger' ? 'bg-danger text-white' : 'bg-ink text-white') : 'bg-surface-low hover:bg-surface-high'
+              decision === o.value
+                ? o.tone === 'danger'
+                  ? 'bg-danger text-white'
+                  : 'bg-ink text-white'
+                : 'bg-surface-low hover:bg-surface-high'
             }`}
           >
             {o.label}
@@ -506,10 +534,17 @@ export function DecisionForm({
       {options.find((o) => o.value === decision)?.hint && (
         <p className="mt-2 text-xs text-ink-soft">{options.find((o) => o.value === decision)?.hint}</p>
       )}
-      <label htmlFor={`${uid}-reason`} className="mt-5 flex justify-between font-label text-xs font-semibold text-ink-soft">
+      <label
+        htmlFor={`${uid}-reason`}
+        className="mt-5 flex justify-between font-label text-xs font-semibold text-ink-soft"
+      >
         <span>Căn cứ phán quyết *</span>
         <span>
-          {reason.trim().length} / tối thiểu {minReason} ký tự
+          {minReason <= 1
+            ? reason.trim().length > 0
+              ? `${reason.trim().length} ký tự`
+              : 'Không được để trống'
+            : `${reason.trim().length} / tối thiểu ${minReason} ký tự`}
         </span>
       </label>
       <textarea
@@ -586,7 +621,9 @@ export function MediaTile({ label, tone = 'violet', icon: Icon }: { label: strin
 
 export function Avatar({ name, tone = 'violet' }: { name: string; tone?: Tone }) {
   return (
-    <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full font-display text-sm font-bold ${TONE[tone]}`}>
+    <span
+      className={`grid h-10 w-10 shrink-0 place-items-center rounded-full font-display text-sm font-bold ${TONE[tone]}`}
+    >
       {name
         .split(/\s+/)
         .slice(-2)

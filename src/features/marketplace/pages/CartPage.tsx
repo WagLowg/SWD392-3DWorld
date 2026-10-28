@@ -14,13 +14,13 @@ import {
 } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { LoginRequired } from '../../../shared/ui/LoginRequired'
-import { ProductMedia } from '../components/ProductMedia'
-import { StatusBlock } from '../../../shared/ui/StatusBlock'
-import { StorefrontBadge } from '../components/StorefrontBadge'
-import { ApiNote, PageHeading, QuantityStepper } from '../../../shared/ui/primitives'
-import { useAcknowledgePrice, useCart, useRemoveCartItem, useRevalidateCart, useUpdateCartItem } from '../hooks/useCart'
 import { useSession } from '../../../shared/session/useSession'
+import { LoginRequired } from '../../../shared/ui/LoginRequired'
+import { ApiNote, PageHeading, QuantityStepper } from '../../../shared/ui/primitives'
+import { StatusBlock } from '../../../shared/ui/StatusBlock'
+import { ProductMedia } from '../components/ProductMedia'
+import { StorefrontBadge } from '../components/StorefrontBadge'
+import { useAcknowledgePrice, useCart, useRemoveCartItem, useRevalidateCart, useUpdateCartItem } from '../hooks/useCart'
 import { groupByStorefront, storefrontName } from '../lib/cart'
 import { formatAttributes, formatVnd } from '../lib/format'
 import { useVariantIndexStore } from '../stores/variant-index.store'
@@ -90,10 +90,7 @@ export function CartPage() {
             title="Giỏ hàng đang trống"
             body="Khám phá các vật phẩm in 3D và thêm món bạn thích nhé."
             action={
-              <Link
-                to="/products"
-                className="rounded-full bg-ink px-6 py-3 font-label text-sm font-semibold text-white"
-              >
+              <Link to="/" className="rounded-full bg-ink px-6 py-3 font-label text-sm font-semibold text-white">
                 Tiếp tục mua sắm tại Chợ Đồ Chơi
               </Link>
             }
@@ -332,7 +329,7 @@ function CartContent({ items }: { items: CartItem[] }) {
             </span>
           </button>
           <div className="mt-3 flex items-center justify-between gap-2">
-            <Link to="/products" className="font-label text-sm font-semibold hover:text-violet">
+            <Link to="/" className="font-label text-sm font-semibold hover:text-violet">
               Tiếp tục mua sắm
             </Link>
             <button
@@ -441,7 +438,12 @@ function Thumb({ item, dim = false }: { item: CartItem; dim?: boolean }) {
   return (
     <div className={`relative h-20 w-20 shrink-0 ${dim ? 'grayscale' : ''}`}>
       {image || seed ? (
-        <ProductMedia src={image ?? undefined} alt="" seed={seed ?? item.variantId} className="h-full w-full rounded-2xl" />
+        <ProductMedia
+          src={image ?? undefined}
+          alt=""
+          seed={seed ?? item.variantId}
+          className="h-full w-full rounded-2xl"
+        />
       ) : (
         <div className="grid h-full w-full place-items-center rounded-2xl bg-gradient-to-br from-violet-soft to-peach text-ink-soft">
           <ShoppingBag size={22} />

@@ -1,5 +1,8 @@
 import { type ReactNode, useEffect } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom'
+import { useSession } from '../../shared/session/useSession'
+import { AdminLayout } from '../admin/components/AdminLayout'
+import { AdminStorefrontPage } from '../admin/pages/AdminStorefrontPage'
 import { AddressesPage } from '../account/pages/AddressesPage'
 import { BankAccountsPage } from '../account/pages/BankAccountsPage'
 import { ProfilePage } from '../account/pages/ProfilePage'
@@ -10,7 +13,7 @@ import { ReportsPage } from '../buyer/pages/ReportsPage'
 import { ModelDetailPage } from '../models/pages/ModelDetailPage'
 import { ProductQueuePage, ProductReviewPage, ReportQueuePage, ReportReviewPage } from '../ops/pages/ModerationPages'
 import { UserAdminDetailPage, UsersAdminPage } from '../ops/pages/UserAuditPages'
-import { StorefrontQueuePage, StorefrontReviewPage } from '../ops/pages/VerificationPages'
+import { StorefrontReviewPage } from '../ops/pages/VerificationPages'
 import { InventoryPage } from '../seller/pages/InventoryPage'
 import { ProductEditorPage } from '../seller/pages/ProductEditorPage'
 import { SellerDashboardPage } from '../seller/pages/SellerDashboardPage'
@@ -34,6 +37,15 @@ import { SellerOrderDetailPage } from '../orders/pages/SellerOrderDetailPage'
 import { SellerOrdersPage } from '../orders/pages/SellerOrdersPage'
 import { SellerShipmentDetailPage } from '../orders/pages/SellerShipmentDetailPage'
 import { SellerShipmentsPage } from '../orders/pages/SellerShipmentsPage'
+import {
+  StaffAccessGate,
+  StaffDashboardPage,
+  StaffLayout,
+  StaffRefundDetailPage,
+  StaffRefundListPage,
+  StaffShippingDetailPage,
+  StaffShippingListPage,
+} from '../staff/StaffApp'
 import { ErrorScreen } from '../../shared/ui/ErrorScreen'
 import { AccountLayout, AccountTabs, RequireUser } from './components/AccountLayout'
 import { PortalShell } from './components/PortalShell'
@@ -54,30 +66,133 @@ const ACCOUNT_ROUTES: { path: string; element: ReactNode }[] = [
   { path: 'reports', element: <ReportsPage /> },
   { path: 'reports/new', element: <NewReportPage /> },
   { path: 'reports/:reportId', element: <ReportDetailPage /> },
-  { path: 'seller', element: <SellerAccessGate minimum="active"><SellerDashboardPage /></SellerAccessGate> },
+  {
+    path: 'seller',
+    element: (
+      <SellerAccessGate minimum="active">
+        <SellerDashboardPage />
+      </SellerAccessGate>
+    ),
+  },
   { path: 'seller/register', element: <SellerRegisterPage /> },
-  { path: 'seller/storefront', element: <SellerAccessGate minimum="verified"><StorefrontProfilePage /></SellerAccessGate> },
-  { path: 'seller/subscription', element: <SellerAccessGate minimum="storefront"><SubscriptionPage /></SellerAccessGate> },
-  { path: 'seller/revenue', element: <SellerAccessGate minimum="active"><RevenuePage /></SellerAccessGate> },
-  { path: 'seller/revenue/:earningId', element: <SellerAccessGate minimum="active"><EarningDetailPage /></SellerAccessGate> },
-  { path: 'seller/payouts/new', element: <SellerAccessGate minimum="active"><PayoutRequestPage /></SellerAccessGate> },
-  { path: 'seller/products', element: <SellerAccessGate minimum="active"><SellerProductsPage /></SellerAccessGate> },
-  { path: 'seller/products/new', element: <SellerAccessGate minimum="active"><ProductEditorPage /></SellerAccessGate> },
-  { path: 'seller/products/:productId', element: <SellerAccessGate minimum="active"><SellerProductDetailPage /></SellerAccessGate> },
-  { path: 'seller/products/:productId/edit', element: <SellerAccessGate minimum="active"><ProductEditorPage /></SellerAccessGate> },
-  { path: 'seller/inventory', element: <SellerAccessGate minimum="active"><InventoryPage /></SellerAccessGate> },
+  {
+    path: 'seller/storefront',
+    element: (
+      <SellerAccessGate minimum="verified">
+        <StorefrontProfilePage />
+      </SellerAccessGate>
+    ),
+  },
+  {
+    path: 'seller/subscription',
+    element: (
+      <SellerAccessGate minimum="storefront">
+        <SubscriptionPage />
+      </SellerAccessGate>
+    ),
+  },
+  {
+    path: 'seller/revenue',
+    element: (
+      <SellerAccessGate minimum="active">
+        <RevenuePage />
+      </SellerAccessGate>
+    ),
+  },
+  {
+    path: 'seller/revenue/:earningId',
+    element: (
+      <SellerAccessGate minimum="active">
+        <EarningDetailPage />
+      </SellerAccessGate>
+    ),
+  },
+  {
+    path: 'seller/payouts/new',
+    element: (
+      <SellerAccessGate minimum="active">
+        <PayoutRequestPage />
+      </SellerAccessGate>
+    ),
+  },
+  {
+    path: 'seller/products',
+    element: (
+      <SellerAccessGate minimum="active">
+        <SellerProductsPage />
+      </SellerAccessGate>
+    ),
+  },
+  {
+    path: 'seller/products/new',
+    element: (
+      <SellerAccessGate minimum="active">
+        <ProductEditorPage />
+      </SellerAccessGate>
+    ),
+  },
+  {
+    path: 'seller/products/:productId',
+    element: (
+      <SellerAccessGate minimum="active">
+        <SellerProductDetailPage />
+      </SellerAccessGate>
+    ),
+  },
+  {
+    path: 'seller/products/:productId/edit',
+    element: (
+      <SellerAccessGate minimum="active">
+        <ProductEditorPage />
+      </SellerAccessGate>
+    ),
+  },
+  {
+    path: 'seller/inventory',
+    element: (
+      <SellerAccessGate minimum="active">
+        <InventoryPage />
+      </SellerAccessGate>
+    ),
+  },
   { path: 'ops/products', element: <ProductQueuePage /> },
   { path: 'ops/products/:caseId', element: <ProductReviewPage /> },
   { path: 'ops/reports', element: <ReportQueuePage /> },
   { path: 'ops/reports/:caseId', element: <ReportReviewPage /> },
-  { path: 'ops/storefronts', element: <StorefrontQueuePage /> },
-  { path: 'ops/storefronts/:caseId', element: <StorefrontReviewPage /> },
   { path: 'ops/users', element: <UsersAdminPage /> },
   { path: 'ops/users/:caseId', element: <UserAdminDetailPage /> },
-  { path: 'seller/orders', element: <SellerAccessGate minimum="active"><SellerOrdersPage /></SellerAccessGate> },
-  { path: 'seller/orders/:orderId', element: <SellerAccessGate minimum="active"><SellerOrderDetailPage /></SellerAccessGate> },
-  { path: 'seller/shipments', element: <SellerAccessGate minimum="active"><SellerShipmentsPage /></SellerAccessGate> },
-  { path: 'seller/shipments/:orderId', element: <SellerAccessGate minimum="active"><SellerShipmentDetailPage /></SellerAccessGate> },
+  {
+    path: 'seller/orders',
+    element: (
+      <SellerAccessGate minimum="active">
+        <SellerOrdersPage />
+      </SellerAccessGate>
+    ),
+  },
+  {
+    path: 'seller/orders/:orderId',
+    element: (
+      <SellerAccessGate minimum="active">
+        <SellerOrderDetailPage />
+      </SellerAccessGate>
+    ),
+  },
+  {
+    path: 'seller/shipments',
+    element: (
+      <SellerAccessGate minimum="active">
+        <SellerShipmentsPage />
+      </SellerAccessGate>
+    ),
+  },
+  {
+    path: 'seller/shipments/:orderId',
+    element: (
+      <SellerAccessGate minimum="active">
+        <SellerShipmentDetailPage />
+      </SellerAccessGate>
+    ),
+  },
   { path: 'models', element: <ModelLibraryPage /> },
   { path: 'models/upload', element: <ModelUploadPage /> },
   { path: 'models/:modelId', element: <ModelDetailPage /> },
@@ -97,6 +212,11 @@ function Redirect({ to }: { to: string }) {
   return null
 }
 
+function LegacyStorefrontReviewRedirect() {
+  const caseId = useParams().caseId
+  return <Navigate to={caseId ? `/admin/storefronts/verifications/${caseId}` : '/admin/storefronts'} replace />
+}
+
 function AccountPage({ children }: { children: ReactNode }) {
   return (
     <RequireUser>
@@ -108,34 +228,85 @@ function AccountPage({ children }: { children: ReactNode }) {
   )
 }
 
+/**
+ * Ranh giới cách ly định tuyến: Ngăn chặn tài khoản chỉ có quyền Staff (PRINT_STAFF mà không có ADMIN)
+ * truy cập vào các màn hình không thuộc phân hệ Staff bên trong ứng dụng Portal.
+ * Khi tài khoản Staff-only cố gắng truy cập các route này (/portal/, /portal/orders, /portal/seller, /portal/admin/storefronts, ...),
+ * hệ thống sẽ tự động chuyển hướng về trang Staff Dashboard (/portal/staff).
+ */
+function NonStaffRouteGuard() {
+  const { data: user, isLoading } = useSession()
+
+  // Không hiển thị chớp nhoáng nội dung trang trước khi phiên xác thực tải xong
+  if (isLoading) {
+    return null
+  }
+
+  if (user) {
+    const roles = user.roles ?? (user.role ? [user.role] : [])
+    const isStaffOnly = roles.includes('PRINT_STAFF') && !roles.includes('ADMIN')
+    if (isStaffOnly) {
+      return <Navigate to="/staff" replace />
+    }
+  }
+
+  return <Outlet />
+}
+
 export function App() {
   return (
     <Routes>
-      <Route element={<AccountLayout />}>
-        {ACCOUNT_ROUTES.map((r) => (
-          <Route key={r.path} path={r.path} element={<AccountPage>{r.element}</AccountPage>} />
-        ))}
-        {/* Xem trước các màn lỗi chung (MP 017 / MP-103 / MP-104) */}
-        <Route path="error/403" element={<ErrorScreen kind="403" />} />
-        <Route path="error/503" element={<ErrorScreen kind="503" />} />
-        <Route path="error/session-expired" element={<ErrorScreen kind="session" />} />
-        <Route path="cart" element={<Redirect to="/marketplace/cart" />} />
-        <Route path="checkout" element={<Redirect to="/marketplace/checkout" />} />
+      {/* Phân hệ Quản trị Staff (UI Prototype) — Độc lập ngoài AccountLayout để không bị gắn Header Marketplace */}
+      <Route
+        path="staff"
+        element={
+          <StaffAccessGate>
+            <StaffLayout />
+          </StaffAccessGate>
+        }
+      >
+        <Route index element={<StaffDashboardPage />} />
+        <Route path="shipments" element={<StaffShippingListPage />} />
+        <Route path="shipments/:shipmentId" element={<StaffShippingDetailPage />} />
+        <Route path="refunds" element={<StaffRefundListPage />} />
+        <Route path="refunds/:refundId" element={<StaffRefundDetailPage />} />
       </Route>
 
-      {/* Bản đồ FRD cho các nghiệp vụ còn lại */}
-      <Route element={<PortalShell />}>
-        <Route index element={<OverviewPage />} />
-        {internalScreens
-          .filter((screen) => !IMPLEMENTED.has(relativePortalRoute(screen.route)))
-          .map((screen) => (
-            <Route key={screen.id} path={relativePortalRoute(screen.route)} element={<ScreenPage screen={screen} />} />
+      {/* Ranh giới bảo vệ: Tự động chuyển hướng tài khoản Staff-only về /portal/staff khi truy cập các route không thuộc Staff */}
+      <Route element={<NonStaffRouteGuard />}>
+        <Route element={<AdminLayout />}>
+          <Route path="admin/storefronts" element={<AdminStorefrontPage />} />
+          <Route path="admin/storefronts/verifications/:caseId" element={<StorefrontReviewPage />} />
+        </Route>
+
+        <Route element={<AccountLayout />}>
+          {ACCOUNT_ROUTES.map((r) => (
+            <Route key={r.path} path={r.path} element={<AccountPage>{r.element}</AccountPage>} />
           ))}
-      </Route>
+          {/* Xem trước các màn lỗi chung (MP 017 / MP-103 / MP-104) */}
+          <Route path="error/403" element={<ErrorScreen kind="403" />} />
+          <Route path="error/503" element={<ErrorScreen kind="503" />} />
+          <Route path="error/session-expired" element={<ErrorScreen kind="session" />} />
+          <Route path="cart" element={<Redirect to="/marketplace/cart" />} />
+          <Route path="checkout" element={<Redirect to="/marketplace/checkout" />} />
+          <Route path="ops/storefronts" element={<Navigate to="/admin/storefronts" replace />} />
+          <Route path="ops/storefronts/:caseId" element={<LegacyStorefrontReviewRedirect />} />
+        </Route>
 
-      {/* MP 018 · 404 */}
-      <Route element={<AccountLayout />}>
-        <Route path="*" element={<ErrorScreen kind="404" />} />
+        {/* Bản đồ FRD cho các nghiệp vụ còn lại */}
+        <Route element={<PortalShell />}>
+          <Route index element={<OverviewPage />} />
+          {internalScreens
+            .filter((screen) => !IMPLEMENTED.has(relativePortalRoute(screen.route)))
+            .map((screen) => (
+              <Route key={screen.id} path={relativePortalRoute(screen.route)} element={<ScreenPage screen={screen} />} />
+            ))}
+        </Route>
+
+        {/* MP 018 · 404 */}
+        <Route element={<AccountLayout />}>
+          <Route path="*" element={<ErrorScreen kind="404" />} />
+        </Route>
       </Route>
     </Routes>
   )
