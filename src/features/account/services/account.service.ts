@@ -10,12 +10,18 @@ import type {
 
 export const profileService = {
   async get(signal?: AbortSignal) {
-    return (await http.get<ApiEnvelope<Profile>>('/api/auth/me', { signal })).data
+    return (await http.get<ApiEnvelope<Profile>>('/api/users/me', { signal })).data
   },
 
   /** Chỉ cập nhật họ tên và số điện thoại; email không đổi được qua API này. */
   async update(input: ProfileInput) {
     return (await http.patch<ApiEnvelope<Profile>, ProfileInput>('/api/users/me', input)).data
+  },
+
+  async uploadAvatar(file: File) {
+    const form = new FormData()
+    form.append('file', file)
+    return (await http.post<ApiEnvelope<Profile>, FormData>('/api/users/me/avatar', form)).data
   },
 }
 

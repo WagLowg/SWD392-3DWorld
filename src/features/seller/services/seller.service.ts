@@ -1,19 +1,17 @@
 import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
 import type { AuditEntry } from '../../../shared/ui/kit'
-import { bankAccountService } from '../../account/services/account.service'
+import { addressService, bankAccountService } from '../../account/services/account.service'
+import { formatStructuredAddress, isGhtkReadyAddress } from '../../account/lib/address'
 import { rememberPaymentAttempt } from '../../marketplace/lib/payment'
 import {
   disputes,
-  earnings,
-  inventoryLogs,
-  type Plan,
+  type Earning,
   type ProductStatus,
   type SellerApplication,
   type SellerProduct,
   type SellerVariant,
   type Storefront,
   type Subscription,
-  wallet,
 } from '../data/seller.fixtures'
 import {
   type ApiProduct,
@@ -22,6 +20,7 @@ import {
   type ApiSubscriptionOverview,
   type ApiVariant,
   sellerProductApi,
+  sellerWalletApi,
   sellerVerificationApi,
   storefrontOwnerApi,
   type VariantWrite,
@@ -136,8 +135,11 @@ function storefrontStatus(shop: ApiShop): Storefront['status'] {
   const s = shop.status?.toUpperCase()
   if (s === 'SUSPENDED' || s === 'BANNED') return 'SUSPENDED'
   if (!shop.expiresAt || Date.parse(shop.expiresAt) < Date.now()) return shop.expiresAt ? 'EXPIRED' : 'INACTIVE'
+  // `available` là kết quả canPublish() của BE (role + xác thực + trạng thái + hạn gói),
+  // vì vậy luôn ưu tiên chặn trước khi gắn nhãn sắp hết hạn.
+  if (shop.available === false) return 'INACTIVE'
   if (Date.parse(shop.expiresAt) - Date.now() < 7 * 86_400_000) return 'EXPIRING'
-  return shop.available === false ? 'INACTIVE' : 'ACTIVE'
+  return 'ACTIVE'
 }
 
 function toStorefront(shop: ApiShop): Storefront {
@@ -183,31 +185,21 @@ function subRow(s: ApiSubscription): Subscription['history'][number] {
   }
 }
 
-const MONTHLY_PLAN_ID = 'monthly'
-
-function toSubscription(o: ApiSubscriptionOverview): { subscription: Subscription; plans: Plan[] } {
+function toSubscription(o: ApiSubscriptionOverview): { subscription: Subscription; monthlyFee: number; hasPendingPayment: boolean } {
   const expiresAt = o.storefrontExpiresAt ?? o.latest?.endAt ?? null
   const left = expiresAt ? Date.parse(expiresAt) - Date.now() : -1
   const rows = [o.pending, o.latest].filter((s): s is ApiSubscription => !!s)
   return {
     subscription: {
-      planId: MONTHLY_PLAN_ID,
+      planId: 'monthly',
       status: left < 0 ? 'EXPIRED' : left < 7 * 86_400_000 ? 'EXPIRING' : 'ACTIVE',
       startedAt: o.latest?.startAt ?? nowIso(),
       expiresAt: expiresAt ?? nowIso(),
       autoRenew: false,
       history: rows.filter((s, i) => rows.findIndex((x) => x.id === s.id) === i).map(subRow),
     },
-    plans: [
-      {
-        id: MONTHLY_PLAN_ID,
-        name: 'Gói xưởng tháng',
-        price: Number(o.monthlyFee) || 0,
-        period: 'tháng',
-        perks: ['Mở bán sản phẩm trên Chợ Đồ Chơi', 'Kích hoạt 1 tháng lịch (UTC) sau khi thanh toán thành công'],
-        highlight: true,
-      },
-    ],
+    monthlyFee: Number(o.monthlyFee) || 0,
+    hasPendingPayment: !!o.pending,
   }
 }
 
@@ -268,10 +260,6 @@ async function findVariant(variantId: number) {
   throw new Error('Không tìm thấy biến thể.')
 }
 
-function logInventory(sku: string, change: number, reason: string, kind: 'IN' | 'OUT' | 'PRICE') {
-  inventoryLogs.unshift({ at: nowIso(), sku, change, reason, actor: 'Bạn', kind })
-}
-
 export type SaveProductInput = Omit<
   SellerProduct,
   'id' | 'status' | 'updatedAt' | 'sold' | 'audit' | 'media' | 'mediaItems' | 'storefrontId' | 'revision'
@@ -281,13 +269,15 @@ export type SaveProductInput = Omit<
 
 export const sellerService = {
   async application(): Promise<SellerApplication> {
-    const [v, banks, shop] = await Promise.all([
+    const [v, banks, shop, addresses] = await Promise.all([
       sellerVerificationApi.get(),
-      bankAccountService.list().catch(() => []),
-      storefrontOwnerApi.mine().catch(() => null),
+      bankAccountService.list(),
+      storefrontOwnerApi.mine(),
+      addressService.list(),
     ])
     const ver = v.verification
     const draft = readEvidence(ver?.evidenceReference)
+    const pickup = addresses.find((address) => address.isDefault)
     const bank =
       banks.find((b) => b.id === ver?.bankAccountId) ??
       banks.find((b) => b.isActive && isVerifiedBank(b.verificationStatus)) ??
@@ -309,7 +299,7 @@ export const sellerService = {
       status: VERIFICATION_STATUS[ver?.status?.toUpperCase() ?? ''] ?? 'DRAFT',
       storefrontName: shop?.name ?? draft.storefrontName,
       description: shop?.description ?? '',
-      address: draft.address,
+      address: pickup ? formatStructuredAddress(pickup) : draft.address,
       technologies: draft.technologies,
       emailVerified: v.emailVerified,
       phoneVerified: v.phoneVerified,
@@ -328,6 +318,8 @@ export const sellerService = {
       eligible: v.eligible,
       verifiedBankAvailable: v.verifiedBankAvailable,
       storefrontId: shop?.id,
+      storefrontStatus: shop ? storefrontStatus(shop) : undefined,
+      pickupAddressReady: isGhtkReadyAddress(pickup),
       audit,
     }
   },
@@ -336,9 +328,13 @@ export const sellerService = {
   async submitApplication(
     patch: Pick<SellerApplication, 'storefrontName' | 'description' | 'address' | 'technologies'> & { evidence?: string },
   ) {
-    const banks = await bankAccountService.list()
+    const [banks, addresses] = await Promise.all([bankAccountService.list(), addressService.list()])
     const bank = banks.find((b) => b.isActive && isVerifiedBank(b.verificationStatus))
     if (!bank) throw new Error('Cần một tài khoản ngân hàng đã được quản trị viên duyệt trước khi nộp hồ sơ.')
+    const pickup = addresses.find((address) => address.isDefault)
+    if (!isGhtkReadyAddress(pickup)) {
+      throw new Error('Cần một địa chỉ mặc định có đủ người liên hệ, số điện thoại, địa chỉ chi tiết, tỉnh/thành và phường/xã để GHTK lấy hàng.')
+    }
     await sellerVerificationApi.submit({ bankAccountId: bank.id, evidenceReference: buildEvidence(patch) })
     return sellerService.application()
   },
@@ -353,7 +349,7 @@ export const sellerService = {
   },
 
   /** Tạo/dùng lại kỳ chờ thanh toán rồi chuyển sang ZaloPay. */
-  async renew(_planId: string) {
+  async renew() {
     const overview = await storefrontOwnerApi.subscription()
     const sub = overview.pending ?? (await storefrontOwnerApi.subscribe(!!overview.storefrontExpiresAt))
     const payment = await storefrontOwnerApi.paySubscription(sub.id)
@@ -436,23 +432,18 @@ export const sellerService = {
     return toProduct(await sellerProductApi.submit(id))
   },
 
-  /** Nhật ký tồn kho: chưa có API — chỉ ghi các thay đổi trong phiên làm việc này. */
-  inventoryLogs: () => mockResponse(inventoryLogs, 0),
-
   async adjustStock(variantId: number, delta: number, reason: string) {
     const { product, variant } = await findVariant(variantId)
     const next = variant.stock + delta
     if (next < variant.reserved) throw new Error('Tồn kho không được thấp hơn số đang giữ chỗ.')
     const saved = await sellerProductApi.setStock(product.id, variantId, next, reason)
-    logInventory(variant.sku, delta, reason, delta >= 0 ? 'IN' : 'OUT')
     return toVariant(saved.variants.find((v) => v.id === variantId) ?? { ...variant, stock: next })
   },
 
-  /** PATCH variant price (VariantPatch chưa có trường lý do — lý do chỉ ghi ở nhật ký phiên). */
-  async changePrice(variantId: number, price: number, reason: string) {
+  /** PATCH variant price; Backend hiện chưa nhận lý do thay đổi giá. */
+  async changePrice(variantId: number, price: number) {
     const { product, variant } = await findVariant(variantId)
     const saved = await sellerProductApi.updateVariant(product.id, variantId, { price })
-    logInventory(variant.sku, price - Number(variant.price), reason, 'PRICE')
     return toVariant(saved.variants.find((v) => v.id === variantId) ?? { ...variant, price })
   },
 
@@ -480,7 +471,53 @@ export const sellerService = {
     return mockResponse(d)
   },
 
-  earnings: () => mockResponse({ earnings, wallet }),
+  async earnings() {
+    const data = await sellerWalletApi.mine()
+    const earnings: Earning[] = (data.earnings ?? []).map((e) => {
+      const released = e.status?.toUpperCase() === 'RELEASED'
+      const pending = ['PENDING', 'AWAITING_FUNDS'].includes(e.status?.toUpperCase())
+      const status: Earning['status'] = released ? 'RELEASED' : pending ? 'PENDING' : 'HELD'
+      return {
+        id: `ERN-${e.orderId}`,
+        orderId: e.orderId,
+        product: `Đơn hàng #${e.orderId}`,
+        sku: 'Tổng hợp theo đơn',
+        gross: Number(e.grossAmount) || 0,
+        feeRate: Number(e.commissionRate) || 0,
+        status,
+        releaseAt: e.releasedAt ?? e.eligibleAt ?? undefined,
+        blocker: status === 'PENDING' ? `Dự kiến mở khoá ${e.eligibleAt ? new Date(e.eligibleAt).toLocaleString('vi-VN') : 'sau khi đủ điều kiện'}.` : status === 'HELD' ? `Backend ghi nhận trạng thái ${e.status}.` : undefined,
+        ledger: [
+          {
+            id: `earning-${e.orderId}`,
+            at: e.releasedAt ?? e.eligibleAt ?? nowIso(),
+            type: released ? 'Giải ngân doanh thu' : 'Ghi nhận doanh thu người bán',
+            amount: Number(e.netAmount) || 0,
+            bucket: released ? 'available' : status === 'HELD' ? 'held' : 'pending',
+            status: released ? 'POSTED' : 'PENDING',
+          },
+        ],
+      }
+    })
+    return {
+      earnings,
+      wallet: {
+        available: Number(data.availableBalance) || 0,
+        pending: Number(data.pendingBalance) || 0,
+        held: Number(data.payoutHold) || 0,
+        returnShippingDebt: Number(data.returnShippingDebt) || 0,
+      },
+    }
+  },
 
-  earning: (id: string) => mockFind(earnings, (e) => e.id === id, 'Khoản thu nhập'),
+  async earning(id: string) {
+    const data = await sellerService.earnings()
+    const earning = data.earnings.find((e) => e.id === id)
+    if (!earning) throw Object.assign(new Error('Không tìm thấy khoản thu nhập.'), { status: 404 })
+    return earning
+  },
+
+  requestPayout(input: { amount: number; bankAccountId: number; reason: string }) {
+    return sellerWalletApi.requestPayout(input)
+  },
 }

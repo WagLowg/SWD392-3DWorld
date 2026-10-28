@@ -1,12 +1,24 @@
 import { useEffect } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { PodShell } from './components/PodShell'
 import { AddressesPage, ProfilePage } from './pages/AccountPages'
+import {
+  ConfigurePage,
+  ModelViewerPage,
+  OrdersPage,
+  PreviewPage,
+  ReviewPage,
+} from './pages/CustomerFlowPages'
 import { GenericPage } from './pages/GenericPage'
 import { HomePage } from './pages/HomePage'
 import { MaterialsPage } from './pages/MaterialsPage'
 import { ReportNewPage } from './pages/ReportPage'
 import { RequestDetailPage, RequestListPage, RequestRevisePage } from './pages/RequestPages'
+
+function DetailBridge() {
+  const { requestId = '' } = useParams()
+  return <Navigate to={`/print/review?id=${requestId}`} replace />
+}
 
 function SharedAuth({ target }: { target: string }) {
   const location = useLocation()
@@ -20,6 +32,11 @@ export function PodApp() {
     <Route path="how-it-works" element={<GenericPage id={2} />} />
     <Route path="materials" element={<MaterialsPage />} />
     <Route path="help" element={<GenericPage id={4} />} />
+    <Route path="print" element={<Navigate to="/" replace />} />
+    <Route path="print/preview" element={<PreviewPage />} />
+    <Route path="print/configure" element={<ConfigurePage />} />
+    <Route path="print/review" element={<ReviewPage />} />
+    <Route path="print/model" element={<ModelViewerPage />} />
 
     <Route path="auth/register" element={<SharedAuth target="/register" />} />
     <Route path="auth/verify-email" element={<SharedAuth target="/verify-email" />} />
@@ -40,12 +57,12 @@ export function PodApp() {
     <Route path="requests/:requestId/log" element={<GenericPage id={33} />} />
     <Route path="requests/:requestId" element={<RequestDetailPage />} />
     <Route path="quotes/:quoteId" element={<GenericPage id={19} />} />
-    <Route path="orders" element={<GenericPage id={20} />} />
+    <Route path="orders" element={<OrdersPage />} />
     <Route path="orders/:requestId/production" element={<GenericPage id={22} />} />
     <Route path="orders/:requestId/payment" element={<GenericPage id={23} />} />
     <Route path="orders/:requestId/shipping" element={<GenericPage id={24} />} />
     <Route path="orders/:requestId/complete" element={<GenericPage id={30} />} />
-    <Route path="orders/:requestId" element={<GenericPage id={21} />} />
+    <Route path="orders/:requestId" element={<DetailBridge />} />
 
     <Route path="payments" element={<GenericPage id={26} />} />
     <Route path="payments/:transactionId" element={<GenericPage id={25} />} />

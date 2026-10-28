@@ -22,7 +22,7 @@ export function HomePage() {
   const validation = useMemo(() => {
     if (!file) return null
     if (file.size > 50 * 1024 * 1024) return 'Tệp vượt quá giới hạn 50MB của backend.'
-    if (!/\.(stl|glb|obj)$/i.test(file.name)) return 'Backend hiện chỉ nhận STL, GLB hoặc OBJ.'
+    if (!/\.(stl|glb|obj|3mf)$/i.test(file.name)) return 'Backend hiện nhận STL, GLB, OBJ hoặc 3MF.'
     return null
   }, [file])
   const createRequest = useMutation({ mutationFn: () => {
@@ -44,27 +44,26 @@ export function HomePage() {
           <div className="pod-model-stage"><div className="pod-model-orb"><Box size={86} /></div><span>360° MODEL VIEW</span></div>
           <label className="pod-dropzone">
             <FileUp />
-            <strong>{file ? file.name : 'Tải tệp lên (.STL, .GLB, .OBJ)'}</strong>
+            <strong>{file ? file.name : 'Tải tệp lên (.STL, .GLB, .OBJ, .3MF)'}</strong>
             <span>{file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : 'Dung lượng tối đa 50MB'}</span>
-            <input type="file" accept=".stl,.glb,.obj" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+            <input type="file" accept=".stl,.glb,.obj,.3mf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
           </label>
           <label className="pod-field"><span>Vật liệu xưởng</span><select value={selectedId} onChange={(event) => setMaterialId(Number(event.target.value))}>{options.map((item) => <option key={item.materialId} value={item.materialId}>{item.technologyCode} · {item.materialName}</option>)}</select></label>
           <label className="pod-check"><input type="checkbox" checked={rights} onChange={(event) => setRights(event.target.checked)} /><span>Tôi xác nhận có quyền sử dụng và đặt in tệp mô hình này.</span></label>
           {validation && <StateBlock state="error" title="Tệp chưa hợp lệ" body={validation} />}
           {createRequest.isError && <StateBlock state="error" title="Chưa thể gửi yêu cầu" body={createRequest.error.message} />}
-          {createRequest.data && <StateBlock state="success" title={`Đã tạo yêu cầu #${createRequest.data.printRequestId}`} body="Tệp đã được chuyển tới hàng đợi kỹ thuật của xưởng." />}
-          {createRequest.data ? <Link className="pod-primary pod-wide" to={`/requests/${createRequest.data.printRequestId}`}>Xem yêu cầu vừa tạo</Link> : <button type="button" className="pod-primary pod-wide" disabled={!file || !rights || !!validation || createRequest.isPending || !selectedId} onClick={() => createRequest.mutate()}>{createRequest.isPending ? 'Đang tải lên...' : 'Yêu Cầu Báo Giá Chính Thức'}</button>}
+          {createRequest.data && <StateBlock state="success" title={`Đã tạo bản nháp POD-${createRequest.data.printRequestId}`} body="Tiếp tục kiểm tra file, cấu hình và gửi Staff thẩm định." />}
+          {createRequest.data ? <Link className="pod-primary pod-wide" to={`/print/preview?id=${createRequest.data.printRequestId}`}>Tiếp tục xem trước mô hình</Link> : <button type="button" className="pod-primary pod-wide" disabled={!file || !rights || !!validation || createRequest.isPending || !selectedId} onClick={() => createRequest.mutate()}>{createRequest.isPending ? 'Đang tải lên...' : 'Tải Lên & Tiếp Tục'}</button>}
         </Panel>
       </section>
 
       <section className="pod-section">
-        <div className="pod-section-heading"><span>Quy trình chuẩn hóa</span><h2>Từ bản vẽ đến mô hình thật trong 5 bước</h2></div>
+        <div className="pod-section-heading"><span>Quy trình chuẩn hóa</span><h2>Wizard Customer rõ ràng trong 4 bước</h2></div>
         <div className="pod-step-grid">{[
-          ['01', 'Tải tệp & kiểm tra', 'STL, GLB, OBJ dưới 50MB. Kiểm tra định dạng và quyền sử dụng.'],
-          ['02', 'Đánh giá & báo giá', 'Kỹ thuật viên thẩm định DFM và phát hành báo giá có thời hạn.'],
-          ['03', 'Đặt cọc & khóa lệnh', 'Khóa thông số, tệp và lịch máy sau khi giao dịch thành công.'],
-          ['04', 'Sản xuất & Micro-QC', 'In, hậu kỳ, đo dung sai và lưu bằng chứng kiểm định.'],
-          ['05', 'Tất toán & giao hàng', 'Thanh toán số dư và nhận kiện hàng chống va đập.'],
+          ['01', 'Upload', 'STL, GLB, OBJ hoặc 3MF dưới 50MB và xác nhận quyền sử dụng.'],
+          ['02', 'Preview', 'Kiểm tra đúng file và version trước khi cấu hình sản xuất.'],
+          ['03', 'Configure', 'Chọn vật liệu, quality, kích thước, số lượng và ghi chú kỹ thuật.'],
+          ['04', 'Review & Submit', 'Gửi Staff thẩm định, nhận quote 24 giờ và thanh toán đủ 100%.'],
         ].map(([no, title, body]) => <article key={no}><span>{no}</span><h3>{title}</h3><p>{body}</p></article>)}</div>
       </section>
 

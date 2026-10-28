@@ -26,6 +26,18 @@ export function useUpdateProfile() {
     onSuccess: (profile) => {
       qc.setQueryData(accountKeys.profile, profile)
       qc.invalidateQueries({ queryKey: ['auth', 'me'] })
+      qc.invalidateQueries({ queryKey: ['seller', 'application'] })
+    },
+  })
+}
+
+export function useUploadAvatar() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => profileService.uploadAvatar(file),
+    onSuccess: (profile) => {
+      qc.setQueryData(accountKeys.profile, profile)
+      qc.invalidateQueries({ queryKey: ['auth', 'me'] })
     },
   })
 }
@@ -41,7 +53,11 @@ export function useAddressList() {
 
 export function useAddressMutations() {
   const qc = useQueryClient()
-  const onSuccess = () => qc.invalidateQueries({ queryKey: accountKeys.addresses })
+  const onSuccess = () => {
+    qc.invalidateQueries({ queryKey: accountKeys.addresses })
+    // Seller access dùng địa chỉ mặc định làm điểm lấy hàng GHTK.
+    qc.invalidateQueries({ queryKey: ['seller', 'application'] })
+  }
   return {
     create: useMutation({ mutationFn: (input: AddressInput) => addressService.create(input), onSuccess }),
     update: useMutation({
@@ -64,7 +80,10 @@ export function useBankAccounts() {
 
 export function useBankAccountMutations() {
   const qc = useQueryClient()
-  const onSuccess = () => qc.invalidateQueries({ queryKey: accountKeys.banks })
+  const onSuccess = () => {
+    qc.invalidateQueries({ queryKey: accountKeys.banks })
+    qc.invalidateQueries({ queryKey: ['seller', 'application'] })
+  }
   return {
     create: useMutation({ mutationFn: (input: BankAccountInput) => bankAccountService.create(input), onSuccess }),
     update: useMutation({

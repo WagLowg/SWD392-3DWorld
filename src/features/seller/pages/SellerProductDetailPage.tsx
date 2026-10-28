@@ -2,7 +2,7 @@ import { Archive, EyeOff, Pencil, Play, Send } from 'lucide-react'
 import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { formatDateTime, formatVnd } from '../../../shared/format'
-import { AuditTimeline, Btn, DataTable, DetailLayout, Hero, KeyValues, MockNotice, Pill, Section, StatusPill } from '../../../shared/ui/kit'
+import { AuditTimeline, Btn, DataTable, DetailLayout, Hero, KeyValues, Pill, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { categoryLabel, resolveMediaUrl } from '../../marketplace/lib/format'
 import { useSellerProduct, useSetProductStatus } from '../hooks/useSeller'
@@ -20,7 +20,6 @@ export function SellerProductDetailPage() {
 
   return (
     <>
-      <MockNotice partial="Số lượng đã bán" api="salesCount trong ProductView" />
       <QueryState isLoading={q.isLoading} error={q.error}>
         {q.data &&
           (() => {
@@ -112,14 +111,13 @@ export function SellerProductDetailPage() {
                       <Section title="Hiệu suất">
                         <KeyValues
                           items={[
-                            { label: 'Đã bán', value: p.sold },
                             { label: 'Ảnh', value: p.media },
                             { label: 'Cập nhật', value: formatDateTime(p.updatedAt) },
                             { label: 'Biến thể', value: p.variants.length },
                           ]}
                         />
                       </Section>
-                      <AuditTimeline entries={p.audit} title="Lịch sử kiểm duyệt bất biến" />
+                      <AuditTimeline entries={p.audit} title="Trạng thái kiểm duyệt từ backend" />
                     </>
                   }
                 />

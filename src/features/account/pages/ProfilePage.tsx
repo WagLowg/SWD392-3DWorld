@@ -1,13 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { BadgeCheck, History, Mail, Phone, ShieldCheck, ShoppingBag, Store, User } from 'lucide-react'
-import { useEffect, useId } from 'react'
+import { BadgeCheck, Camera, History, Mail, PencilLine, Phone, ShieldCheck, ShoppingBag, Store, User } from 'lucide-react'
+import { useEffect, useId, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { ApiClientError } from '../../../shared/api'
 import { Field, FormError, inputClass, SubmitButton } from '../../../shared/ui/form'
 import { ApiNote, PageHeading } from '../../../shared/ui/primitives'
 import { useToast } from '../../../shared/ui/toast'
 import { QueryState } from '../../../shared/ui/QueryState'
-import { useProfile, useUpdateProfile } from '../hooks/useAccount'
+import { useProfile, useUpdateProfile, useUploadAvatar } from '../hooks/useAccount'
 import { type ProfileFormValues, profileSchema } from '../schemas/account.schemas'
 import type { Profile } from '../types/account.types'
 
@@ -60,7 +60,9 @@ export function ProfilePage() {
 
 function ProfileContent({ profile }: { profile: Profile }) {
   const uid = useId()
+  const [isEditing, setIsEditing] = useState(false)
   const update = useUpdateProfile()
+  const avatar = useUploadAvatar()
   const toast = useToast()
   const {
     register,
@@ -74,9 +76,11 @@ function ProfileContent({ profile }: { profile: Profile }) {
   })
 
   const submit = handleSubmit(async (v) => {
+    if (!isEditing) return
     try {
       const saved = await update.mutateAsync({ fullName: v.fullName, phone: v.phone || undefined })
       reset({ fullName: saved.fullName ?? '', phone: saved.phone ?? '' })
+      setIsEditing(false)
       toast('Đã lưu hồ sơ.')
     } catch (e) {
       setError('root', { message: e instanceof ApiClientError ? e.message : 'Không lưu được hồ sơ.' })
@@ -84,16 +88,40 @@ function ProfileContent({ profile }: { profile: Profile }) {
   })
 
   const roles = profile.roles?.length ? profile.roles : ['CUSTOMER']
+  const canEdit = profile.capabilities?.includes('PROFILE_UPDATE') ?? false
+  const cancelEditing = () => {
+    reset({ fullName: profile.fullName ?? '', phone: profile.phone ?? '' })
+    setIsEditing(false)
+  }
+  const uploadAvatar = (file: File | undefined) => {
+    if (!file) return
+    if (!['image/jpeg', 'image/png'].includes(file.type)) return toast('Ảnh đại diện chỉ nhận JPEG hoặc PNG.', 'error')
+    if (file.size > 5_000_000) return toast('Ảnh đại diện tối đa 5 MB.', 'error')
+    avatar.mutate(file, {
+      onSuccess: () => toast('Đã cập nhật ảnh đại diện.'),
+      onError: (error) => toast(error.message || 'Không tải được ảnh đại diện.', 'error'),
+    })
+  }
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[360px_1fr]">
       <aside className="space-y-4">
         <div className="rounded-[2rem] bg-white/95 p-6 text-center shadow-soft">
           <div className="mx-auto grid h-28 w-28 place-items-center rounded-full bg-gradient-to-br from-orange to-violet p-1">
-            <span className="grid h-full w-full place-items-center rounded-full bg-white font-display text-5xl font-bold text-violet">
-              {profile.fullName?.charAt(0).toUpperCase() || '?'}
-            </span>
+            {profile.avatarUrl ? (
+              <img src={profile.avatarUrl} alt={`Ảnh đại diện ${profile.fullName}`} className="h-full w-full rounded-full bg-white object-cover" />
+            ) : (
+              <span className="grid h-full w-full place-items-center rounded-full bg-white font-display text-5xl font-bold text-violet">
+                {profile.fullName?.charAt(0).toUpperCase() || '?'}
+              </span>
+            )}
           </div>
+          {isEditing && (
+            <label className="mx-auto mt-3 inline-flex cursor-pointer items-center gap-2 rounded-full bg-surface-low px-3 py-2 font-label text-xs font-semibold hover:bg-surface-high">
+              <Camera size={14} /> {avatar.isPending ? 'Đang tải ảnh…' : 'Đổi ảnh đại diện'}
+              <input type="file" accept="image/jpeg,image/png" disabled={avatar.isPending} className="sr-only" onChange={(e) => uploadAvatar(e.target.files?.[0])} />
+            </label>
+          )}
           <h2 className="mt-4 font-display text-2xl font-bold">{profile.fullName}</h2>
           <p className="mt-1 font-mono text-xs text-ink-soft">UID: usr_{profile.userId}</p>
           <p
@@ -138,6 +166,24 @@ function ProfileContent({ profile }: { profile: Profile }) {
               <span className="block text-xs text-ink-soft">Thông tin liên hệ và định tuyến đơn hàng vật lý</span>
             </span>
           </span>
+          {isEditing ? (
+            <span className="rounded-full bg-violet-soft px-3 py-1.5 font-label text-xs font-semibold text-violet">
+              Đang chỉnh sửa
+            </span>
+          ) : canEdit ? (
+            <button
+              type="button"
+              onClick={() => {
+                reset({ fullName: profile.fullName ?? '', phone: profile.phone ?? '' })
+                setIsEditing(true)
+              }}
+              className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 font-label text-xs font-semibold text-white transition hover:bg-violet"
+            >
+              <PencilLine size={14} /> Chỉnh sửa hồ sơ
+            </button>
+          ) : (
+            <span className="rounded-full bg-white px-3 py-1.5 font-label text-xs font-semibold text-ink-soft">Chỉ xem</span>
+          )}
         </div>
 
         <form onSubmit={submit} noValidate className="mt-6 space-y-5">
@@ -151,7 +197,10 @@ function ProfileContent({ profile }: { profile: Profile }) {
               id={`${uid}-name`}
               autoComplete="name"
               aria-invalid={!!errors.fullName}
-              className={inputClass}
+              aria-readonly={!isEditing}
+              readOnly={!isEditing}
+              tabIndex={isEditing ? 0 : -1}
+              className={`${inputClass} ${!isEditing ? 'cursor-default text-ink' : ''}`}
               {...register('fullName')}
             />
           </Field>
@@ -184,7 +233,10 @@ function ProfileContent({ profile }: { profile: Profile }) {
               inputMode="tel"
               autoComplete="tel"
               aria-invalid={!!errors.phone}
-              className={inputClass}
+              aria-readonly={!isEditing}
+              readOnly={!isEditing}
+              tabIndex={isEditing ? 0 : -1}
+              className={`${inputClass} ${!isEditing ? 'cursor-default text-ink' : ''}`}
               {...register('phone')}
             />
           </Field>
@@ -211,18 +263,22 @@ function ProfileContent({ profile }: { profile: Profile }) {
             <ApiNote className="mt-2">Vai trò do quản trị viên cấp, người dùng không tự đổi được.</ApiNote>
           </div>
 
-          <FormError message={errors.root?.message} />
-          <div className="flex flex-wrap items-center gap-3">
-            <SubmitButton busy={update.isPending}>Lưu thay đổi hồ sơ</SubmitButton>
-            <button
-              type="button"
-              disabled={!isDirty}
-              onClick={() => reset()}
-              className="rounded-full px-5 py-3 font-label text-sm font-semibold text-ink-soft hover:bg-surface-low disabled:opacity-40"
-            >
-              Huỷ thao tác
-            </button>
-          </div>
+          {isEditing && (
+            <>
+              <FormError message={errors.root?.message} />
+              <div className="flex flex-wrap items-center gap-3">
+                <SubmitButton busy={update.isPending}>Xác nhận thay đổi</SubmitButton>
+                <button
+                  type="button"
+                  onClick={cancelEditing}
+                  className="rounded-full px-5 py-3 font-label text-sm font-semibold text-ink-soft hover:bg-surface-low"
+                >
+                  Huỷ chỉnh sửa
+                </button>
+                {!isDirty && <span className="font-label text-xs text-ink-soft">Chưa có thay đổi mới</span>}
+              </div>
+            </>
+          )}
         </form>
 
         <p className="mt-6 flex items-center gap-2 rounded-2xl bg-surface-low px-4 py-3 text-xs text-ink-soft">

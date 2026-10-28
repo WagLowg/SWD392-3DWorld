@@ -113,6 +113,34 @@ export type ApiSellerVerification = {
 
 export type ApiPayment = { transactionId: number; amount: number; status: string; orderUrl: string; appTransId: string }
 
+export type ApiEarning = {
+  orderId: number
+  grossAmount: number
+  commissionRate: number
+  commissionAmount: number
+  netAmount: number
+  status: string
+  eligibleAt?: string | null
+  releasedAt?: string | null
+}
+
+export type ApiWallet = {
+  userId: number
+  pendingBalance: number
+  availableBalance: number
+  payoutHold: number
+  returnShippingDebt: number
+  earnings: ApiEarning[]
+}
+
+export type ApiPayout = {
+  transactionId: number
+  amount: number
+  status: string
+  bankAccountId: number
+  transferReference?: string | null
+}
+
 const P = (id: number) => `/api/seller/products/${id}`
 
 export const sellerProductApi = {
@@ -215,5 +243,14 @@ export const sellerVerificationApi = {
   /** Cần email, SĐT đã xác thực và một tài khoản ngân hàng VERIFIED. */
   async submit(input: { bankAccountId: number; evidenceReference: string }) {
     return (await http.post<ApiEnvelope<ApiSellerVerification>>('/api/users/me/seller-verification', input)).data
+  },
+}
+
+export const sellerWalletApi = {
+  async mine() {
+    return (await http.get<ApiEnvelope<ApiWallet>>('/api/users/me/wallet')).data
+  },
+  async requestPayout(input: { amount: number; bankAccountId: number; reason: string }) {
+    return (await http.post<ApiEnvelope<ApiPayout>>('/api/users/me/payouts', input)).data
   },
 }

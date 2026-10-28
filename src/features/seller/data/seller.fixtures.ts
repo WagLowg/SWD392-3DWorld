@@ -25,6 +25,10 @@ export type SellerApplication = {
   verifiedBankAvailable?: boolean
   /** Có khi đã tạo gian hàng. */
   storefrontId?: number
+  /** Trạng thái vận hành hiện tại của gian hàng, dùng để chặn khu vực quản trị khi chưa mua/hết gói. */
+  storefrontStatus?: Storefront['status']
+  /** Địa chỉ mặc định có đủ dữ liệu để backend dùng làm điểm lấy hàng GHTK. */
+  pickupAddressReady?: boolean
   audit: AuditEntry[]
 }
 
@@ -49,22 +53,6 @@ export const application: SellerApplication = {
 
 /* --------------------------------------------------------- subscription */
 
-export type Plan = { id: string; name: string; price: number; period: string; perks: string[]; commission?: number; highlight?: boolean }
-
-export const plans: Plan[] = [
-  { id: 'basic', name: 'Maker Basic', price: 150_000, period: 'tháng', commission: 8, perks: ['Tối đa 20 sản phẩm', 'Hỗ trợ email', 'Báo cáo doanh thu cơ bản'] },
-  {
-    id: 'pro',
-    name: 'Maker Pro',
-    price: 250_000,
-    period: 'tháng',
-    commission: 5,
-    highlight: true,
-    perks: ['Không giới hạn sản phẩm', 'Ưu tiên kiểm duyệt < 12h', 'Huy hiệu xưởng uy tín', 'Thống kê nâng cao'],
-  },
-  { id: 'studio', name: 'Studio Partner', price: 690_000, period: 'tháng', commission: 3, perks: ['Mọi quyền Pro', 'Quản lý đa nhân sự', 'Chuyên viên hỗ trợ riêng'] },
-]
-
 export type Subscription = {
   planId: string
   status: 'ACTIVE' | 'EXPIRING' | 'EXPIRED' | 'SUSPENDED'
@@ -72,19 +60,6 @@ export type Subscription = {
   expiresAt: string
   autoRenew: boolean
   history: { period: string; txnId: string; amount: number; status: 'SUCCEEDED' | 'FAILED' | 'PENDING'; paidAt: string }[]
-}
-
-export const subscription: Subscription = {
-  planId: 'pro',
-  status: 'EXPIRING',
-  startedAt: nowIso(24 * 25),
-  expiresAt: nowIso(-24 * 5),
-  autoRenew: false,
-  history: [
-    { period: 'Tháng 10/2026', txnId: 'txn_sub_88219', amount: 250_000, status: 'SUCCEEDED', paidAt: nowIso(24 * 25) },
-    { period: 'Tháng 09/2026', txnId: 'txn_sub_77140', amount: 250_000, status: 'SUCCEEDED', paidAt: nowIso(24 * 55) },
-    { period: 'Tháng 08/2026', txnId: 'txn_sub_66021', amount: 250_000, status: 'FAILED', paidAt: nowIso(24 * 86) },
-  ],
 }
 
 /* ----------------------------------------------------------- storefront */
