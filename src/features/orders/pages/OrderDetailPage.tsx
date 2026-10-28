@@ -231,7 +231,7 @@ export function OrderDetailPage() {
                   )}
                   {REFUNDABLE.includes(order.status) && (
                     <Link
-                      to={`/refunds/new?orderId=${order.id}`}
+                      to={`/refunds?orderId=${order.id}`}
                       className="inline-flex items-center justify-center gap-2 rounded-full bg-surface-low px-5 py-2.5 font-label text-sm font-semibold hover:bg-surface-high"
                     >
                       <Undo2 size={15} /> Yêu cầu hoàn tiền

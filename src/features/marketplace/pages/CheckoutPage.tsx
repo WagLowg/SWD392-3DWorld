@@ -24,8 +24,8 @@ import { LoginRequired } from '../../../shared/ui/LoginRequired'
 import { ProductMedia } from '../components/ProductMedia'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { StorefrontBadge } from '../components/StorefrontBadge'
-import { ApiNote, PageHeading } from '../../../shared/ui/primitives'
-import { cartKey, useCart } from '../hooks/useCart'
+import { ApiNote, PageHeading, QuantityStepper } from '../../../shared/ui/primitives'
+import { cartKey, useCart, useUpdateCartItem } from '../hooks/useCart'
 import { addressKey, useAddresses, useCheckout, useShippingQuote, useZaloPayPayment } from '../hooks/useCheckout'
 import { useSession } from '../../../shared/session/useSession'
 import { groupByStorefront, storefrontName } from '../lib/cart'
@@ -198,6 +198,7 @@ function CheckoutForm({
   const addresses = useAddresses()
   const checkout = useCheckout()
   const pay = useZaloPayPayment()
+  const updateCartItem = useUpdateCartItem()
   const [addressId, setAddressId] = useState<number>()
   const [adding, setAdding] = useState(false)
   const [agree, setAgree] = useState(false)
@@ -251,7 +252,7 @@ function CheckoutForm({
     () => new Map((quote?.shops ?? []).map((shop) => [shop.storefrontId, Number(shop.selected.shippingFee) || 0])),
     [quote],
   )
-  const busy = checkout.isPending || pay.isPending
+  const busy = checkout.isPending || pay.isPending || updateCartItem.isPending
   const priceChanged = items.filter((i) => i.priceChanged)
 
   useEffect(() => {
@@ -445,7 +446,7 @@ function CheckoutForm({
               {g.items.map((item) => {
                 const info = index[item.variantId]
                 return (
-                  <li key={item.itemId} className="flex items-center gap-4 py-4">
+                  <li key={item.itemId} className="flex flex-wrap items-center gap-4 py-4 sm:flex-nowrap">
                     <ProductMedia
                       src={item.thumbnailUrl ?? info?.image}
                       alt=""
@@ -457,11 +458,17 @@ function CheckoutForm({
                       {info && <p className="text-xs text-ink-soft">{formatAttributes(info.attributes)}</p>}
                       <p className="font-mono text-[11px] text-violet">Mã kho: {item.sku}</p>
                     </div>
+                    <div className="text-center">
+                      <p className="mb-1 font-label text-[10px] font-semibold uppercase text-ink-soft">Số lượng</p>
+                      <QuantityStepper
+                        size="sm"
+                        value={item.quantity}
+                        disabled={busy || !!pendingAttempt}
+                        onChange={(quantity) => updateCartItem.mutate({ itemId: item.itemId, quantity })}
+                      />
+                    </div>
                     <div className="text-right">
-                      <p className="text-xs text-ink-soft">
-                        Số lượng: <strong className="text-ink">x{item.quantity}</strong>
-                        {item.quantity > 1 && ` (${formatVnd(item.unitPrice)}/sp)`}
-                      </p>
+                      <p className="text-xs text-ink-soft">{formatVnd(item.unitPrice)}/sản phẩm</p>
                       <p className="font-display text-lg font-bold">{formatVnd(item.lineTotal)}</p>
                     </div>
                   </li>
