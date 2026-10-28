@@ -9,12 +9,14 @@ import {
   ExternalLink,
   MapPin,
   Plus,
+  RefreshCw,
   ShieldCheck,
   Tag,
   Truck,
   Wallet,
 } from 'lucide-react'
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
 import { AddressForm } from '../components/AddressForm'
@@ -23,15 +25,23 @@ import { ProductMedia } from '../components/ProductMedia'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { StorefrontBadge } from '../components/StorefrontBadge'
 import { ApiNote, PageHeading } from '../../../shared/ui/primitives'
-import { useCart } from '../hooks/useCart'
-import { useAddresses, useCheckout, useZaloPayPayment } from '../hooks/useCheckout'
+import { cartKey, useCart } from '../hooks/useCart'
+import { addressKey, useAddresses, useCheckout, useShippingQuote, useZaloPayPayment } from '../hooks/useCheckout'
 import { useSession } from '../../../shared/session/useSession'
 import { groupByStorefront, storefrontName } from '../lib/cart'
 import { formatAttributes, formatVnd } from '../lib/format'
 import { paymentResultUrl } from '../lib/payment'
+import { isShippingQuoteUsable, SHIPPING_QUOTE_EXPIRY_BUFFER_MS } from '../lib/shipping'
 import { useVariantIndexStore } from '../stores/variant-index.store'
 import { useOrderPaymentsStore } from '../../orders/stores/order-payments.store'
-import type { Address, Order, Payment } from '../types/catalog.types'
+import { goLogin } from '../../auth/services/session'
+import {
+  clearPendingCheckout,
+  loadPendingCheckout,
+  savePendingCheckout,
+  type PendingCheckoutAttempt,
+} from '../lib/checkoutAttempt'
+import type { Address, CheckoutInput, Order, Payment, ShippingQuoteInput } from '../types/catalog.types'
 
 type PaymentMethod = 'zalopay' | 'cod'
 
@@ -39,10 +49,6 @@ type PaymentState = { orderId: number; payment?: Payment; error?: string }
 
 function addressLine(a: Address) {
   return [a.addressLine, a.ward, a.district, a.province || a.city].filter(Boolean).join(', ')
-}
-
-function addressSnapshot(a: Address) {
-  return [a.recipientName, a.phone, addressLine(a)].filter(Boolean).join(' | ')
 }
 
 function formatTime(iso: string) {
@@ -66,6 +72,7 @@ export function CheckoutPage() {
   const [orders, setOrders] = useState<Order[] | null>(null)
   const [payments, setPayments] = useState<PaymentState[]>([])
   const [method, setMethod] = useState<PaymentMethod>('zalopay')
+  const [pendingAttempt, setPendingAttempt] = useState<PendingCheckoutAttempt | null>(() => loadPendingCheckout())
 
   useEffect(() => {
     document.title = 'Đặt Hàng & Thanh Toán · 3DWorld'
@@ -104,7 +111,7 @@ export function CheckoutPage() {
           <LoginRequired title="Đăng nhập để đặt hàng" body="Bạn cần đăng nhập để chọn địa chỉ và thanh toán." />
         ) : done ? (
           <OrderResult orders={orders} payments={payments} method={method} onPaymentsChange={setPayments} />
-        ) : !items.length ? (
+        ) : !items.length && !pendingAttempt ? (
           <StatusBlock
             tone="empty"
             title="Chưa có vật phẩm để đặt"
@@ -120,6 +127,8 @@ export function CheckoutPage() {
             items={items}
             method={method}
             onMethodChange={setMethod}
+            pendingAttempt={pendingAttempt}
+            onPendingAttemptChange={setPendingAttempt}
             onPlaced={(placed, paid) => {
               setOrders(placed)
               setPayments(paid)
@@ -173,13 +182,18 @@ function CheckoutForm({
   items,
   method,
   onMethodChange,
+  pendingAttempt,
+  onPendingAttemptChange,
   onPlaced,
 }: {
   items: NonNullable<ReturnType<typeof useCart>['data']>['items']
   method: PaymentMethod
   onMethodChange: (m: PaymentMethod) => void
+  pendingAttempt: PendingCheckoutAttempt | null
+  onPendingAttemptChange: (attempt: PendingCheckoutAttempt | null) => void
   onPlaced: (orders: Order[], payments: PaymentState[]) => void
 }) {
+  const queryClient = useQueryClient()
   const index = useVariantIndexStore((s) => s.variants)
   const addresses = useAddresses()
   const checkout = useCheckout()
@@ -188,7 +202,8 @@ function CheckoutForm({
   const [adding, setAdding] = useState(false)
   const [agree, setAgree] = useState(false)
   const [error, setError] = useState('')
-  const idempotencyKey = useRef(newKey())
+  const [quoteRefreshKey, setQuoteRefreshKey] = useState(0)
+  const [expiryTick, setExpiryTick] = useState(() => Date.now())
   const rememberPayment = useOrderPaymentsStore((s) => s.remember)
 
   const list = addresses.data ?? []
@@ -199,21 +214,89 @@ function CheckoutForm({
 
   const groups = groupByStorefront(items, index)
   const subtotal = items.reduce((s, i) => s + (Number(i.lineTotal) || 0), 0)
+  const cartItemIds = useMemo(() => [...items.map((item) => item.itemId)].sort((a, b) => a - b), [items])
+  const hasDuplicateIds = new Set(cartItemIds).size !== cartItemIds.length
+  const invalidCartSelection = hasDuplicateIds || cartItemIds.length > 100
+  const cartFingerprint = useMemo(
+    () =>
+      [...items]
+        .sort((a, b) => a.itemId - b.itemId)
+        .map((item) => `${item.itemId}:${item.quantity}:${item.unitPrice}:${item.lineTotal}`)
+        .join('|'),
+    [items],
+  )
+  const quoteInput = useMemo<ShippingQuoteInput | null>(
+    () =>
+      addressId && cartItemIds.length && !invalidCartSelection
+        ? { cartItemIds, shippingAddressId: addressId }
+        : null,
+    [addressId, cartItemIds, invalidCartSelection],
+  )
+  const shippingQuote = useShippingQuote(quoteInput, cartFingerprint, quoteRefreshKey)
+  const quote = shippingQuote.data
+  const quoteUsable = isShippingQuoteUsable(quote, Math.max(expiryTick, Date.now()))
+  const quoteExpired = !!quote && !quoteUsable
+  const shippingQuoteLoading = shippingQuote.isDebouncing || shippingQuote.isFetching
+  const shippingQuoteError = invalidCartSelection
+    ? hasDuplicateIds
+      ? 'Danh sách sản phẩm có ID trùng lặp.'
+      : 'Mỗi lần checkout chỉ hỗ trợ tối đa 100 sản phẩm trong giỏ.'
+    : shippingQuote.error instanceof ApiClientError
+      ? shippingQuote.error.message
+      : shippingQuote.error
+        ? 'Không tính được phí vận chuyển.'
+        : ''
+  const grandTotal = subtotal + (quoteUsable ? Number(quote?.totalShippingFee) || 0 : 0)
+  const shopFees = useMemo(
+    () => new Map((quote?.shops ?? []).map((shop) => [shop.storefrontId, Number(shop.selected.shippingFee) || 0])),
+    [quote],
+  )
   const busy = checkout.isPending || pay.isPending
   const priceChanged = items.filter((i) => i.priceChanged)
 
-  const submit = async () => {
-    if (!address) return setError('Vui lòng chọn hoặc thêm địa chỉ nhận hàng.')
-    if (priceChanged.length) return setError('Có món đã đổi giá — vui lòng chấp nhận giá mới trong giỏ hàng.')
+  useEffect(() => {
+    if (!quote) return
+    const delay = Math.max(0, quote.expiresAt - SHIPPING_QUOTE_EXPIRY_BUFFER_MS - Date.now())
+    const timer = window.setTimeout(() => setExpiryTick((value) => value + 1), delay + 20)
+    return () => window.clearTimeout(timer)
+  }, [quote])
+
+  useEffect(() => {
+    if (shippingQuote.error instanceof ApiClientError && [401, 403].includes(shippingQuote.error.status)) goLogin()
+  }, [shippingQuote.error])
+
+  const refreshShippingQuote = () => {
     setError('')
-    try {
-      const placed = await checkout.mutateAsync({
-        cartItemIds: items.map((i) => i.itemId),
-        shippingAddressSnapshot: addressSnapshot(address),
+    setQuoteRefreshKey((value) => value + 1)
+  }
+
+  const submit = async () => {
+    if (!pendingAttempt && !address) return setError('Vui lòng chọn hoặc thêm địa chỉ nhận hàng.')
+    if (!pendingAttempt && priceChanged.length)
+      return setError('Có món đã đổi giá — vui lòng chấp nhận giá mới trong giỏ hàng.')
+    if (!pendingAttempt && !isShippingQuoteUsable(quote))
+      return setError('Phí vận chuyển chưa sẵn sàng hoặc đã hết hạn. Vui lòng lấy phí lại.')
+    setError('')
+
+    let payload: CheckoutInput
+    if (pendingAttempt) {
+      payload = pendingAttempt.payload
+    } else {
+      if (!address || !quote) return setError('Phí vận chuyển chưa sẵn sàng. Vui lòng lấy phí lại.')
+      payload = {
+        cartItemIds,
         shippingAddressId: address.id,
-        idempotencyKey: idempotencyKey.current,
-      })
-      idempotencyKey.current = newKey()
+        idempotencyKey: newKey(),
+        shippingQuoteToken: quote.quoteToken,
+      }
+    }
+    const attempt = pendingAttempt ?? savePendingCheckout(payload)
+    if (!pendingAttempt) onPendingAttemptChange(attempt)
+
+    try {
+      const placed = await checkout.mutateAsync(payload)
+      clearPendingCheckout(payload.idempotencyKey)
+      onPendingAttemptChange(null)
       const paid: PaymentState[] = []
       if (method === 'zalopay') {
         for (const order of placed) {
@@ -231,7 +314,31 @@ function CheckoutForm({
       }
       onPlaced(placed, paid)
     } catch (e) {
-      setError(e instanceof ApiClientError ? e.message : 'Không đặt được hàng. Vui lòng thử lại.')
+      if (e instanceof ApiClientError && e.status > 0) {
+        clearPendingCheckout(payload.idempotencyKey)
+        onPendingAttemptChange(null)
+
+        if (e.status === 409) {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: cartKey }),
+            queryClient.invalidateQueries({ queryKey: addressKey }),
+          ])
+          refreshShippingQuote()
+        } else if (e.status === 400 || e.status === 422 || e.status === 503) {
+          refreshShippingQuote()
+        }
+
+        if (e.status === 401 || e.status === 403) return goLogin()
+      }
+
+      const message = e instanceof ApiClientError ? e.message : 'Không đặt được hàng. Vui lòng thử lại.'
+      setError(
+        e instanceof ApiClientError && e.status === 409
+          ? `${message} Giỏ hàng và phí vận chuyển đang được cập nhật; vui lòng xác nhận lại.`
+          : e instanceof ApiClientError && e.status === 0
+            ? `${message} Yêu cầu trước chưa rõ kết quả; lần thử lại sẽ dùng đúng mã và payload cũ.`
+            : message,
+      )
     }
   }
 
@@ -272,6 +379,7 @@ function CheckoutForm({
                     type="radio"
                     name="address"
                     checked={a.id === addressId}
+                    disabled={checkout.isPending}
                     onChange={() => setAddressId(a.id)}
                     className="mt-1 accent-violet"
                   />
@@ -368,19 +476,30 @@ function CheckoutForm({
                 <input type="radio" checked readOnly className="mt-1 accent-orange" />
                 <span>
                   <span className="block text-sm font-semibold">Giao tiêu chuẩn của xưởng</span>
-                  <span className="block text-xs text-ink-soft">Phí vận chuyển do xưởng tính khi tạo đơn con</span>
+                  <span className="block text-xs text-ink-soft">
+                    {shippingQuoteLoading
+                      ? 'Đang tính phí vận chuyển…'
+                      : quoteUsable && g.storefrontId !== null && shopFees.has(g.storefrontId)
+                        ? `Phí vận chuyển: ${formatVnd(shopFees.get(g.storefrontId) ?? 0)}`
+                        : shippingQuoteError
+                          ? 'Chưa tính được phí vận chuyển'
+                          : quoteExpired
+                            ? 'Báo giá vận chuyển đã hết hạn'
+                            : 'Chờ địa chỉ nhận hàng'}
+                  </span>
                 </span>
               </label>
-              <ApiNote className="mt-2">
-                CheckoutRequest chưa có lựa chọn đơn vị vận chuyển — phí ship trả về trong đơn con sau khi đặt.
-              </ApiNote>
             </div>
             <div className="mt-4 flex flex-wrap items-baseline justify-between gap-2 text-sm">
               <span className="text-ink-soft">
                 Tạm tính {storefrontName(g.storefrontId).toLowerCase()}:{' '}
-                <strong className="text-ink">{formatVnd(g.subtotal)}</strong> + phí ship
+                <strong className="text-ink">{formatVnd(g.subtotal)}</strong>
               </span>
-              <span className="font-display text-xl font-bold">Tạm tính: {formatVnd(g.subtotal)}</span>
+              <span className="font-display text-xl font-bold">
+                {quoteUsable && g.storefrontId !== null && shopFees.has(g.storefrontId)
+                  ? `Gồm ship: ${formatVnd(g.subtotal + (shopFees.get(g.storefrontId) ?? 0))}`
+                  : `Tạm tính: ${formatVnd(g.subtotal)}`}
+              </span>
             </div>
           </section>
         ))}
@@ -427,7 +546,18 @@ function CheckoutForm({
           <h2 className="font-display text-2xl font-bold">Tổng Kết Đơn Hàng</h2>
           <dl className="mt-5 space-y-3 text-sm">
             <SummaryRow label={`Tổng tiền hàng (${groups.length} xưởng):`} value={formatVnd(subtotal)} />
-            <SummaryRow label={`Phí vận chuyển (${groups.length} kiện riêng):`} value="Tính khi tạo đơn" />
+            <SummaryRow
+              label={`Phí vận chuyển (${groups.length} xưởng):`}
+              value={
+                shippingQuoteLoading
+                  ? 'Đang tính…'
+                  : quoteUsable
+                    ? formatVnd(quote?.totalShippingFee ?? 0)
+                    : quoteExpired
+                      ? 'Đã hết hạn'
+                      : 'Chưa có'
+              }
+            />
             <SummaryRow label="Khấu trừ voucher ưu đãi:" value="0₫" />
           </dl>
           <div className="mt-4 flex items-center justify-between rounded-xl bg-surface-low px-3 py-2.5 font-label text-xs text-ink-soft">
@@ -437,10 +567,14 @@ function CheckoutForm({
             <span>Chưa hỗ trợ</span>
           </div>
           <div className="mt-5 flex items-end justify-between border-t border-line pt-5">
-            <span className="font-label text-xs font-semibold uppercase tracking-wider">Tạm tính thanh toán</span>
-            <span className="font-display text-3xl font-bold text-orange-deep">{formatVnd(subtotal)}</span>
+            <span className="font-label text-xs font-semibold uppercase tracking-wider">Tổng thanh toán</span>
+            <span className="font-display text-3xl font-bold text-orange-deep">
+              {quoteUsable ? formatVnd(grandTotal) : '—'}
+            </span>
           </div>
-          <p className="text-right font-label text-[11px] text-ink-soft">Chưa gồm phí vận chuyển từng xưởng</p>
+          <p className="text-right font-label text-[11px] text-ink-soft">
+            {quoteUsable ? 'Đã gồm phí vận chuyển GHTK' : 'Cần phí vận chuyển hợp lệ trước khi đặt hàng'}
+          </p>
 
           <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl bg-peach/40 p-4 text-sm">
             <input
@@ -464,17 +598,56 @@ function CheckoutForm({
             </p>
           )}
 
+          {pendingAttempt && (
+            <p className="mt-3 rounded-xl bg-butter/70 px-4 py-3 text-sm text-ink">
+              Yêu cầu đặt hàng trước chưa nhận được kết quả. Lần xác nhận tiếp theo sẽ kiểm tra lại bằng đúng mã và
+              payload cũ để tránh tạo đơn trùng.
+            </p>
+          )}
+
+          {!pendingAttempt && (shippingQuoteError || quoteExpired) && (
+            <div className="mt-3 rounded-xl bg-[#ffdad6] px-4 py-3 text-sm text-danger">
+              <p>{shippingQuoteError || 'Báo giá vận chuyển đã hết hạn. Vui lòng lấy phí lại.'}</p>
+              <button
+                type="button"
+                onClick={refreshShippingQuote}
+                disabled={shippingQuoteLoading || !quoteInput}
+                className="mt-2 inline-flex items-center gap-1.5 font-label text-xs font-semibold underline disabled:opacity-50"
+              >
+                <RefreshCw size={13} className={shippingQuoteLoading ? 'animate-spin' : ''} /> Thử lại
+              </button>
+            </div>
+          )}
+
           {error && <p className="mt-3 rounded-xl bg-[#ffdad6] px-4 py-3 text-sm text-danger">{error}</p>}
 
           <button
             type="button"
             onClick={submit}
-            disabled={!agree || !address || busy || priceChanged.length > 0}
+            disabled={
+              !agree ||
+              busy ||
+              (!pendingAttempt &&
+                (!address ||
+                  !items.length ||
+                  priceChanged.length > 0 ||
+                  shippingQuoteLoading ||
+                  !!shippingQuoteError ||
+                  !quoteUsable))
+            }
             className="mt-5 flex w-full items-center justify-between gap-3 rounded-full bg-ink py-2.5 pl-6 pr-2.5 font-label text-sm font-semibold text-white transition hover:bg-violet disabled:opacity-40"
           >
-            <span>{busy ? 'Đang xử lý…' : method === 'cod' ? 'Xác Nhận Đặt Hàng' : 'Xác Nhận Thanh Toán'}</span>
+            <span>
+              {busy
+                ? 'Đang xử lý…'
+                : pendingAttempt
+                  ? 'Kiểm Tra Lại Yêu Cầu'
+                  : method === 'cod'
+                    ? 'Xác Nhận Đặt Hàng'
+                    : 'Xác Nhận Thanh Toán'}
+            </span>
             <span className="inline-flex items-center gap-2 font-display text-base">
-              {formatVnd(subtotal)}
+              {pendingAttempt ? 'Retry' : quoteUsable ? formatVnd(grandTotal) : '—'}
               <span className="grid h-9 w-9 place-items-center rounded-full bg-orange">
                 <ArrowRight size={16} />
               </span>
