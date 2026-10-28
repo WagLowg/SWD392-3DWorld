@@ -17,20 +17,20 @@ import {
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
-import { AddressForm } from '../components/AddressForm'
+import { useSession } from '../../../shared/session/useSession'
 import { LoginRequired } from '../../../shared/ui/LoginRequired'
-import { ProductMedia } from '../components/ProductMedia'
-import { StatusBlock } from '../../../shared/ui/StatusBlock'
-import { StorefrontBadge } from '../components/StorefrontBadge'
 import { ApiNote, PageHeading } from '../../../shared/ui/primitives'
+import { StatusBlock } from '../../../shared/ui/StatusBlock'
+import { useOrderPaymentsStore } from '../../orders/stores/order-payments.store'
+import { AddressForm } from '../components/AddressForm'
+import { ProductMedia } from '../components/ProductMedia'
+import { StorefrontBadge } from '../components/StorefrontBadge'
 import { useCart } from '../hooks/useCart'
 import { useAddresses, useCheckout, useZaloPayPayment } from '../hooks/useCheckout'
-import { useSession } from '../../../shared/session/useSession'
 import { groupByStorefront, storefrontName } from '../lib/cart'
 import { formatAttributes, formatVnd } from '../lib/format'
 import { paymentResultUrl } from '../lib/payment'
 import { useVariantIndexStore } from '../stores/variant-index.store'
-import { useOrderPaymentsStore } from '../../orders/stores/order-payments.store'
 import type { Address, Order, Payment } from '../types/catalog.types'
 
 type PaymentMethod = 'zalopay' | 'cod'
@@ -285,9 +285,7 @@ function CheckoutForm({
                         </span>
                       )}
                     </span>
-                    <span className="mt-1 block text-sm text-ink-soft">
-                      {addressLine(a)}
-                    </span>
+                    <span className="mt-1 block text-sm text-ink-soft">{addressLine(a)}</span>
                   </span>
                 </label>
               ))}
@@ -615,7 +613,10 @@ function OrderResult({
       <div className="flex flex-wrap justify-center gap-3">
         {method === 'zalopay' && (
           <Link
-            to={paymentResultUrl('order', orders.map((o) => o.id)).replace('/marketplace', '')}
+            to={paymentResultUrl(
+              'order',
+              orders.map((o) => o.id),
+            ).replace('/marketplace', '')}
             className="rounded-full bg-[#0068ff] px-6 py-3 font-label text-sm font-semibold text-white hover:opacity-90"
           >
             Tôi đã thanh toán — kiểm tra kết quả
@@ -627,7 +628,7 @@ function OrderResult({
         >
           Xem đơn hàng của tôi
         </a>
-        <Link to="/products" className="rounded-full bg-white px-6 py-3 font-label text-sm font-semibold shadow-soft">
+        <Link to="/" className="rounded-full bg-white px-6 py-3 font-label text-sm font-semibold shadow-soft">
           Tiếp tục mua sắm
         </Link>
       </div>

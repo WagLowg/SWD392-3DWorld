@@ -39,7 +39,12 @@ const LIFECYCLE = [
 export function AdminStorefrontPage() {
   const [view, setView] = useState<View>('verification')
   const [status, setStatus] = useState('')
+  const [eligibility, setEligibility] = useState('')
+  const [bankStatus, setBankStatus] = useState('')
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
   const [term, setTerm] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const query = useOpsList('storefront')
 
   useEffect(() => {
@@ -48,13 +53,41 @@ export function AdminStorefrontPage() {
 
   const rows = useMemo(() => {
     const normalized = term.trim().toLowerCase()
-    return (query.data ?? []).filter(
-      (item) =>
-        (!status || item.status === status) &&
-        (!normalized ||
-          `${item.id} ${item.title} ${item.subtitle ?? ''} ${item.f.phone ?? ''}`.toLowerCase().includes(normalized)),
-    )
-  }, [query.data, status, term])
+    return (query.data ?? [])
+      .filter(
+        (item) =>
+          (!status || item.status === status) &&
+          (!eligibility ||
+            (eligibility === 'ELIGIBLE' ? item.f.eligible === 'Đủ điều kiện' : item.f.eligible !== 'Đủ điều kiện')) &&
+          (!bankStatus || item.f.bankStatus === bankStatus) &&
+          (!normalized ||
+            `${item.id} ${item.title} ${item.subtitle ?? ''} ${item.f.owner ?? ''} ${item.f.phone ?? ''} ${item.f.location ?? ''} ${item.f.bank ?? ''}`
+              .toLowerCase()
+              .includes(normalized)),
+      )
+      .sort((left, right) => {
+        const difference = Date.parse(right.createdAt) - Date.parse(left.createdAt)
+        return sortOrder === 'newest' ? difference : -difference
+      })
+  }, [bankStatus, eligibility, query.data, sortOrder, status, term])
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const firstRow = rows.length ? (currentPage - 1) * pageSize + 1 : 0
+  const lastRow = Math.min(currentPage * pageSize, rows.length)
+  const pagedRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const firstVisiblePage = Math.max(1, Math.min(currentPage - 2, totalPages - 4))
+  const visiblePages = Array.from({ length: Math.min(5, totalPages) }, (_, index) => firstVisiblePage + index)
+  const hasFilters = !!term || !!status || !!eligibility || !!bankStatus || sortOrder !== 'newest'
+
+  const clearFilters = () => {
+    setTerm('')
+    setStatus('')
+    setEligibility('')
+    setBankStatus('')
+    setSortOrder('newest')
+    setPage(1)
+  }
 
   const all = query.data ?? []
   const pending = all.filter((item) => item.status === 'PENDING').length
@@ -119,16 +152,23 @@ export function AdminStorefrontPage() {
           </div>
 
           <div className="rounded-[1.75rem] border border-line bg-white p-4 shadow-sm sm:p-6">
-            <div className="mb-5 flex flex-wrap gap-3">
+            <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_repeat(4,auto)]">
               <input
                 value={term}
-                onChange={(event) => setTerm(event.target.value)}
+                onChange={(event) => {
+                  setTerm(event.target.value)
+                  setPage(1)
+                }}
                 placeholder="Tìm theo mã, tên gian hàng, số điện thoại…"
-                className="min-w-[240px] flex-1 rounded-2xl border border-line bg-[#faf9ff] px-4 py-3 text-sm outline-none focus:border-violet focus:ring-2 focus:ring-violet/10"
+                className="min-w-0 rounded-2xl border border-line bg-[#faf9ff] px-4 py-3 text-sm outline-none focus:border-violet focus:ring-2 focus:ring-violet/10"
               />
               <select
+                aria-label="Lọc trạng thái hồ sơ"
                 value={status}
-                onChange={(event) => setStatus(event.target.value)}
+                onChange={(event) => {
+                  setStatus(event.target.value)
+                  setPage(1)
+                }}
                 className="rounded-2xl border border-line bg-[#faf9ff] px-4 py-3 text-sm font-semibold outline-none focus:border-violet"
               >
                 <option value="">Tất cả trạng thái</option>
@@ -136,58 +176,171 @@ export function AdminStorefrontPage() {
                 <option value="VERIFIED">Đã xác minh</option>
                 <option value="REJECTED">Đã từ chối</option>
               </select>
+              <select
+                aria-label="Lọc điều kiện seller"
+                value={eligibility}
+                onChange={(event) => {
+                  setEligibility(event.target.value)
+                  setPage(1)
+                }}
+                className="rounded-2xl border border-line bg-[#faf9ff] px-4 py-3 text-sm font-semibold outline-none focus:border-violet"
+              >
+                <option value="">Mọi điều kiện</option>
+                <option value="ELIGIBLE">Đủ điều kiện</option>
+                <option value="INELIGIBLE">Chưa đủ điều kiện</option>
+              </select>
+              <select
+                aria-label="Lọc trạng thái ngân hàng"
+                value={bankStatus}
+                onChange={(event) => {
+                  setBankStatus(event.target.value)
+                  setPage(1)
+                }}
+                className="rounded-2xl border border-line bg-[#faf9ff] px-4 py-3 text-sm font-semibold outline-none focus:border-violet"
+              >
+                <option value="">Mọi ngân hàng</option>
+                <option value="APPROVED">Ngân hàng đã duyệt</option>
+                <option value="PENDING">Ngân hàng chờ duyệt</option>
+                <option value="REJECTED">Ngân hàng từ chối</option>
+              </select>
+              <select
+                aria-label="Sắp xếp hồ sơ"
+                value={sortOrder}
+                onChange={(event) => {
+                  setSortOrder(event.target.value as 'newest' | 'oldest')
+                  setPage(1)
+                }}
+                className="rounded-2xl border border-line bg-[#faf9ff] px-4 py-3 text-sm font-semibold outline-none focus:border-violet"
+              >
+                <option value="newest">Mới gửi trước</option>
+                <option value="oldest">Cũ gửi trước</option>
+              </select>
             </div>
 
+            {hasFilters && (
+              <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl bg-[#f8f7fc] px-4 py-3 text-xs text-ink-soft">
+                <span>Tìm thấy {rows.length} hồ sơ theo bộ lọc hiện tại.</span>
+                <button type="button" onClick={clearFilters} className="font-bold text-violet hover:underline">
+                  Xóa bộ lọc
+                </button>
+              </div>
+            )}
+
             <QueryState isLoading={query.isLoading} error={query.error}>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[800px] border-separate border-spacing-0 text-left text-sm">
-                  <thead>
-                    <tr className="text-xs uppercase tracking-[.08em] text-ink-soft">
-                      <th className="border-b border-line px-4 py-3">Hồ sơ</th>
-                      <th className="border-b border-line px-4 py-3">Chủ sở hữu</th>
-                      <th className="border-b border-line px-4 py-3">Điều kiện</th>
-                      <th className="border-b border-line px-4 py-3">Trạng thái</th>
-                      <th className="border-b border-line px-4 py-3">Ngày gửi</th>
-                      <th className="border-b border-line px-4 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((item) => (
-                      <tr key={item.id} className="group hover:bg-[#faf9ff]">
-                        <td className="border-b border-line px-4 py-4">
-                          <p className="font-bold text-ink">{item.title}</p>
-                          <p className="mt-1 text-xs text-ink-soft">
-                            USR-{item.id} · {String(item.f.location ?? '—')}
-                          </p>
-                        </td>
-                        <td className="border-b border-line px-4 py-4">
-                          <p className="font-semibold">{String(item.f.owner ?? '—')}</p>
-                          <p className="mt-1 text-xs text-ink-soft">{String(item.f.phone ?? '—')}</p>
-                        </td>
-                        <td className="border-b border-line px-4 py-4">
-                          <p>{String(item.f.eligible ?? '—')}</p>
-                          <p className="mt-1 text-xs text-ink-soft">Ngân hàng: {String(item.f.bankStatus ?? '—')}</p>
-                        </td>
-                        <td className="border-b border-line px-4 py-4">
-                          <StatusPill status={item.status} map={OPS_STATUS.storefront} />
-                        </td>
-                        <td className="border-b border-line px-4 py-4 text-xs text-ink-soft">
-                          {formatDateTime(item.createdAt)}
-                        </td>
-                        <td className="border-b border-line px-4 py-4 text-right">
-                          <Link
-                            to={`/admin/storefronts/verifications/${item.id}`}
-                            className="inline-flex rounded-xl bg-ink px-3.5 py-2 text-xs font-bold text-white transition hover:bg-violet"
-                          >
-                            {item.status === 'PENDING' ? 'Thẩm định' : 'Xem hồ sơ'}
-                          </Link>
-                        </td>
+              <div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[800px] border-separate border-spacing-0 text-left text-sm">
+                    <thead>
+                      <tr className="text-xs uppercase tracking-[.08em] text-ink-soft">
+                        <th className="border-b border-line px-4 py-3">Hồ sơ</th>
+                        <th className="border-b border-line px-4 py-3">Chủ sở hữu</th>
+                        <th className="border-b border-line px-4 py-3">Điều kiện</th>
+                        <th className="border-b border-line px-4 py-3">Trạng thái</th>
+                        <th className="border-b border-line px-4 py-3">Ngày gửi</th>
+                        <th className="border-b border-line px-4 py-3" />
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {!rows.length && (
-                  <p className="py-12 text-center text-sm text-ink-soft">Không có hồ sơ phù hợp bộ lọc.</p>
+                    </thead>
+                    <tbody>
+                      {pagedRows.map((item) => (
+                        <tr key={item.id} className="group hover:bg-[#faf9ff]">
+                          <td className="border-b border-line px-4 py-4">
+                            <p className="font-bold text-ink">{item.title}</p>
+                            <p className="mt-1 text-xs text-ink-soft">
+                              USR-{item.id} · {String(item.f.location ?? '—')}
+                            </p>
+                          </td>
+                          <td className="border-b border-line px-4 py-4">
+                            <p className="font-semibold">{String(item.f.owner ?? '—')}</p>
+                            <p className="mt-1 text-xs text-ink-soft">{String(item.f.phone ?? '—')}</p>
+                          </td>
+                          <td className="border-b border-line px-4 py-4">
+                            <p>{String(item.f.eligible ?? '—')}</p>
+                            <p className="mt-1 text-xs text-ink-soft">Ngân hàng: {String(item.f.bankStatus ?? '—')}</p>
+                          </td>
+                          <td className="border-b border-line px-4 py-4">
+                            <StatusPill status={item.status} map={OPS_STATUS.storefront} />
+                          </td>
+                          <td className="border-b border-line px-4 py-4 text-xs text-ink-soft">
+                            {formatDateTime(item.createdAt)}
+                          </td>
+                          <td className="border-b border-line px-4 py-4 text-right">
+                            <Link
+                              to={`/admin/storefronts/verifications/${item.id}`}
+                              className="inline-flex rounded-xl bg-ink px-3.5 py-2 text-xs font-bold text-white transition hover:bg-violet"
+                            >
+                              {item.status === 'PENDING' ? 'Thẩm định' : 'Xem hồ sơ'}
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {!rows.length && (
+                    <p className="py-12 text-center text-sm text-ink-soft">Không có hồ sơ phù hợp bộ lọc.</p>
+                  )}
+                </div>
+
+                {rows.length > 0 && (
+                  <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-5">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-ink-soft">
+                      <span>
+                        Hiển thị{' '}
+                        <strong className="text-ink">
+                          {firstRow}–{lastRow}
+                        </strong>{' '}
+                        trong <strong className="text-ink">{rows.length}</strong> hồ sơ
+                      </span>
+                      <label className="flex items-center gap-2">
+                        Số dòng
+                        <select
+                          value={pageSize}
+                          onChange={(event) => {
+                            setPageSize(Number(event.target.value))
+                            setPage(1)
+                          }}
+                          className="rounded-xl border border-line bg-[#faf9ff] px-2 py-1.5 font-semibold text-ink outline-none focus:border-violet"
+                        >
+                          <option value={10}>10</option>
+                          <option value={20}>20</option>
+                          <option value={50}>50</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <nav className="flex items-center gap-1" aria-label="Phân trang hồ sơ người bán">
+                      <button
+                        type="button"
+                        disabled={currentPage === 1}
+                        onClick={() => setPage((value) => Math.max(1, value - 1))}
+                        className="rounded-xl border border-line px-3 py-2 text-xs font-bold hover:border-violet disabled:cursor-not-allowed disabled:opacity-35"
+                      >
+                        Trước
+                      </button>
+                      {visiblePages.map((pageNumber) => (
+                        <button
+                          key={pageNumber}
+                          type="button"
+                          aria-current={currentPage === pageNumber ? 'page' : undefined}
+                          onClick={() => setPage(pageNumber)}
+                          className={`grid h-9 min-w-9 place-items-center rounded-xl px-2 text-xs font-bold transition ${
+                            currentPage === pageNumber
+                              ? 'bg-ink text-white'
+                              : 'border border-line bg-white hover:border-violet'
+                          }`}
+                        >
+                          {pageNumber}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        disabled={currentPage === totalPages}
+                        onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                        className="rounded-xl border border-line px-3 py-2 text-xs font-bold hover:border-violet disabled:cursor-not-allowed disabled:opacity-35"
+                      >
+                        Sau
+                      </button>
+                    </nav>
+                  </div>
                 )}
               </div>
             </QueryState>

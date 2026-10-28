@@ -12,18 +12,18 @@ import { orderService } from '../../orders/services/order.service'
 import type { Order } from '../../orders/types/order.types'
 import { type ApiSubscription, storefrontOwnerApi } from '../../seller/services/seller.api'
 import { sellerService } from '../../seller/services/seller.service'
+import { formatVnd } from '../lib/format'
 import {
   combineStates,
   gatewayMessage,
   orderPaymentState,
   type PaymentState,
-  parsePaymentParams,
   POLL_INTERVAL_MS,
   POLL_TIMEOUT_MS,
+  parsePaymentParams,
   resolvePaymentParams,
   subscriptionPaymentState,
 } from '../lib/payment'
-import { formatVnd } from '../lib/format'
 
 /**
  * MP 023 · Kết Quả Thanh Toán ZaloPay — đang xác nhận / thành công / thất bại.
@@ -394,7 +394,7 @@ function ResultShell({
           </button>
         )}
         <Link
-          to="/products"
+          to="/"
           className="rounded-full bg-white px-6 py-3 font-label text-sm font-semibold shadow-soft hover:bg-surface-low"
         >
           Tiếp tục mua sắm
