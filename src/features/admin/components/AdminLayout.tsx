@@ -11,7 +11,7 @@ const NAVIGATION = [
   { label: 'Tổng quan', icon: LayoutDashboard, disabled: true },
   { label: 'Quản lý gian hàng', icon: Store, to: '/admin/storefronts' },
   { label: 'Đối soát vận chuyển & COD', icon: Truck, to: '/staff/shipments' },
-  { label: 'Kiểm duyệt sản phẩm', icon: Boxes, disabled: true },
+  { label: 'Kiểm duyệt sản phẩm', icon: Boxes, to: '/admin/products' },
   { label: 'Quản lý người dùng', icon: UsersRound, disabled: true },
   { label: 'Báo cáo vi phạm', icon: ShieldCheck, disabled: true },
 ]

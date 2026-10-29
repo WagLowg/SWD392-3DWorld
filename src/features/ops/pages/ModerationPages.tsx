@@ -24,13 +24,13 @@ export function ProductQueuePage() {
       accent="Phẩm Chất, Bản Quyền & Lưới In."
       api="GET /api/admin/products/pending"
       columns={[
-        { key: 'p', header: 'Sản phẩm', render: (c) => <CellTitle title={c.title} sub={`prd_${c.id} · ${c.subtitle}`} to={`/ops/products/${c.id}`} /> },
+        { key: 'p', header: 'Sản phẩm', render: (c) => <CellTitle title={c.title} sub={`prd_${c.id} · ${c.subtitle}`} to={`/admin/products/${c.id}`} /> },
         { key: 'c', header: 'Phân loại', render: (c) => `${categoryLabel(String(c.f.category))} · ${c.f.variants} SKU` },
         { key: 's', header: 'Gian hàng', render: (c) => val(c, 'store') },
         { key: 'pr', header: 'Giá từ', render: (c) => val(c, 'price') },
         statusColumn('product'),
         { key: 't', header: 'Gửi lúc', render: (c) => <span className="text-xs">{formatDateTime(c.createdAt)}</span> },
-        { key: 'x', header: '', render: (c) => <Btn to={`/ops/products/${c.id}`} size="sm" variant="primary">Thẩm định</Btn> },
+        { key: 'x', header: '', render: (c) => <Btn to={`/admin/products/${c.id}`} size="sm" variant="primary">Thẩm định</Btn> },
       ]}
       rules={{
         title: 'Quy trình kiểm soát phẩm chất & bản quyền',

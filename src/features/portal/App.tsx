@@ -277,6 +277,8 @@ export function App() {
         <Route element={<AdminLayout />}>
           <Route path="admin/storefronts" element={<AdminStorefrontPage />} />
           <Route path="admin/storefronts/verifications/:caseId" element={<StorefrontReviewPage />} />
+          <Route path="admin/products" element={<ProductQueuePage />} />
+          <Route path="admin/products/:caseId" element={<ProductReviewPage />} />
         </Route>
 
         <Route element={<AccountLayout />}>
