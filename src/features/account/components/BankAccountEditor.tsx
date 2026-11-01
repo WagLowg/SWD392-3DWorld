@@ -40,7 +40,7 @@ export function BankAccountEditor({
     try {
       if (account) await update.mutateAsync({ id: account.id, input })
       else await create.mutateAsync(input)
-      toast(account ? 'Đã cập nhật — tài khoản chờ xác minh lại.' : 'Đã thêm tài khoản, chờ xác minh.')
+      toast(account ? 'Đã cập nhật tài khoản ngân hàng.' : 'Đã lưu tài khoản ngân hàng.')
       onDone()
     } catch (error) {
       setError('root', {

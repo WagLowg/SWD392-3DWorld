@@ -7,9 +7,6 @@ import { AddressesPage } from '../account/pages/AddressesPage'
 import { BankAccountsPage } from '../account/pages/BankAccountsPage'
 import { ProfilePage } from '../account/pages/ProfilePage'
 import { CancelOrderPage } from '../buyer/pages/CancelOrderPage'
-import { NewReportPage } from '../buyer/pages/NewReportPage'
-import { ReportDetailPage } from '../buyer/pages/ReportDetailPage'
-import { ReportsPage } from '../buyer/pages/ReportsPage'
 import { ModelDetailPage } from '../models/pages/ModelDetailPage'
 import { ProductQueuePage, ProductReviewPage, ReportQueuePage, ReportReviewPage } from '../ops/pages/ModerationPages'
 import { UserAdminDetailPage, UsersAdminPage } from '../ops/pages/UserAuditPages'
@@ -63,9 +60,6 @@ const ACCOUNT_ROUTES: { path: string; element: ReactNode }[] = [
   { path: 'orders/:orderId/tracking', element: <OrderTrackingPage /> },
   { path: 'orders/:orderId/cancel', element: <CancelOrderPage /> },
   { path: 'refunds', element: <RefundRequestPage /> },
-  { path: 'reports', element: <ReportsPage /> },
-  { path: 'reports/new', element: <NewReportPage /> },
-  { path: 'reports/:reportId', element: <ReportDetailPage /> },
   {
     path: 'seller',
     element: (

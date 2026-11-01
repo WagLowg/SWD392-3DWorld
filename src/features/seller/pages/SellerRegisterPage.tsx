@@ -1,3 +1,4 @@
+import { missingSellerVerification } from '../lib/verification'
 import { Link2, MapPin, Pencil, Store } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { AddressEditor } from '../../account/components/AddressEditor'
@@ -57,6 +58,7 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
     setForm((current) => (current.address === address ? current : { ...current, address }))
   }, [pickup, pickupReady])
 
+  const missingVerification = missingSellerVerification(app)
   const locked = app.status === 'PENDING' || app.status === 'VERIFIED'
   const valid =
     form.storefrontName.trim().length >= 3 &&
@@ -66,7 +68,7 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
     pickupReady &&
     app.emailVerified &&
     app.phoneVerified &&
-    app.verifiedBankAvailable !== false
+    app.verifiedBankAvailable === true
 
   return (
     <DetailLayout
@@ -191,6 +193,13 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
             </p>
           </Section>
 
+          {!locked && missingVerification.length > 0 && (
+            <div role="status" className="rounded-2xl bg-peach/60 p-4 text-sm text-orange-deep">
+              <p className="font-semibold">Chưa thể nộp hồ sơ. Bạn cần hoàn tất:</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5">{missingVerification.map((item) => <li key={item}>{item}</li>)}</ul>
+              <p className="mt-2">Sau khi được duyệt, bấm “Kiểm tra trạng thái” để cập nhật.</p>
+            </div>
+          )}
           {!locked && (
             <div className="flex justify-end">
               <Btn variant="primary" disabled={!valid || submit.isPending} onClick={() => submit.mutate(form)}>
@@ -204,7 +213,7 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
         <>
           <Section title="Quy trình xét duyệt">
             <ol className="space-y-3 text-sm">
-              {['Nộp hồ sơ & minh chứng', 'Chuyên viên thẩm định (24–48h)', 'Xác minh tài khoản ngân hàng', 'Mở gian hàng & chọn gói'].map((s, i) => (
+              {['Xác thực email, SĐT và ngân hàng', 'Nộp hồ sơ & minh chứng', 'Chuyên viên thẩm định hồ sơ', 'Mở gian hàng & chọn gói'].map((s, i) => (
                 <li key={s} className="flex gap-3">
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-violet-soft font-display text-xs font-bold text-violet">{i + 1}</span>
                   {s}

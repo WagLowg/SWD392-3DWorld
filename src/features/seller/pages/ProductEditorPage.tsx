@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ImagePlus, PackageCheck, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { useFieldArray, useForm } from 'react-hook-form'
+import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { useNavigate, useParams } from 'react-router-dom'
 import { z } from 'zod'
 import { resolveMediaUrl } from '../../marketplace/lib/format'
@@ -11,6 +11,7 @@ import { QueryState } from '../../../shared/ui/QueryState'
 import type { SellerProduct } from '../data/seller.fixtures'
 import { useRemoveProductMedia, useSaveProduct, useSellerProduct, useUploadProductMedia } from '../hooks/useSeller'
 import { PRODUCT_STATUS } from '../lib/status'
+import { productSku } from '../lib/productSku'
 import type { PendingProductMedia } from '../services/seller.service'
 
 const CATEGORIES = [
@@ -87,7 +88,7 @@ const variantSchema = z.object({
 const schema = z.object({
   title: z.string().trim().min(5, 'Tối thiểu 5 ký tự').max(120, 'Tối đa 120 ký tự'),
   category: z.string().min(1, 'Chọn danh mục'),
-  description: z.string().trim().min(30, 'Mô tả tối thiểu 30 ký tự').max(5000),
+  description: z.string().trim().max(5000, 'Mô tả tối đa 5.000 ký tự'),
   shippingClass: z.string().min(1, 'Chọn quy chuẩn vận chuyển'),
   polygonCount: z.coerce.number().int().min(0),
   manifold: z.boolean(),
@@ -357,6 +358,8 @@ function EditorForm({ product }: { product?: SellerProduct }) {
   const uid = useId()
   const navigate = useNavigate()
   const save = useSaveProduct()
+  // New products have no server ID yet; keep one frontend code for this draft.
+  const [skuProductCode] = useState(() => product ? String(product.id) : crypto.randomUUID().replaceAll('-', '').slice(0, 6).toUpperCase())
   const [pendingMedia, setPendingMedia] = useState<PendingMediaPreview[]>([])
   const pendingMediaRef = useRef<PendingMediaPreview[]>([])
   const [mediaError, setMediaError] = useState<string>()
@@ -364,7 +367,7 @@ function EditorForm({ product }: { product?: SellerProduct }) {
     register,
     control,
     handleSubmit,
-    watch,
+    setValue,
     formState: { errors },
   } = useForm<Values>({
     resolver: zodResolver(schema),
@@ -381,9 +384,36 @@ function EditorForm({ product }: { product?: SellerProduct }) {
         },
   })
   const variants = useFieldArray({ control, name: 'variants', keyName: 'fieldKey' })
-  const title = watch('title') ?? ''
+  const title = useWatch({ control, name: 'title' }) ?? ''
   const colorListId = `${uid}-product-colors`
-  const watchedVariants = watch('variants') ?? []
+  const watchedVariants = useWatch({ control, name: 'variants' }) ?? []
+  const previousSkus = useRef(new Map<string, string>())
+  useEffect(() => {
+    const next = new Map<string, string>()
+    const renamed = new Map<string, string | undefined>()
+    const used = new Set(watchedVariants.filter((variant) => variant.id).map((variant) => variant.sku))
+    variants.fields.forEach((field, index) => {
+      const variant = watchedVariants[index]
+      if (!variant) return
+      let sku = variant.sku
+      if (!field.id) {
+        sku = productSku(title, variant.material, variant.color, variant.size, skuProductCode)
+        let duplicate = 1
+        while (used.has(sku)) {
+          sku = productSku(title, variant.material, variant.color, variant.size, skuProductCode, String(++duplicate).padStart(2, '0'))
+        }
+      }
+      used.add(sku)
+      next.set(field.fieldKey, sku)
+      const previous = previousSkus.current.get(field.fieldKey)
+      if (previous && previous !== sku) renamed.set(previous, sku)
+      if (sku !== variant.sku) setValue(`variants.${index}.sku`, sku, { shouldDirty: true, shouldValidate: true })
+    })
+    previousSkus.current.forEach((sku, key) => { if (!next.has(key)) renamed.set(sku, undefined) })
+    previousSkus.current = next
+    if (renamed.size) setPendingMedia((items) => items.map((item) =>
+      item.variantSku && renamed.has(item.variantSku) ? { ...item, variantSku: renamed.get(item.variantSku) } : item))
+  }, [title, watchedVariants, variants.fields, setValue, skuProductCode])
   const skus = watchedVariants
     .map((variant) => (typeof variant.sku === 'string' ? variant.sku.trim().toUpperCase() : ''))
     .filter(Boolean)
@@ -517,7 +547,7 @@ function EditorForm({ product }: { product?: SellerProduct }) {
                 </Field>
                 <Field
                   id={`${uid}-description`}
-                  label="Mô tả câu chuyện & quy trình đúc *"
+                  label="Mô tả câu chuyện & quy trình đúc (không bắt buộc)"
                   error={errors.description?.message}
                   className="sm:col-span-2"
                 >
@@ -567,7 +597,7 @@ function EditorForm({ product }: { product?: SellerProduct }) {
                       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <p className="font-label text-sm font-bold">Biến thể {String(index + 1).padStart(2, '0')}</p>
-                          <p className="text-xs text-ink-soft">Mã SKU phải duy nhất trên toàn hệ thống.</p>
+                          <p className="text-xs text-ink-soft">SKU tự tạo theo tên sản phẩm, chất liệu, màu và kích cỡ.</p>
                         </div>
                         <div className="flex items-center gap-3">
                           <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft">
@@ -594,6 +624,7 @@ function EditorForm({ product }: { product?: SellerProduct }) {
                         <VariantField label="SKU *" error={error?.sku?.message} className="sm:col-span-2">
                           <input
                             aria-label={`SKU biến thể ${index + 1}`}
+                            readOnly={!field.id}
                             placeholder="VD: JADE-RESIN-GREEN-S"
                             className={`${inputClass} bg-white font-mono uppercase`}
                             {...register(`variants.${index}.sku`)}
@@ -746,22 +777,7 @@ function EditorForm({ product }: { product?: SellerProduct }) {
               </div>
             </Section>
 
-            <Section n={4} title="Thông số kỹ thuật lưới">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field id={`${uid}-polygon`} label="Số đỉnh lưới (polygon count)" error={errors.polygonCount?.message}>
-                  <input
-                    id={`${uid}-polygon`}
-                    inputMode="numeric"
-                    className={inputClass}
-                    {...register('polygonCount')}
-                  />
-                </Field>
-                <label className="flex items-center gap-3 self-end rounded-2xl bg-surface-low p-3 text-sm">
-                  <input type="checkbox" className="h-4 w-4 accent-violet" {...register('manifold')} />
-                  Lưới kín (manifold), đã kiểm tra slicer
-                </label>
-              </div>
-            </Section>
+
           </>
         }
         aside={

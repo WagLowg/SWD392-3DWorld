@@ -1,5 +1,6 @@
+import { isVerifiedSellerBank } from '../lib/verification'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Clock3, Landmark, Mail, Pencil, Phone, RefreshCw, Send } from 'lucide-react'
+import { CheckCircle2, Landmark, Mail, Pencil, Phone, RefreshCw, Send } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { BankAccountEditor } from '../../account/components/BankAccountEditor'
 import { accountKeys, useBankAccounts, useProfile, useUpdateProfile } from '../../account/hooks/useAccount'
@@ -9,7 +10,6 @@ import { useToast } from '../../../shared/ui/toast'
 import type { SellerApplication } from '../data/seller.fixtures'
 import { sellerKeys } from '../hooks/useSeller'
 
-const verifiedBank = (status: string | undefined) => /^(VERIFIED|APPROVED)$/i.test(status ?? '')
 
 export function SellerPrerequisites({ application }: { application: SellerApplication }) {
   const profile = useProfile()
@@ -31,7 +31,7 @@ export function SellerPrerequisites({ application }: { application: SellerApplic
   })
 
   const accounts = useMemo(() => (banks.data ?? []).filter((account) => account.isActive !== false), [banks.data])
-  const approved = accounts.find((account) => verifiedBank(account.verificationStatus))
+  const approved = accounts.find(isVerifiedSellerBank)
   const currentBank = approved ?? accounts.find((account) => account.isDefault) ?? accounts[0]
   const bankRejected = currentBank?.verificationStatus?.toUpperCase() === 'REJECTED'
   const phoneChanged = phone.trim() !== (profile.data?.phone ?? '')
@@ -58,7 +58,7 @@ export function SellerPrerequisites({ application }: { application: SellerApplic
     setPhoneError('')
     try {
       await updateProfile.mutateAsync({ fullName: profile.data.fullName, phone: value })
-      toast('Đã cập nhật số điện thoại vào hồ sơ. Số điện thoại đang chờ quản trị viên xác minh.')
+      toast('Đã lưu số điện thoại. Vui lòng liên hệ quản trị viên để xác minh.')
     } catch (error) {
       setPhoneError(error instanceof Error ? error.message : 'Không cập nhật được số điện thoại.')
     }
@@ -89,9 +89,9 @@ export function SellerPrerequisites({ application }: { application: SellerApplic
           )}
         </PrerequisiteCard>
 
-        <PrerequisiteCard icon={Phone} title="Xác thực số điện thoại" ok={application.phoneVerified}>
+        <PrerequisiteCard icon={Phone} title="Số điện thoại" ok={application.phoneVerified}>
           {application.phoneVerified ? (
-            <><p className="text-sm font-medium">{profile.data?.phone}</p><VerifiedLabel /></>
+            <><p className="text-sm font-medium">{profile.data?.phone}</p><span className="text-sm text-[#0f7050]">Đã xác thực</span></>
           ) : (
             <>
               <label className="block">
@@ -99,28 +99,26 @@ export function SellerPrerequisites({ application }: { application: SellerApplic
                 <input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="0901234567" className={inputClass} />
               </label>
               {phoneError && <p className="text-xs text-danger">{phoneError}</p>}
-              <p className="text-xs leading-5 text-ink-soft">Sau khi lưu, số điện thoại chờ Admin xác minh. Backend hiện chưa có luồng OTP/SMS cho người dùng.</p>
+              <p className="text-xs leading-5 text-ink-soft">Số điện thoại cần được quản trị viên xác minh thủ công. Lưu số điện thoại chưa đồng nghĩa với đã xác thực.</p>
               <button type="button" disabled={!phone.trim() || !phoneChanged || updateProfile.isPending} onClick={savePhone} className="rounded-full bg-ink px-4 py-2.5 font-label text-xs font-semibold text-white hover:bg-violet disabled:opacity-40">
                 {updateProfile.isPending ? 'Đang lưu…' : profile.data?.phone ? 'Cập nhật số điện thoại' : 'Lưu vào hồ sơ'}
               </button>
-              {!!profile.data?.phone && !phoneChanged && <span className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-deep"><Clock3 size={13} /> Đã lưu · chờ xác minh</span>}
             </>
           )}
         </PrerequisiteCard>
 
         <PrerequisiteCard icon={Landmark} title="Tài khoản ngân hàng" ok={!!approved}>
-          {approved ? (
-            <><p className="text-sm font-semibold">{approved.bankName}</p><p className="font-mono text-sm text-ink-soft">{approved.accountNumberMasked}</p><VerifiedLabel /></>
-          ) : currentBank && !editingBank && !bankRejected ? (
+          {currentBank && !editingBank ? (
             <>
               <p className="text-sm font-semibold">{currentBank.bankName}</p>
               <p className="font-mono text-sm text-ink-soft">{currentBank.accountNumberMasked}</p>
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-deep"><Clock3 size={13} /> Đã lưu · chờ Admin xác minh</span>
-              <button type="button" onClick={() => setEditingBank(true)} className="inline-flex items-center gap-1.5 self-start rounded-full bg-surface-high px-3 py-2 font-label text-xs font-semibold"><Pencil size={13} /> Sửa thông tin</button>
+              {approved ? <VerifiedLabel /> : <p className="text-sm text-orange-deep">{bankRejected ? 'Tài khoản bị từ chối. Vui lòng sửa thông tin và lưu lại.' : 'Đã lưu · Chờ quản trị viên xác minh tài khoản ngân hàng.'}</p>}
+              <button type="button" onClick={() => setEditingBank(true)} className="inline-flex items-center gap-1.5 text-sm"><Pencil size={13} /> Sửa thông tin</button>
             </>
           ) : (
             <>
-              {bankRejected && <p className="rounded-xl bg-[#ffdad6] px-3 py-2 text-xs text-danger">Tài khoản đã bị từ chối. Vui lòng nhập lại thông tin chính xác.</p>}
+              {bankRejected && <p className="text-xs text-danger">Thông tin đã bị từ chối. Vui lòng sửa và lưu lại.</p>}
+              <p className="text-xs text-ink-soft">Sau khi lưu, tài khoản ngân hàng cần được quản trị viên xác minh trước khi nộp hồ sơ.</p>
               <BankAccountEditor account={currentBank} compact onDone={() => setEditingBank(false)} />
             </>
           )}
@@ -136,7 +134,7 @@ function PrerequisiteCard({ icon: Icon, title, ok, children }: { icon: typeof Ma
     <section className={`flex min-w-0 flex-col gap-3 rounded-2xl border p-4 ${ok ? 'border-mint bg-mint/25' : 'border-orange/20 bg-surface-low'}`}>
       <div className="flex items-center gap-3">
         <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${ok ? 'bg-mint text-[#0f5132]' : 'bg-peach text-orange-deep'}`}>{ok ? <CheckCircle2 size={17} /> : <Icon size={17} />}</span>
-        <div><p className="text-sm font-semibold">{title}</p><p className="text-xs text-ink-soft">{ok ? 'Đã xác thực' : 'Cần hoàn tất'}</p></div>
+        <div><p className="text-sm font-semibold">{title}</p><p className="text-xs text-ink-soft">{ok ? 'Đã hoàn tất' : 'Cần hoàn tất'}</p></div>
       </div>
       {children}
     </section>

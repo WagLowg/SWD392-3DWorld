@@ -25,6 +25,7 @@ export function useUpdateProfile() {
     mutationFn: (input: ProfileInput) => profileService.update(input),
     onSuccess: (profile) => {
       qc.setQueryData(accountKeys.profile, profile)
+      qc.invalidateQueries({ queryKey: accountKeys.banks })
       qc.invalidateQueries({ queryKey: ['auth', 'me'] })
       qc.invalidateQueries({ queryKey: ['seller', 'application'] })
     },

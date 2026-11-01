@@ -1,5 +1,6 @@
+import { AddressRegionFields } from '../../../shared/ui/AddressRegionFields'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { ApiClientError } from '../../../shared/api'
 import { Field, FormError, inputClass, SubmitButton } from '../../../shared/ui/form'
@@ -19,10 +20,13 @@ export function AddressEditor({
   forceDefault?: boolean
 }) {
   const uid = useId()
+  const [regionValid, setRegionValid] = useState(false)
   const { create, update, setDefault } = useAddressMutations()
   const toast = useToast()
   const {
     register,
+    watch,
+    setValue,
     handleSubmit,
     setError,
     formState: { errors },
@@ -39,6 +43,7 @@ export function AddressEditor({
   })
 
   const submit = handleSubmit(async (values) => {
+    if (!regionValid) return setError('root', { message: 'Vui lòng chọn tỉnh/thành phố và phường/xã hợp lệ.' })
     const input = {
       recipientName: values.recipientName,
       addressLine: values.addressLine,
@@ -80,20 +85,17 @@ export function AddressEditor({
           {...register('addressLine')}
         />
       </Field>
-      <Field id={`${uid}-province`} label="Tỉnh / Thành phố *" error={errors.province?.message}>
-        <input id={`${uid}-province`} autoComplete="address-level1" aria-invalid={!!errors.province} className={inputClass} {...register('province')} />
-      </Field>
-      <Field id={`${uid}-district`} label="Quận / Huyện (nếu có)" error={errors.district?.message}>
-        <input id={`${uid}-district`} autoComplete="address-level2" aria-invalid={!!errors.district} className={inputClass} {...register('district')} />
-      </Field>
-      <Field id={`${uid}-ward`} label="Phường / Xã *" error={errors.ward?.message}>
-        <input id={`${uid}-ward`} autoComplete="address-level3" aria-invalid={!!errors.ward} className={inputClass} {...register('ward')} />
-      </Field>
+      <AddressRegionFields value={{ province: watch('province'), ward: watch('ward') }}
+        onValidityChange={setRegionValid} onChange={(region) => {
+          setValue('province', region.province, { shouldValidate: true, shouldDirty: true })
+          setValue('ward', region.ward, { shouldValidate: true, shouldDirty: true })
+          setValue('district', '', { shouldDirty: true })
+        }} />
       <div className="flex items-end justify-end gap-2">
         <button type="button" onClick={onDone} className="rounded-full px-5 py-3 font-label text-sm font-semibold text-ink-soft hover:bg-surface-low">
           Huỷ
         </button>
-        <SubmitButton busy={create.isPending || update.isPending || setDefault.isPending}>
+        <SubmitButton disabled={!regionValid} busy={create.isPending || update.isPending || setDefault.isPending}>
           {address ? 'Lưu địa chỉ' : 'Thêm địa chỉ'}
         </SubmitButton>
       </div>

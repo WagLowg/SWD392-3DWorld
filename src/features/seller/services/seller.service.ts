@@ -1,3 +1,4 @@
+import { isVerifiedSellerBank, missingSellerVerification } from '../lib/verification'
 import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
 import type { AuditEntry } from '../../../shared/ui/kit'
 import { addressService, bankAccountService } from '../../account/services/account.service'
@@ -306,7 +307,6 @@ export function readEvidence(ref: string | null | undefined) {
   }
 }
 
-const isVerifiedBank = (status: string) => ['VERIFIED', 'APPROVED'].includes(status?.toUpperCase())
 
 /** Tìm sản phẩm chứa variant (API tồn kho cần cả productId). */
 async function findVariant(variantId: number) {
@@ -340,7 +340,7 @@ export const sellerService = {
     const pickup = addresses.find((address) => address.isDefault)
     const bank =
       banks.find((b) => b.id === ver?.bankAccountId) ??
-      banks.find((b) => b.isActive && isVerifiedBank(b.verificationStatus)) ??
+      banks.find(isVerifiedSellerBank) ??
       banks.find((b) => b.isDefault) ??
       banks[0]
     const audit: AuditEntry[] = []
@@ -388,9 +388,11 @@ export const sellerService = {
   async submitApplication(
     patch: Pick<SellerApplication, 'storefrontName' | 'description' | 'address' | 'technologies'> & { evidence?: string },
   ) {
-    const [banks, addresses] = await Promise.all([bankAccountService.list(), addressService.list()])
-    const bank = banks.find((b) => b.isActive && isVerifiedBank(b.verificationStatus))
-    if (!bank) throw new Error('Cần một tài khoản ngân hàng đã được quản trị viên duyệt trước khi nộp hồ sơ.')
+    const [verification, banks, addresses] = await Promise.all([sellerVerificationApi.get(), bankAccountService.list(), addressService.list()])
+    const missing = missingSellerVerification(verification)
+    if (missing.length) throw new Error(missing.join(' '))
+    const bank = banks.find(isVerifiedSellerBank)
+    if (!bank) throw new Error('Cần một tài khoản ngân hàng đang hoạt động được quản trị viên xác minh trước khi nộp hồ sơ.')
     const pickup = addresses.find((address) => address.isDefault)
     if (!isGhtkReadyAddress(pickup)) {
       throw new Error('Cần một địa chỉ mặc định có đủ người liên hệ, số điện thoại, địa chỉ chi tiết, tỉnh/thành và phường/xã để GHTK lấy hàng.')

@@ -13,7 +13,6 @@ import {
   MapPin,
   PackageSearch,
   PanelLeft,
-  ReceiptText,
   RotateCcw,
   ShieldCheck,
   ShoppingBag,
@@ -40,7 +39,6 @@ const BUYER_TABS = [
   { to: '/profile', label: 'Hồ sơ', icon: CircleUserRound },
   { to: '/addresses', label: 'Sổ địa chỉ', icon: MapPin },
   { to: '/bank-accounts', label: 'Tài khoản ngân hàng', icon: WalletCards },
-  { to: '/reports', label: 'Báo cáo vi phạm', icon: ReceiptText },
 ]
 
 const SELLER_TABS = [
@@ -131,7 +129,7 @@ export function AccountTabs() {
         <PanelLeft size={15} /> {title}
       </div>
       <nav className="flex gap-1 lg:grid">
-        {links.map((item) => {
+        {links.filter((item) => item.to !== '/bank-accounts' || !isSeller(user)).map((item) => {
           const Icon = item.icon
           return (
             <NavLink key={item.to} to={item.to} end={item.to === '/seller'} className={tab}>
@@ -153,10 +151,6 @@ export function AccountTabs() {
           <span>Bắt đầu bán hàng</span>
         </NavLink>
       )}
-      <a href="/marketplace/cart" className={tab({ isActive: false })}>
-        <ShoppingBag size={17} />
-        <span>Giỏ hàng</span>
-      </a>
     </aside>
   )
 }

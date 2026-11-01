@@ -50,17 +50,19 @@ export function FormError({ message }: { message?: string }) {
 
 export function SubmitButton({
   busy,
+  disabled,
   children,
   className = '',
 }: {
   busy?: boolean
+  disabled?: boolean
   children: ReactNode
   className?: string
 }) {
   return (
     <button
       type="submit"
-      disabled={busy}
+      disabled={busy || disabled}
       className={`inline-flex items-center justify-between gap-3 rounded-full bg-ink py-2 pl-6 pr-2 font-label text-sm font-semibold text-white transition hover:bg-violet disabled:opacity-50 ${className}`}
     >
       <span>{busy ? 'Đang xử lý…' : children}</span>

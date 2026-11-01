@@ -1,5 +1,6 @@
+import { AddressRegionFields } from '../../../shared/ui/AddressRegionFields'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { type ReactNode, useId } from 'react'
+import { type ReactNode, useId, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { ApiClientError } from '../../../shared/api'
 import { useCreateAddress } from '../hooks/useCheckout'
@@ -12,9 +13,12 @@ const field =
 /** Form thêm địa chỉ nhận hàng (POST /api/users/me/addresses). */
 export function AddressForm({ onCreated, onCancel }: { onCreated: (address: Address) => void; onCancel?: () => void }) {
   const uid = useId()
+  const [regionValid, setRegionValid] = useState(false)
   const create = useCreateAddress()
   const {
     register,
+    watch,
+    setValue,
     handleSubmit,
     setError,
     formState: { errors },
@@ -24,6 +28,7 @@ export function AddressForm({ onCreated, onCancel }: { onCreated: (address: Addr
   })
 
   const submit = handleSubmit(async (values) => {
+    if (!regionValid) return setError('root', { message: 'Vui lòng chọn tỉnh/thành phố và phường/xã hợp lệ.' })
     try {
       const address = await create.mutateAsync({
         recipientName: values.recipientName,
@@ -76,27 +81,12 @@ export function AddressForm({ onCreated, onCancel }: { onCreated: (address: Addr
           className={field}
         />
       </Field>
-      <Field id={`${uid}-ward`} label="Phường / Xã" error={errors.ward?.message}>
-        <input id={`${uid}-ward`} {...register('ward')} aria-invalid={!!errors.ward} className={field} />
-      </Field>
-      <Field id={`${uid}-district`} label="Quận / Huyện" error={errors.district?.message}>
-        <input
-          id={`${uid}-district`}
-          {...register('district')}
-          autoComplete="address-level2"
-          aria-invalid={!!errors.district}
-          className={field}
-        />
-      </Field>
-      <Field id={`${uid}-city`} label="Tỉnh / Thành phố" error={errors.city?.message}>
-        <input
-          id={`${uid}-city`}
-          {...register('city')}
-          autoComplete="address-level1"
-          aria-invalid={!!errors.city}
-          className={field}
-        />
-      </Field>
+      <AddressRegionFields value={{ province: watch('city'), ward: watch('ward') }}
+        onValidityChange={setRegionValid} onChange={(region) => {
+          setValue('city', region.province, { shouldValidate: true, shouldDirty: true })
+          setValue('ward', region.ward, { shouldValidate: true, shouldDirty: true })
+          setValue('district', '', { shouldDirty: true })
+        }} />
       <div className="flex items-end justify-end gap-2">
         {onCancel && (
           <button
@@ -109,7 +99,7 @@ export function AddressForm({ onCreated, onCancel }: { onCreated: (address: Addr
         )}
         <button
           type="submit"
-          disabled={create.isPending}
+          disabled={create.isPending || !regionValid}
           className="rounded-full bg-ink px-5 py-2.5 font-label text-sm font-semibold text-white hover:bg-violet disabled:opacity-50"
         >
           {create.isPending ? 'Đang lưu…' : 'Lưu địa chỉ'}

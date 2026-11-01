@@ -3,7 +3,6 @@ import {
   ArrowRight,
   Box,
   Flag,
-  Gem,
   Image as ImageIcon,
   Link2,
   Package,
@@ -179,21 +178,6 @@ function ProductView({ detail }: { detail: ProductDetail }) {
           <ArrowLeft size={14} /> Quay lại danh mục
         </Link>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-full bg-white/70 px-5 py-2.5 font-label text-xs text-ink-soft">
-        <span>
-          Mã định danh: <code className="rounded-md bg-surface-low px-1.5 py-0.5 text-ink">prd_{product.id}</code>
-        </span>
-        {selected && (
-          <span>
-            Biến thể SKU: <code className="rounded-md bg-violet-soft px-1.5 py-0.5 text-violet">{selected.sku}</code>
-          </span>
-        )}
-        <span className="ml-auto inline-flex items-center gap-1.5 font-semibold text-ink">
-          <span className={`h-2 w-2 rounded-full ${variants.length ? 'bg-teal' : 'bg-line'}`} />
-          {variants.length ? 'Đang mở bán vật lý (Active)' : 'Tạm ngừng bán'}
-        </span>
-      </div>
-
       <div className="mt-6 grid gap-8 lg:grid-cols-[1.15fr_1fr] lg:gap-10">
         {/* Cột trái: ảnh + thư viện */}
         <div className="min-w-0 animate-fade-up">
@@ -203,7 +187,7 @@ function ProductView({ detail }: { detail: ProductDetail }) {
                 <span className="h-2 w-2 rounded-full bg-orange" /> Ảnh sản phẩm · Chế độ chi tiết
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-low px-3 py-1 text-ink-soft">
-                <Box size={12} /> Xem 3D sẽ có khi API trả file mô hình
+                <Box size={12} /> Xem 3D sẽ có khi bán file model 3D trong tương lai
               </span>
             </div>
             <ProductMedia
@@ -218,9 +202,6 @@ function ProductView({ detail }: { detail: ProductDetail }) {
           <div className="mt-6">
             <h2 className="inline-flex flex-wrap items-center gap-2 font-display text-xl font-bold">
               <ImageIcon size={18} className="text-orange" /> Thư Viện Ảnh Chế Tác
-              <span className="font-label text-xs font-semibold text-ink-soft">
-                ({media.length} ảnh từ product_media)
-              </span>
             </h2>
             {media.length ? (
               <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
@@ -244,9 +225,8 @@ function ProductView({ detail }: { detail: ProductDetail }) {
             )}
           </div>
 
-          <ul className="mt-6 grid gap-3 rounded-[2rem] bg-white/90 p-5 shadow-soft sm:grid-cols-3">
+          <ul className="mt-6 grid gap-3 rounded-[2rem] bg-white/90 p-5 shadow-soft sm:grid-cols-2">
             {[
-              { icon: Gem, title: 'In 3D vật lý', sub: 'Không bán file số', tone: 'bg-violet-soft text-violet' },
               { icon: ShieldCheck, title: 'Bảo vệ người mua', sub: 'Hỗ trợ hoàn tiền', tone: 'bg-teal-soft text-teal' },
               {
                 icon: Package,
@@ -366,9 +346,7 @@ function ProductView({ detail }: { detail: ProductDetail }) {
                 <div className="mt-2.5">
                   <StockBar available={available} stock={selected.stock} />
                 </div>
-                <p className="mt-2 font-mono text-[11px] text-ink-soft">
-                  stock: {selected.stock} · đang giữ chỗ: {selected.reserved} · sẵn sàng giao: {available}
-                </p>
+
               </div>
             )}
 

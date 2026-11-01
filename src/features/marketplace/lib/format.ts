@@ -119,10 +119,23 @@ const COLOR_NAMES: Record<string, { label: string; hex: string }> = {
   purple: { label: 'Tím', hex: '#a78bfa' },
   grey: { label: 'Xám', hex: '#a1a1aa' },
   gray: { label: 'Xám', hex: '#a1a1aa' },
+  brown: { label: 'Nâu', hex: '#a16a42' },
+  beige: { label: 'Be', hex: '#e8d5b7' },
+  silver: { label: 'Bạc', hex: '#c0c0c0' },
+  gold: { label: 'Vàng kim', hex: '#d4af37' },
+  clear: { label: 'Trong suốt', hex: 'repeating-conic-gradient(#fff 0% 25%, #ddd 0% 50%) 0 / 12px 12px' },
+  raw: { label: 'Nguyên bản / chưa sơn', hex: '#d6d0c6' },
+  multicolor: { label: 'Đa màu', hex: 'conic-gradient(#e5484d, #ffe58f, #46a758, #4c7cf0, #a78bfa, #e5484d)' },
 }
 
+const normalizeColor = (value: string) => value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').toLowerCase().replace(/[^a-z0-9]/g, '')
+
 export function colorSwatch(value: string) {
-  return COLOR_NAMES[value.toLowerCase()]
+  const key = normalizeColor(value)
+  const named = COLOR_NAMES[key] ?? Object.values(COLOR_NAMES).find((color) => normalizeColor(color.label) === key)
+  if (named) return named
+  if (/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim())) return { label: value.trim(), hex: value.trim() }
+  return undefined
 }
 
 export function attributeValueLabel(key: string, value: string) {
