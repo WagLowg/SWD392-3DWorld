@@ -4,27 +4,29 @@ import { Link, useParams } from 'react-router-dom'
 import { formatDateTime } from '../../../shared/lib/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { Breadcrumbs } from '../../../shared/ui/primitives'
-import { PackagesPanel } from '../components/PackagesPanel'
-import { ShippingAddressSnapshot } from '../components/ShippingAddressSnapshot'
 import { QueryState } from '../../../shared/ui/QueryState'
 import {
+  displayOrderCode,
   OrderItemRow,
   OrderMoney,
   OrderStatusBadge,
   OrderTimeline,
-  displayOrderCode,
   orderCode,
   ShipmentStatusBadge,
   StorefrontLabel,
 } from '../components/OrderParts'
-import { SellerOrderActions, ShipmentEventActions } from '../components/SellerActions'
-import { useOrder, useSellerShipments } from '../hooks/useOrders'
+import { PackagesPanel } from '../components/PackagesPanel'
+import { CodPaymentPanel } from '../components/CodPaymentPanel'
+import { SellerOrderActions } from '../components/SellerActions'
+import { ShippingAddressSnapshot } from '../components/ShippingAddressSnapshot'
+import { useOrder, useOrderHistory, useSellerShipments } from '../hooks/useOrders'
 
 /** MP 048 · Chi Tiết Đơn Chế Tác & Vận Chuyển (người bán) — GET /api/orders/{id}. */
 export function SellerOrderDetailPage() {
   const orderId = Number(useParams().orderId)
   const orders = useOrder(orderId)
   const order = orders.data
+  const history = useOrderHistory(order ? orderId : undefined)
   const shipments = useSellerShipments(order ? orderId : undefined)
 
   useEffect(() => {
@@ -67,6 +69,11 @@ export function SellerOrderDetailPage() {
             </div>
             <span className="font-label text-xs text-ink-soft">Tạo lúc {formatDateTime(order.createdAt)}</span>
           </section>
+          {order.paymentMethod === 'COD' && order.status === 'CREATED' && order.reservationExpiresAt && (
+            <p className="mt-3 rounded-2xl bg-peach/60 px-5 py-3 text-sm font-semibold text-orange-deep">
+              Đơn COD cần được tiếp nhận trước {formatDateTime(order.reservationExpiresAt)}.
+            </p>
+          )}
 
           <section className="mt-6 rounded-[2rem] bg-white/95 p-6 shadow-soft sm:p-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -74,7 +81,12 @@ export function SellerOrderDetailPage() {
               <SellerOrderActions order={order} />
             </div>
             <div className="mt-6">
-              <OrderTimeline order={order} />
+              <OrderTimeline
+                order={order}
+                history={history.data}
+                historyLoading={history.isLoading}
+                historyError={history.isError}
+              />
             </div>
           </section>
 
@@ -117,14 +129,12 @@ export function SellerOrderDetailPage() {
                             </span>
                             <ShipmentStatusBadge status={s.status} />
                           </div>
-                          <ShipmentEventActions shipment={s} orderId={order.id} />
                         </li>
                       ))}
                     </ul>
                   ) : (
                     <p className="mt-4 rounded-2xl bg-surface-low p-4 text-sm text-ink-soft">
-                      Chưa có vận đơn. Khi đơn đã thanh toán hoặc đang chế tác, bấm “Tạo vận đơn bưu tá” để bàn giao
-                      kiện hàng.
+                      Hệ thống đang khởi tạo vận đơn GHTK. Seller không cần tạo vận đơn thủ công.
                     </p>
                   )}
                 </QueryState>
@@ -136,6 +146,9 @@ export function SellerOrderDetailPage() {
                 <h2 className="font-display text-xl font-bold">Doanh thu đơn con</h2>
                 <div className="mt-4">
                   <OrderMoney order={order} />
+                </div>
+                <div className="mt-4">
+                  <CodPaymentPanel orderId={order.id} paymentMethod={order.paymentMethod} orderStatus={order.status} />
                 </div>
               </section>
               <section className="rounded-[2rem] bg-white/95 p-6 shadow-soft">

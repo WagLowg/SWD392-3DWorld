@@ -163,13 +163,59 @@ export type AddressInput = {
   ward?: string
 }
 
+export type ShippingQuoteInput = {
+  cartItemIds: number[]
+  shippingAddressId: number
+}
+
+export type ShippingCarrierFee = {
+  shipping: number
+  insurance: number
+  service: string
+  /** Backend hiện trả chuỗi JSON; không dùng trường này để tính tổng. */
+  extraFees: string
+  /** Chỉ mang tính thông tin, không quyết định khả năng checkout. */
+  delivery: boolean
+}
+
+export type ShippingQuoteOption = {
+  packing: {
+    parcels: unknown[]
+    [key: string]: unknown
+  }
+  carrierFees: ShippingCarrierFee[]
+  /** Phí cuối cùng của shop, đã gồm shipping và insurance. */
+  shippingFee: number
+  packagingCost: number
+  combinedCost: number
+}
+
+export type ShippingShopQuote = {
+  storefrontId: number
+  selected: ShippingQuoteOption
+  alternatives: ShippingQuoteOption[]
+}
+
+export type ShippingQuote = {
+  quoteToken: string
+  /** Unix timestamp theo milliseconds. */
+  expiresAt: number
+  version: string
+  pricingMode: string
+  /** Phí ship duy nhất được cộng vào tổng checkout preview. */
+  totalShippingFee: number
+  shops: ShippingShopQuote[]
+}
+
+export type PaymentMethod = 'COD' | 'GATEWAY'
+
 export type CheckoutInput = {
   cartItemIds: number[]
-  /** Bản chụp địa chỉ dạng chuỗi, lưu độc lập cho từng đơn con. */
-  shippingAddressSnapshot?: string
   shippingAddressId: number
-  /** Bắt buộc trong body theo CheckoutRequest; giữ nguyên khi thử lại cùng một lần đặt. */
+  /** Backend chỉ đọc key trong body. */
   idempotencyKey: string
+  shippingQuoteToken: string
+  paymentMethod: PaymentMethod
 }
 
 export type OrderItem = {
@@ -199,6 +245,8 @@ export type Order = {
   refundWindowHoursSnapshot?: number | null
   autoConfirmHoursSnapshot?: number | null
   shippingAddressSnapshot?: string | null
+  paymentMethod?: PaymentMethod | null
+  onlinePaymentRequired?: boolean
 }
 
 export type Payment = {

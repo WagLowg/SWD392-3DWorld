@@ -4,13 +4,13 @@ import { ApiClientError } from '../../../shared/api'
 import { useOrderPackages, usePackagingProfiles, useSavePackages } from '../hooks/useOrders'
 import type { Order } from '../types/order.types'
 
-/** Trạng thái còn được đóng gói lại (trước khi tạo vận đơn). */
+/** Trạng thái còn được đóng gói lại trước khi Seller bàn giao vận chuyển. */
 const PACKABLE = ['PAID', 'PROCESSING']
 
 type Mode = 'single' | 'perItem'
 
 /**
- * Đóng gói đơn trước khi tạo vận đơn — GET/POST /api/orders/{id}/packages, GET /api/shipping/packaging-profiles.
+ * Đóng gói đơn trước khi bàn giao — GET/POST /api/orders/{id}/packages, GET /api/shipping/packaging-profiles.
  * Hai cách phân bổ nhanh: tất cả vào 1 kiện, hoặc mỗi dòng hàng 1 kiện. Backend kiểm tra kích thước / khối lượng.
  */
 export function PackagesPanel({ order }: { order: Order }) {
@@ -59,7 +59,8 @@ export function PackagesPanel({ order }: { order: Order }) {
                 <strong>{p.packageWeightGrams} g</strong>
               </p>
               <p className="text-xs text-ink-soft">
-                {p.items.reduce((s, i) => s + i.quantity, 0)} món · chi phí bao bì {p.packagingCost.toLocaleString('vi-VN')}₫
+                {p.items.reduce((s, i) => s + i.quantity, 0)} món · chi phí bao bì{' '}
+                {p.packagingCost.toLocaleString('vi-VN')}₫
               </p>
             </li>
           ))}

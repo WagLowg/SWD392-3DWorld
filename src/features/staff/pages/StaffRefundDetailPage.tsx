@@ -40,7 +40,7 @@ import {
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { StaffHeader } from '../components/StaffHeader'
 import { StaffAdminExecutionBadge, StaffRefundBadge } from '../components/StaffStatusBadge'
-import { useStaffRefunds } from '../mocks/staffMockData'
+import { useStaffRefunds } from '../services/staff.service'
 import type {
   AdminRefundExecutionStatus,
   RefundStatus,
@@ -53,7 +53,7 @@ export function StaffRefundDetailPage() {
   const { refundId } = useParams<{ refundId: string }>()
   const idNum = Number(refundId)
 
-  const { refunds, updateStaffRefund } = useStaffRefunds()
+  const { refunds = [], updateStaffRefund } = useStaffRefunds()
   const refund = refunds.find((r) => r.id === idNum) ?? null
 
   // Decision form state

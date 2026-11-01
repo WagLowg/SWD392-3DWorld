@@ -1,6 +1,19 @@
 import type { Tone } from '../../../shared/ui/kit'
 
-export type ShipmentStatus = 'PENDING' | 'SHIPPED' | 'DELIVERED' | 'FAILED' | 'RETURNED'
+export type ShipmentStatus =
+  | 'PREPARING'
+  | 'HANDED_TO_CARRIER'
+  | 'IN_TRANSIT'
+  | 'ARRIVED_AT_DESTINATION'
+  | 'DELIVERED'
+  | 'RECEIVED'
+  | 'RETURNED'
+  | 'FAILED'
+  | 'CANCELLED'
+  // Legacy values kept readable for rows created before the enum workflow.
+  | 'PENDING'
+  | 'PENDING_PICKUP'
+  | 'SHIPPED'
 
 export interface StaffShipmentAuditEntry {
   id: string
@@ -41,7 +54,8 @@ export interface StaffShipment {
   orderId: number
   orderCode: string
   status: ShipmentStatus
-  shippedAt: string
+  createdAt?: string
+  shippedAt?: string | null
   deliveredAt?: string | null
   lastUpdatedAt: string
   recipientName: string
@@ -75,20 +89,17 @@ export interface StaffShipment {
 }
 
 export type RefundStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'PAID'
   | 'SUBMITTED'
   | 'UNDER_REVIEW'
   | 'NEEDS_INFO'
-  | 'APPROVED'
-  | 'REJECTED'
   | 'COMPLETED'
 
 /** Trạng thái thực chi / đối soát của Admin (tách bạch khỏi thẩm định của Staff) */
-export type AdminRefundExecutionStatus =
-  | 'NOT_REQUESTED'
-  | 'PENDING_ADMIN'
-  | 'PROCESSING'
-  | 'COMPLETED'
-  | 'FAILED'
+export type AdminRefundExecutionStatus = 'NOT_REQUESTED' | 'PENDING_ADMIN' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
 
 /** Bản ghi hợp đồng bàn giao giữa Staff và Admin (Admin Handoff Contract) */
 export interface StaffAdminHandoffRecord {

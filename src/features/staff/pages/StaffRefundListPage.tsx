@@ -26,21 +26,20 @@ import {
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { StaffHeader } from '../components/StaffHeader'
 import { StaffAdminExecutionBadge, StaffRefundBadge } from '../components/StaffStatusBadge'
-import { useStaffRefunds } from '../mocks/staffMockData'
+import { useStaffRefunds } from '../services/staff.service'
 import type { RefundStatus, StaffRefundRequest } from '../types/staff.types'
 
 const REFUND_TABS: { value: string; label: string }[] = [
   { value: '', label: 'Tất cả yêu cầu' },
-  { value: 'SUBMITTED', label: 'Chờ thẩm định' },
-  { value: 'UNDER_REVIEW', label: 'Đang thẩm định' },
-  { value: 'NEEDS_INFO', label: 'Cần bổ sung' },
-  { value: 'APPROVED', label: 'Đã duyệt — Chờ Admin hoàn tiền' },
+  { value: 'PENDING', label: 'Chờ thẩm định' },
+  { value: 'APPROVED', label: 'Đã duyệt' },
   { value: 'REJECTED', label: 'Đã từ chối' },
+  { value: 'PAID', label: 'Đã hoàn tiền' },
   { value: 'HISTORY', label: 'Lịch sử xử lý' },
 ]
 
 export function StaffRefundListPage() {
-  const { refunds } = useStaffRefunds()
+  const { refunds = [] } = useStaffRefunds()
   const [activeTab, setActiveTab] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState<string>('')
 
@@ -51,9 +50,7 @@ export function StaffRefundListPage() {
   const countByTab = (tabVal: string) => {
     if (!tabVal) return refunds.length
     if (tabVal === 'HISTORY') {
-      return refunds.filter(
-        (r) => r.status === 'APPROVED' || r.status === 'REJECTED' || r.status === 'COMPLETED',
-      ).length
+      return refunds.filter((r) => ['APPROVED', 'REJECTED', 'PAID'].includes(r.status)).length
     }
     return refunds.filter((r) => r.status === tabVal).length
   }
@@ -62,10 +59,7 @@ export function StaffRefundListPage() {
     return refunds.filter((item) => {
       let matchTab = true
       if (activeTab === 'HISTORY') {
-        matchTab =
-          item.status === 'APPROVED' ||
-          item.status === 'REJECTED' ||
-          item.status === 'COMPLETED'
+        matchTab = ['APPROVED', 'REJECTED', 'PAID'].includes(item.status)
       } else if (activeTab) {
         matchTab = item.status === activeTab
       }
@@ -106,22 +100,15 @@ export function StaffRefundListPage() {
       <StatGrid>
         <StatCard
           label="Chờ thẩm định"
-          value={countByTab('SUBMITTED')}
+          value={countByTab('PENDING')}
           hint="Hồ sơ mới gửi"
           icon={Clock}
           tone="orange"
         />
         <StatCard
-          label="Đang thẩm định"
-          value={countByTab('UNDER_REVIEW')}
-          hint="Đang đối chiếu chứng cứ"
-          icon={AlertCircle}
-          tone="violet"
-        />
-        <StatCard
-          label="Đã duyệt — Chờ Admin"
+          label="Đã duyệt"
           value={countByTab('APPROVED')}
-          hint="Hàng chờ Admin chi trả"
+          hint="Đã chấp thuận hoàn tiền"
           icon={CheckCircle2}
           tone="green"
         />
@@ -131,6 +118,13 @@ export function StaffRefundListPage() {
           hint="Lưu trữ lịch sử thẩm định"
           icon={XCircle}
           tone="danger"
+        />
+        <StatCard
+          label="Đã hoàn tiền"
+          value={countByTab('PAID')}
+          hint="Hoàn tất thanh toán"
+          icon={ShieldCheck}
+          tone="violet"
         />
       </StatGrid>
 

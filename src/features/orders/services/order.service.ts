@@ -1,6 +1,8 @@
 import { type ApiEnvelope, http } from '../../../shared/api'
 import { rememberPaymentAttempt } from '../../marketplace/lib/payment'
 import type {
+  CodPayment,
+  CodRecordInput,
   Order,
   OrderHistoryEntry,
   PackagingProfile,
@@ -8,7 +10,6 @@ import type {
   RefundInput,
   SavePackagesInput,
   Shipment,
-  ShipmentEvent,
   ShippingPackage,
 } from '../types/order.types'
 
@@ -27,6 +28,24 @@ export const orderService = {
   async packages(orderId: number, signal?: AbortSignal) {
     return (await http.get<ApiEnvelope<ShippingPackage[]>>(`/api/orders/${orderId}/packages`, { signal })).data ?? []
   },
+
+  async codPayment(orderId: number, signal?: AbortSignal) {
+    return (await http.get<ApiEnvelope<CodPayment>>(`/api/orders/${orderId}/cod-payment`, { signal })).data
+  },
+}
+
+export const codAdminService = {
+  async recordCollection(orderId: number, input: CodRecordInput) {
+    return (
+      await http.post<ApiEnvelope<CodPayment>, CodRecordInput>(`/api/admin/orders/${orderId}/cod/collection`, input)
+    ).data
+  },
+
+  async recordSettlement(orderId: number, input: CodRecordInput) {
+    return (
+      await http.post<ApiEnvelope<CodPayment>, CodRecordInput>(`/api/admin/orders/${orderId}/cod/settlement`, input)
+    ).data
+  },
 }
 
 export const buyerOrderService = {
@@ -36,12 +55,10 @@ export const buyerOrderService = {
 
   /** Huỷ đơn chưa thanh toán — giải phóng tồn kho; đơn đã trả tiền phải đi luồng hoàn tiền. */
   async cancel(orderId: number, reason: string) {
-    return (
-      await http.post<ApiEnvelope<Order>, { reason: string }>(`/api/orders/${orderId}/cancel`, { reason })
-    ).data
+    return (await http.post<ApiEnvelope<Order>, { reason: string }>(`/api/orders/${orderId}/cancel`, { reason })).data
   },
 
-  /** Xác nhận đã nhận đơn DELIVERED — bắt đầu thời hạn hoàn tiền. */
+  /** Người mua xác nhận đã nhận hàng sau khi Staff cập nhật DELIVERED. */
   async confirmReceived(orderId: number) {
     return (await http.post<ApiEnvelope<Order>>(`/api/orders/${orderId}/confirm-received`)).data
   },
@@ -57,7 +74,7 @@ export const sellerOrderService = {
     return (await http.get<ApiEnvelope<Order[]>>('/api/orders/seller', { signal })).data ?? []
   },
 
-  /** Chuyển trạng thái có kiểm soát (PAID→PROCESSING, …→CANCELLED). */
+  /** Seller chỉ dùng endpoint order status để nhận đơn: PAID/CREATED(COD) → PROCESSING. */
   async updateStatus(orderId: number, status: string) {
     return (await http.patch<ApiEnvelope<Order>, { status: string }>(`/api/orders/${orderId}/status`, { status })).data
   },
@@ -66,16 +83,16 @@ export const sellerOrderService = {
     return (await http.get<ApiEnvelope<Shipment[]>>(`/api/seller/orders/${orderId}/shipments`, { signal })).data ?? []
   },
 
-  /** Tạo vận đơn: đơn PAID/PROCESSING → SHIPPED, Backend sinh mã vận đơn. */
-  async createShipment(orderId: number, carrierName: string) {
+  /** Seller bàn giao kiện hàng qua shipment event; Backend đồng bộ cả Shipment và PhysicalOrder sang SHIPPED. */
+  async handoffShipment(shipmentId: number) {
     return (
-      await http.post<ApiEnvelope<Shipment>, { carrierName: string }>(`/api/orders/${orderId}/shipment`, {
-        carrierName,
+      await http.patch<ApiEnvelope<Shipment>, { event: 'SHIPPED' }>(`/api/shipments/${shipmentId}/event`, {
+        event: 'SHIPPED',
       })
     ).data
   },
 
-  /** Thay toàn bộ kiện hàng trước khi tạo vận đơn; mỗi đơn vị hàng phải được phân bổ đúng 1 lần. */
+  /** Thay toàn bộ kiện đóng gói trước khi Seller bàn giao; mỗi đơn vị hàng phải được phân bổ đúng 1 lần. */
   async savePackages(orderId: number, input: SavePackagesInput) {
     return (
       await http.post<ApiEnvelope<ShippingPackage[]>, SavePackagesInput>(`/api/orders/${orderId}/packages`, input)
@@ -84,11 +101,6 @@ export const sellerOrderService = {
 
   async packagingProfiles(signal?: AbortSignal) {
     return (await http.get<ApiEnvelope<PackagingProfile[]>>('/api/shipping/packaging-profiles', { signal })).data ?? []
-  },
-
-  async applyShipmentEvent(shipmentId: number, event: ShipmentEvent) {
-    return (await http.patch<ApiEnvelope<Shipment>, { event: string }>(`/api/shipments/${shipmentId}/event`, { event }))
-      .data
   },
 }
 

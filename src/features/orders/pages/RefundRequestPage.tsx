@@ -26,7 +26,6 @@ const REASONS = [
 const schema = z.object({
   orderId: z.coerce.number().int().positive('Chọn đơn hàng.'),
   transactionId: z.coerce.number({ message: 'Nhập mã giao dịch.' }).int().positive('Nhập mã giao dịch ZaloPay.'),
-  amount: z.coerce.number({ message: 'Nhập số tiền.' }).positive('Số tiền phải lớn hơn 0.'),
   reasonType: z.string().min(1, 'Chọn lý do.'),
   detail: z.string().trim().max(1000, 'Tối đa 1000 ký tự.').optional(),
 })
@@ -94,7 +93,6 @@ function RefundForm({ orders, initialOrderId }: { orders: Order[]; initialOrderI
     defaultValues: {
       orderId: start.id,
       transactionId: payments[start.id]?.transactionId ?? ('' as unknown as number),
-      amount: start.totalAmount,
       reasonType: '',
       detail: '',
     },
@@ -104,21 +102,18 @@ function RefundForm({ orders, initialOrderId }: { orders: Order[]; initialOrderI
   const order = orders.find((o) => o.id === orderId) ?? start
   const reasonType = watch('reasonType')
 
-  // Đổi đơn → điền lại số tiền & mã giao dịch đã ghi nhớ
+  // Đổi đơn → điền lại mã giao dịch đã ghi nhớ
   useEffect(() => {
-    setValue('amount', order.totalAmount)
     setValue('transactionId', (payments[order.id]?.transactionId ?? '') as unknown as number)
   }, [order, payments, setValue])
 
   const submit = handleSubmit(async (raw) => {
     const v = schema.parse(raw)
-    if (v.amount > order.totalAmount) {
-      setError('amount', { message: `Không vượt quá ${formatVnd(order.totalAmount)}.` })
-      return
-    }
     try {
       const reason = [v.reasonType, v.detail].filter(Boolean).join(' — ')
-      setResult(await refund.mutateAsync({ transactionId: v.transactionId, input: { amount: v.amount, reason } }))
+      setResult(
+        await refund.mutateAsync({ transactionId: v.transactionId, input: { amount: order.totalAmount, reason } }),
+      )
     } catch (e) {
       setError('root', { message: e instanceof ApiClientError ? e.message : 'Không gửi được yêu cầu hoàn tiền.' })
     }
@@ -213,7 +208,7 @@ function RefundForm({ orders, initialOrderId }: { orders: Order[]; initialOrderI
 
       <aside className="space-y-4 lg:sticky lg:top-28">
         <section className="rounded-[2rem] bg-white/95 p-6 shadow-soft">
-          <h2 className="font-display text-xl font-bold">3. Số tiền hoàn</h2>
+          <h2 className="font-display text-xl font-bold">3. Giá trị hoàn tiền</h2>
           <Field
             id={`${uid}-tx`}
             label="Mã giao dịch ZaloPay *"
@@ -232,20 +227,20 @@ function RefundForm({ orders, initialOrderId }: { orders: Order[]; initialOrderI
               {...register('transactionId')}
             />
           </Field>
-          <Field
-            id={`${uid}-amount`}
-            label="Số tiền yêu cầu hoàn (VND) *"
-            error={errors.amount?.message}
-            hint={`Tối đa ${formatVnd(order.totalAmount)}.`}
-            className="mt-4"
-          >
-            <input
-              id={`${uid}-amount`}
-              inputMode="numeric"
-              className={`${inputClass} font-display text-lg font-bold`}
-              {...register('amount')}
-            />
-          </Field>
+          <dl className="mt-4 space-y-2 rounded-2xl bg-surface-low p-4 text-sm">
+            <div className="flex justify-between gap-3">
+              <dt className="text-ink-soft">Tiền hàng</dt>
+              <dd className="font-semibold">{formatVnd(order.subtotal)}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-ink-soft">Phí vận chuyển</dt>
+              <dd className="font-semibold">{formatVnd(order.shippingFee)}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 border-t border-line pt-2">
+              <dt className="font-display font-bold">Tổng hoàn</dt>
+              <dd className="font-display text-xl font-bold text-orange-deep">{formatVnd(order.totalAmount)}</dd>
+            </div>
+          </dl>
           <div className="mt-4">
             <FormError message={errors.root?.message} />
           </div>
@@ -262,8 +257,8 @@ function RefundForm({ orders, initialOrderId }: { orders: Order[]; initialOrderI
             toán.
           </p>
           <p className="flex gap-2">
-            <Undo2 size={15} className="shrink-0 text-violet" /> Có thể yêu cầu hoàn một phần hoặc toàn bộ giá trị đơn
-            con.
+            <Undo2 size={15} className="shrink-0 text-violet" /> Khi yêu cầu được duyệt, hệ thống hoàn toàn bộ tiền hàng
+            và phí vận chuyển của đơn con.
           </p>
           <p className="flex gap-2">
             <Info size={15} className="shrink-0 text-orange" /> Đơn thanh toán khi nhận hàng (COD) không hoàn qua cổng

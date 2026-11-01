@@ -2,19 +2,28 @@ import { Pill, type Tone } from '../../../shared/ui/kit'
 import type { AdminRefundExecutionStatus, RefundStatus, ShipmentStatus } from '../types/staff.types'
 
 const SHIPMENT_STATUS_MAP: Record<ShipmentStatus, { label: string; tone: Tone }> = {
-  PENDING: { label: 'Chờ vận chuyển', tone: 'orange' },
-  SHIPPED: { label: 'Đang vận chuyển', tone: 'teal' },
+  PREPARING: { label: 'Chuẩn bị giao hàng', tone: 'orange' },
+  HANDED_TO_CARRIER: { label: 'Đã bàn giao vận chuyển', tone: 'violet' },
+  IN_TRANSIT: { label: 'Đang vận chuyển', tone: 'teal' },
+  ARRIVED_AT_DESTINATION: { label: 'Đến điểm giao', tone: 'teal' },
   DELIVERED: { label: 'Giao thành công', tone: 'green' },
+  RECEIVED: { label: 'Đã nhận hàng', tone: 'green' },
+  RETURNED: { label: 'Hoàn trả', tone: 'danger' },
   FAILED: { label: 'Giao thất bại', tone: 'orange' },
-  RETURNED: { label: 'Đã chuyển hoàn', tone: 'danger' },
+  CANCELLED: { label: 'Đã huỷ', tone: 'neutral' },
+  PENDING: { label: 'Chờ seller bàn giao', tone: 'orange' },
+  PENDING_PICKUP: { label: 'Chờ seller bàn giao', tone: 'orange' },
+  SHIPPED: { label: 'Đã bàn giao vận chuyển', tone: 'violet' },
 }
 
 const REFUND_STATUS_MAP: Record<RefundStatus, { label: string; tone: Tone }> = {
+  PENDING: { label: 'Chờ thẩm định', tone: 'orange' },
+  APPROVED: { label: 'Đã duyệt', tone: 'green' },
+  REJECTED: { label: 'Đã từ chối', tone: 'danger' },
+  PAID: { label: 'Đã hoàn tiền', tone: 'ink' },
   SUBMITTED: { label: 'Chờ tiếp nhận', tone: 'orange' },
   UNDER_REVIEW: { label: 'Đang thẩm định', tone: 'violet' },
   NEEDS_INFO: { label: 'Cần bổ sung', tone: 'neutral' },
-  APPROVED: { label: 'Đã duyệt — Chờ Admin hoàn tiền', tone: 'green' },
-  REJECTED: { label: 'Đã từ chối', tone: 'danger' },
   COMPLETED: { label: 'Đã chi trả hoàn tất', tone: 'ink' },
 }
 
