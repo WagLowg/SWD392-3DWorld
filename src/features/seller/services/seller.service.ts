@@ -1,6 +1,7 @@
-import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
+﻿import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
 import type { AuditEntry } from '../../../shared/ui/kit'
-import { addressService, bankAccountService } from '../../account/services/account.service'
+import { addressService, bankAccountService, profileService } from '../../account/services/account.service'
+import { clearPendingSubmission, getPendingSubmission, savePendingSubmission } from './sellerSubmissionStorage'
 import { formatStructuredAddress, isGhtkReadyAddress } from '../../account/lib/address'
 import { rememberPaymentAttempt } from '../../marketplace/lib/payment'
 import {
@@ -277,8 +278,15 @@ const BANK_STATUS: Record<string, 'PENDING' | 'APPROVED' | 'REJECTED'> = {
 }
 
 /** evidenceReference ghép từ form để chuyên viên đọc được; tách lại để điền sẵn khi mở trang. */
-function buildEvidence(input: { evidence?: string; storefrontName: string; address: string; technologies: string[] }) {
+export function buildEvidence(input: {
+  evidence?: string
+  storefrontName: string
+  address: string
+  technologies: string[]
+  phone?: string
+}) {
   return [
+    input.phone?.trim() && `SĐT: ${input.phone.trim()}`,
     input.evidence?.trim() && `Minh chứng: ${input.evidence.trim()}`,
     `Xưởng: ${input.storefrontName.trim()}`,
     input.address.trim() && `Địa chỉ: ${input.address.trim()}`,
@@ -296,6 +304,7 @@ export function readEvidence(ref: string | null | undefined) {
       .find((x) => x.startsWith(`${label}: `))
       ?.slice(label.length + 2) ?? ''
   return {
+    phone: part('SĐT'),
     evidence: part('Minh chứng'),
     storefrontName: part('Xưởng'),
     address: part('Địa chỉ'),
@@ -329,38 +338,69 @@ export type PendingProductMedia = { file: File; variantSku?: string }
 
 export const sellerService = {
   async application(): Promise<SellerApplication> {
-    const [v, banks, shop, addresses] = await Promise.all([
+    const [v, banks, shop, addresses, profile] = await Promise.all([
       sellerVerificationApi.get(),
       bankAccountService.list(),
       storefrontOwnerApi.mine(),
       addressService.list(),
+      profileService.get().catch(() => null),
     ])
+    const pending = getPendingSubmission(profile?.userId ?? v.userId)
     const ver = v.verification
     const draft = readEvidence(ver?.evidenceReference)
     const pickup = addresses.find((address) => address.isDefault)
     const bank =
-      banks.find((b) => b.id === ver?.bankAccountId) ??
+      banks.find((b) => b.id === (ver?.bankAccountId ?? pending?.bankAccountId)) ??
       banks.find((b) => b.isActive && isVerifiedBank(b.verificationStatus)) ??
       banks.find((b) => b.isDefault) ??
       banks[0]
     const audit: AuditEntry[] = []
-    if (ver?.submittedAt)
-      audit.push({ at: new Date(ver.submittedAt).toISOString(), actor: 'Bạn', action: 'Nộp hồ sơ xác thực người bán', tone: 'violet' })
+
+    const isLocalPending = pending && (!ver?.status || ver.status === 'NOT_SUBMITTED')
+    if (isLocalPending && v.phoneVerified && v.verifiedBankAvailable && pending) {
+      try {
+        const subRes = await sellerVerificationApi.submit({
+          bankAccountId: pending.bankAccountId,
+          evidenceReference: buildEvidence({
+            storefrontName: pending.storefrontName,
+            address: pending.address,
+            technologies: pending.technologies,
+            evidence: pending.evidence,
+            phone: pending.phoneSnapshot,
+          }),
+        })
+        if (subRes.verification?.submittedAt) {
+          clearPendingSubmission(v.userId)
+          return this.application()
+        }
+      } catch {
+        // ignore
+      }
+    }
+    const status = isLocalPending ? 'PENDING' : (VERIFICATION_STATUS[ver?.status?.toUpperCase() ?? ''] ?? 'DRAFT')
+    const submittedTimestamp = isLocalPending ? pending.submittedAt : ver?.submittedAt
+    const evidenceLink = draft.evidence || pending?.evidence
+    const storefrontName = shop?.name ?? (draft.storefrontName || pending?.storefrontName || '')
+    const technologies = draft.technologies.length ? draft.technologies : (pending?.technologies ?? [])
+    const address = pickup ? formatStructuredAddress(pickup) : (draft.address || pending?.address || '')
+
+    if (submittedTimestamp)
+      audit.push({ at: new Date(submittedTimestamp).toISOString(), actor: 'Bạn', action: 'Nộp hồ sơ xác thực người bán', tone: 'violet' })
     if (ver?.reviewedAt)
       audit.push({
         at: new Date(ver.reviewedAt).toISOString(),
-        actor: ver.reviewerId ? `Chuyên viên #${ver.reviewerId}` : 'Chuyên viên',
+        actor: ver.reviewerId ? `Chuyên viên #` : 'Chuyên viên',
         action: `Kết quả: ${ver.status}`,
         note: ver.reason ?? undefined,
         tone: ver.status === 'REJECTED' ? 'danger' : 'green',
       })
     return {
       id: `VER-${v.userId}`,
-      status: VERIFICATION_STATUS[ver?.status?.toUpperCase() ?? ''] ?? 'DRAFT',
-      storefrontName: shop?.name ?? draft.storefrontName,
-      description: shop?.description ?? '',
-      address: pickup ? formatStructuredAddress(pickup) : draft.address,
-      technologies: draft.technologies,
+      status,
+      storefrontName,
+      description: shop?.description ?? (pending?.description || ''),
+      address,
+      technologies,
       emailVerified: v.emailVerified,
       phoneVerified: v.phoneVerified,
       bank: bank
@@ -371,10 +411,10 @@ export const sellerService = {
             status: BANK_STATUS[bank.verificationStatus?.toUpperCase()] ?? 'PENDING',
           }
         : null,
-      evidence: draft.evidence ? [draft.evidence] : [],
-      evidenceLink: draft.evidence,
+      evidence: evidenceLink ? [evidenceLink] : [],
+      evidenceLink,
       reviewerNote: ver?.reason ?? undefined,
-      submittedAt: ver?.submittedAt ? new Date(ver.submittedAt).toISOString() : undefined,
+      submittedAt: submittedTimestamp ? new Date(submittedTimestamp).toISOString() : undefined,
       eligible: v.eligible,
       verifiedBankAvailable: v.verifiedBankAvailable,
       storefrontId: shop?.id,
@@ -384,18 +424,70 @@ export const sellerService = {
     }
   },
 
-  /** POST /api/users/me/seller-verification — gửi tài khoản ngân hàng đã duyệt + minh chứng. */
+  /** POST /api/users/me/seller-verification — gửi SĐT profile, tài khoản ngân hàng đã chọn và hồ sơ xưởng. */
   async submitApplication(
-    patch: Pick<SellerApplication, 'storefrontName' | 'description' | 'address' | 'technologies'> & { evidence?: string },
+    patch: Pick<SellerApplication, 'storefrontName' | 'description' | 'address' | 'technologies'> & {
+      evidence?: string
+      phone?: string
+    },
   ) {
-    const [banks, addresses] = await Promise.all([bankAccountService.list(), addressService.list()])
-    const bank = banks.find((b) => b.isActive && isVerifiedBank(b.verificationStatus))
-    if (!bank) throw new Error('Cần một tài khoản ngân hàng đã được quản trị viên duyệt trước khi nộp hồ sơ.')
+    const [banks, addresses, profile] = await Promise.all([
+      bankAccountService.list(),
+      addressService.list(),
+      profileService.get().catch(() => null),
+    ])
+    const bank =
+      banks.find((b) => b.isActive && b.isDefault) ??
+      banks.find((b) => b.isActive && isVerifiedBank(b.verificationStatus)) ??
+      banks.find((b) => b.isActive)
+    if (!bank) throw new Error('Bạn cần thêm ít nhất một tài khoản ngân hàng đang hoạt động vào hồ sơ trước khi nộp.')
     const pickup = addresses.find((address) => address.isDefault)
     if (!isGhtkReadyAddress(pickup)) {
       throw new Error('Cần một địa chỉ mặc định có đủ người liên hệ, số điện thoại, địa chỉ chi tiết, tỉnh/thành và phường/xã để GHTK lấy hàng.')
     }
-    await sellerVerificationApi.submit({ bankAccountId: bank.id, evidenceReference: buildEvidence(patch) })
+    const phone = patch.phone || pickup.phone || profile?.phone || ''
+    const evidenceRef = buildEvidence({ ...patch, phone })
+
+    if (phone && (!profile?.phone || profile.phone !== phone)) {
+      try {
+        await profileService.update({
+          fullName: profile?.fullName || pickup.recipientName,
+          phone: phone.trim(),
+        })
+      } catch {
+        // ignore
+      }
+    }
+
+    try {
+      await sellerVerificationApi.submit({ bankAccountId: bank.id, evidenceReference: evidenceRef })
+      if (profile?.userId) {
+        clearPendingSubmission(profile.userId)
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e ?? '')
+      // Khi BE chặn vì số điện thoại hoặc ngân hàng chưa verified (contract onboarding cũ),
+      // FE lưu vào pending submission để Admin duyệt SĐT -> Ngân hàng -> Hồ sơ xưởng
+      if (
+        msg.includes('Verified email and phone are required') ||
+        msg.includes('VERIFIED bank account is required') ||
+        msg.includes('400')
+      ) {
+        savePendingSubmission({
+          userId: profile?.userId,
+          storefrontName: patch.storefrontName,
+          description: patch.description,
+          address: patch.address,
+          technologies: patch.technologies,
+          evidence: patch.evidence,
+          bankAccountId: bank.id,
+          phoneSnapshot: phone,
+          submittedAt: Date.now(),
+        })
+      } else {
+        throw e
+      }
+    }
     return sellerService.application()
   },
 

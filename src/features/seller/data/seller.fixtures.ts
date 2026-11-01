@@ -20,7 +20,7 @@ export type SellerApplication = {
   evidenceLink?: string
   reviewerNote?: string
   submittedAt?: string
-  /** Đủ điều kiện nộp (email + SĐT + ngân hàng đã xác thực). */
+    /** Đủ điều kiện giao dịch sau khi Admin duyệt toàn bộ hồ sơ. */
   eligible?: boolean
   verifiedBankAvailable?: boolean
   /** Có khi đã tạo gian hàng. */
