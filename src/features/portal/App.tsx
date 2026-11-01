@@ -2,6 +2,7 @@ import { type ReactNode, useEffect } from 'react'
 import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom'
 import { useSession } from '../../shared/session/useSession'
 import { AdminLayout } from '../admin/components/AdminLayout'
+import { AdminShipmentDetailPage, AdminShipmentsPage } from '../admin/pages/AdminShipmentsPage'
 import { AdminStorefrontPage } from '../admin/pages/AdminStorefrontPage'
 import { AddressesPage } from '../account/pages/AddressesPage'
 import { BankAccountsPage } from '../account/pages/BankAccountsPage'
@@ -277,6 +278,10 @@ export function App() {
         <Route element={<AdminLayout />}>
           <Route path="admin/storefronts" element={<AdminStorefrontPage />} />
           <Route path="admin/storefronts/verifications/:caseId" element={<StorefrontReviewPage />} />
+          <Route path="admin/shipments" element={<AdminShipmentsPage />} />
+          <Route path="admin/shipments/:shipmentId" element={<AdminShipmentDetailPage />} />
+          <Route path="admin/products" element={<ProductQueuePage basePath="/admin/products" />} />
+          <Route path="admin/products/:caseId" element={<ProductReviewPage admin />} />
         </Route>
 
         <Route element={<AccountLayout />}>
@@ -299,7 +304,11 @@ export function App() {
           {internalScreens
             .filter((screen) => !IMPLEMENTED.has(relativePortalRoute(screen.route)))
             .map((screen) => (
-              <Route key={screen.id} path={relativePortalRoute(screen.route)} element={<ScreenPage screen={screen} />} />
+              <Route
+                key={screen.id}
+                path={relativePortalRoute(screen.route)}
+                element={<ScreenPage screen={screen} />}
+              />
             ))}
         </Route>
 

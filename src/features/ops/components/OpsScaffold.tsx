@@ -1,4 +1,4 @@
-import { Download, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Download, RefreshCw } from 'lucide-react'
 import { type ReactNode, useEffect, useState } from 'react'
 import { formatVnd } from '../../../shared/lib/format'
 import {
@@ -37,9 +37,12 @@ export type QueueConfig = {
   description?: string
   api: string
   columns: Column<OpsCase>[]
-  kpis?: (rows: OpsCase[]) => { label: string; value: ReactNode; hint?: string; tone?: 'orange' | 'violet' | 'teal' | 'green' | 'danger' }[]
+  kpis?: (
+    rows: OpsCase[],
+  ) => { label: string; value: ReactNode; hint?: string; tone?: 'orange' | 'violet' | 'teal' | 'green' | 'danger' }[]
   rules?: { title: string; items: string[] }
   search?: string
+  titleSuffix?: string
 }
 
 /** Khung hàng chờ quản trị: KPI + lọc trạng thái + tìm kiếm + bảng + quy chuẩn. */
@@ -50,12 +53,14 @@ export function OpsQueue(cfg: QueueConfig) {
   const map = OPS_STATUS[cfg.domain]
 
   useEffect(() => {
-    document.title = `${cfg.title} · Ops 3DWorld`
-  }, [cfg.title])
+    document.title = `${cfg.title} · ${cfg.titleSuffix ?? 'Ops 3DWorld'}`
+  }, [cfg.title, cfg.titleSuffix])
 
   const all = q.data ?? []
   const t = term.trim().toLowerCase()
-  const rows = all.filter((c) => (!tab || c.status === tab) && (!t || `${c.id} ${c.title} ${c.subtitle ?? ''}`.toLowerCase().includes(t)))
+  const rows = all.filter(
+    (c) => (!tab || c.status === tab) && (!t || `${c.id} ${c.title} ${c.subtitle ?? ''}`.toLowerCase().includes(t)),
+  )
 
   return (
     <>
@@ -91,12 +96,21 @@ export function OpsQueue(cfg: QueueConfig) {
           onChange={setTab}
           options={[
             { value: '', label: 'Tất cả', count: all.length },
-            ...Object.keys(map).map((s) => ({ value: s, label: map[s].label, count: all.filter((c) => c.status === s).length })),
+            ...Object.keys(map).map((s) => ({
+              value: s,
+              label: map[s].label,
+              count: all.filter((c) => c.status === s).length,
+            })),
           ]}
         />
       </Toolbar>
       <QueryState isLoading={q.isLoading} error={q.error}>
-        <DataTable rows={rows} rowKey={(c) => c.id} columns={cfg.columns} empty="Không có hồ sơ trong phân luồng này." />
+        <DataTable
+          rows={rows}
+          rowKey={(c) => c.id}
+          columns={cfg.columns}
+          empty="Không có hồ sơ trong phân luồng này."
+        />
       </QueryState>
       {cfg.rules && <RuleBox title={cfg.rules.title} rules={cfg.rules.items} />}
     </>
@@ -105,11 +119,19 @@ export function OpsQueue(cfg: QueueConfig) {
 
 /** Cột trạng thái chuẩn. */
 export function statusColumn(domain: OpsDomain): Column<OpsCase> {
-  return { key: 'status', header: 'Trạng thái', render: (c) => <StatusPill status={c.status} map={OPS_STATUS[domain]} /> }
+  return {
+    key: 'status',
+    header: 'Trạng thái',
+    render: (c) => <StatusPill status={c.status} map={OPS_STATUS[domain]} />,
+  }
 }
 
 export function moneyColumn(header = 'Số tiền'): Column<OpsCase> {
-  return { key: 'amount', header, render: (c) => (c.amount !== undefined ? <strong>{formatVnd(c.amount)}</strong> : '—') }
+  return {
+    key: 'amount',
+    header,
+    render: (c) => (c.amount !== undefined ? <strong>{formatVnd(c.amount)}</strong> : '—'),
+  }
 }
 
 /* ------------------------------------------------------------ review page */
@@ -128,6 +150,9 @@ export type ReviewConfig = {
   minReason?: number
   /** Ẩn form khi hồ sơ đã ở trạng thái kết thúc. */
   closed?: (c: OpsCase) => boolean
+  titleSuffix?: string
+  backTo?: string
+  backLabel?: string
 }
 
 /** Khung trang thẩm định: thông tin + bằng chứng + form phán quyết ký số + audit log. */
@@ -137,8 +162,8 @@ export function OpsReview(cfg: ReviewConfig) {
   const [done, setDone] = useState<string | null>(null)
 
   useEffect(() => {
-    document.title = `${cfg.titlePrefix} ${cfg.id} · Ops 3DWorld`
-  }, [cfg.titlePrefix, cfg.id])
+    document.title = `${cfg.titlePrefix} ${cfg.id} · ${cfg.titleSuffix ?? 'Ops 3DWorld'}`
+  }, [cfg.titlePrefix, cfg.id, cfg.titleSuffix])
 
   return (
     <>
@@ -150,7 +175,20 @@ export function OpsReview(cfg: ReviewConfig) {
             const closed = cfg.closed?.(c)
             return (
               <>
-                <Hero code={cfg.code} eyebrow={cfg.eyebrow} title={`${cfg.titlePrefix} #${c.id}`} accent={c.title} description={c.subtitle} />
+                {cfg.backTo && (
+                  <div className="mb-5">
+                    <Btn to={cfg.backTo} variant="white" icon={ArrowLeft}>
+                      {cfg.backLabel ?? 'Quay lại'}
+                    </Btn>
+                  </div>
+                )}
+                <Hero
+                  code={cfg.code}
+                  eyebrow={cfg.eyebrow}
+                  title={`${cfg.titlePrefix} #${c.id}`}
+                  accent={c.title}
+                  description={c.subtitle}
+                />
                 <div className="mt-4">
                   <StatusPill status={c.status} map={OPS_STATUS[cfg.domain]} />
                 </div>
@@ -160,7 +198,9 @@ export function OpsReview(cfg: ReviewConfig) {
                       {cfg.main(c)}
                       {closed && !done ? (
                         <Section title="Hồ sơ đã có phán quyết">
-                          <p className="text-sm text-ink-soft">Trạng thái hiện tại không cho phép ký thêm phán quyết. Xem sổ audit để biết chi tiết.</p>
+                          <p className="text-sm text-ink-soft">
+                            Trạng thái hiện tại không cho phép ký thêm phán quyết. Xem sổ audit để biết chi tiết.
+                          </p>
                         </Section>
                       ) : (
                         <DecisionForm
@@ -174,7 +214,12 @@ export function OpsReview(cfg: ReviewConfig) {
                             if (!d) return
                             decide.mutate(
                               { domain: cfg.domain, id: c.id, decision: d.label, status: d.status, reason },
-                              { onSuccess: () => setDone(`Đã ký: ${d.label}. Hồ sơ chuyển sang “${OPS_STATUS[cfg.domain][d.status]?.label ?? d.status}”.`) },
+                              {
+                                onSuccess: () =>
+                                  setDone(
+                                    `Đã ký: ${d.label}. Hồ sơ chuyển sang “${OPS_STATUS[cfg.domain][d.status]?.label ?? d.status}”.`,
+                                  ),
+                              },
                             )
                           }}
                         />
@@ -204,5 +249,12 @@ export function OpsReview(cfg: ReviewConfig) {
 
 export function val(c: OpsCase, key: string) {
   const v = c.f[key]
-  return v === undefined ? '—' : typeof v === 'number' && key.match(/price|amount|declared|settled|received|paid|refunded|escrow|wallet|available|held|expected|remitted|fee|refundedBefore/i) ? formatVnd(v) : String(v)
+  return v === undefined
+    ? '—'
+    : typeof v === 'number' &&
+        key.match(
+          /price|amount|declared|settled|received|paid|refunded|escrow|wallet|available|held|expected|remitted|fee|refundedBefore/i,
+        )
+      ? formatVnd(v)
+      : String(v)
 }

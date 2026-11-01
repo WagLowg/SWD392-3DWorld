@@ -26,6 +26,17 @@ export type ApiReport = {
 
 type SpringPage<T> = { content: T[]; totalElements: number; totalPages: number; number: number; size: number }
 
+type ApiCatalogProduct = {
+  id: number
+  storefrontId: number
+  title: string
+  category: string
+  thumbnailUrl?: string | null
+  price?: number | null
+}
+
+type ApiCatalogPage = ApiPage<ApiCatalogProduct>
+
 export const REAL_OPS_DOMAINS = new Set<OpsDomain>(['product', 'report', 'storefront', 'user'])
 
 export type ApiAccount = {
@@ -80,6 +91,68 @@ function productCase(p: ApiProduct): OpsCase {
       },
     ],
   }
+}
+
+/** Fallback while BE has not exposed the full Admin moderation history endpoint. */
+function publishedCatalogCase(p: ApiCatalogProduct): OpsCase {
+  return {
+    id: String(p.id),
+    domain: 'product',
+    status: 'APPROVED',
+    title: p.title,
+    subtitle: `${p.category} · Đã mở bán`,
+    createdAt: '',
+    f: {
+      store: `Xưởng #${p.storefrontId}`,
+      category: p.category,
+      variants: '—',
+      price: p.price == null ? '—' : formatVnd(p.price),
+      specs: '—',
+      shippingClass: '—',
+      description: '',
+      revision: '',
+      media: p.thumbnailUrl ? 1 : 0,
+    },
+    evidence: p.thumbnailUrl ? [p.thumbnailUrl] : [],
+    audit: [{ at: '', actor: 'Quản trị viên', action: 'Đã duyệt mở bán', tone: 'green' }],
+  }
+}
+
+async function allPendingProducts() {
+  const items: ApiProduct[] = []
+  let page = 0
+  while (true) {
+    const response = await http.get<ApiEnvelope<ApiPage<ApiProduct>>>(
+      `/api/admin/products/pending${toQueryString({ page, size: 100 })}`,
+    )
+    items.push(...response.data.items)
+    if (page + 1 >= response.data.totalPages) break
+    page += 1
+  }
+  return items
+}
+
+async function allPublishedCatalogProducts() {
+  const items: ApiCatalogProduct[] = []
+  let page = 0
+  while (true) {
+    const response = await http.get<ApiEnvelope<ApiCatalogPage>>(
+      `/api/catalog${toQueryString({ sort: 'newest', page, size: 100 })}`,
+    )
+    items.push(...response.data.items)
+    if (page + 1 >= response.data.totalPages) break
+    page += 1
+  }
+  return items
+}
+
+async function productModerationCases(): Promise<OpsCase[]> {
+  // Current BE contract: pending is the only complete private moderation list.
+  // Public catalog enrichment is best-effort and must never block Admin review.
+  const pending = await allPendingProducts()
+  const published = await allPublishedCatalogProducts().catch(() => [])
+  const merged = [...pending.map(productCase), ...published.map(publishedCatalogCase)]
+  return [...new Map(merged.map((item) => [item.id, item])).values()]
 }
 
 /* ---------------------------------------------------------------- report */
@@ -226,8 +299,7 @@ async function settle<T>(p: Promise<T[]>) {
 export const adminOpsApi = {
   async list(domain: OpsDomain): Promise<OpsCase[]> {
     if (domain === 'product') {
-      const page = (await http.get<ApiEnvelope<ApiPage<ApiProduct>>>(`/api/admin/products/pending${PAGE}`)).data
-      return page.items.map(productCase)
+      return productModerationCases()
     }
     if (domain === 'report') {
       const lists = await Promise.all(

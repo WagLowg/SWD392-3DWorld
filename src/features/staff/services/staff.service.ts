@@ -226,31 +226,46 @@ export function normalizeRefundApi(raw: StaffRefundApi | null | undefined): Staf
 const staffShipmentQueryKey = ['staff', 'shipments'] as const
 const staffRefundQueryKey = ['staff', 'refunds'] as const
 
-export const staffService = {
-  async listShipments(signal?: AbortSignal): Promise<StaffShipment[]> {
-    try {
-      const response = await http.get<ApiEnvelope<StaffShipmentApi[]>>('/api/staff/shipments?page=0&size=100', {
+/** Load and enrich the system-wide shipment feed exposed to operational roles. */
+export async function listOperationalShipments(endpoint: string, signal?: AbortSignal): Promise<StaffShipment[]> {
+  try {
+    const rows: StaffShipmentApi[] = []
+    const pageSize = 100
+    let page = 0
+
+    // The endpoint returns a plain list without totalPages, so keep reading until
+    // the final short page to ensure Admin can see the whole system feed.
+    while (true) {
+      const response = await http.get<ApiEnvelope<StaffShipmentApi[]>>(`${endpoint}?page=${page}&size=${pageSize}`, {
         signal,
       })
-      const rows = Array.isArray(response?.data) ? response.data : []
-      const orders = await Promise.all(
-        rows.map(async (row) => {
-          const orderId = asNumber(row.physicalOrderId ?? row.orderId)
-          if (!orderId) return null
-          try {
-            return (await http.get<ApiEnvelope<Order>>(`/api/orders/${orderId}`, { signal })).data
-          } catch {
-            return null
-          }
-        }),
-      )
-      return rows.map((row, index) => normalizeShipmentApi(row, orders[index]))
-    } catch (error) {
-      if (error instanceof ApiClientError && (error.status === 404 || error.status === 405)) {
-        return []
-      }
-      throw error
+      const chunk = Array.isArray(response?.data) ? response.data : []
+      rows.push(...chunk)
+      if (chunk.length < pageSize) break
+      page += 1
     }
+
+    const orders = await Promise.all(
+      rows.map(async (row) => {
+        const orderId = asNumber(row.physicalOrderId ?? row.orderId)
+        if (!orderId) return null
+        try {
+          return (await http.get<ApiEnvelope<Order>>(`/api/orders/${orderId}`, { signal })).data
+        } catch {
+          return null
+        }
+      }),
+    )
+    return rows.map((row, index) => normalizeShipmentApi(row, orders[index]))
+  } catch (error) {
+    if (error instanceof ApiClientError && (error.status === 404 || error.status === 405)) return []
+    throw error
+  }
+}
+
+export const staffService = {
+  async listShipments(signal?: AbortSignal): Promise<StaffShipment[]> {
+    return listOperationalShipments('/api/staff/shipments', signal)
   },
 
   async updateShipmentEvent(shipmentId: number, event: string): Promise<StaffShipment> {
