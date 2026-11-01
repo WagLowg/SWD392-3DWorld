@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box, Circle, KeyRound, MoreHorizontal, PackageOpen, Shapes, Smartphone, Type } from 'lucide-react';
-import { relativeTime, type ProjectMeta } from '../projects';
+import { relativeTime, type ProjectMeta } from '../services/projects';
 
 export function ShapeIcon({ icon, size = 56 }: { icon?: string; size?: number }) {
   const p = { size, strokeWidth: 1.1, color: 'var(--secondary)' };

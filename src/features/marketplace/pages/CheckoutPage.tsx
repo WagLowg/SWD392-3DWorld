@@ -34,7 +34,7 @@ import { ordersRequiringGatewayPayment } from '../lib/checkoutPayment'
 import { isShippingQuoteUsable, SHIPPING_QUOTE_EXPIRY_BUFFER_MS } from '../lib/shipping'
 import { useVariantIndexStore } from '../stores/variant-index.store'
 import { useOrderPaymentsStore } from '../../orders/stores/order-payments.store'
-import { goLogin } from '../../auth/services/session'
+import { goLogin } from '../../../shared/session/session'
 import {
   clearPendingCheckout,
   loadPendingCheckout,

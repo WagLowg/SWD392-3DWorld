@@ -3,8 +3,8 @@ import * as THREE from 'three';
 import { CheckCircle2, FileUp, Loader2, Printer } from 'lucide-react';
 import { useStudio, uid } from '../store';
 import { CAPABILITIES, POD_CATALOG } from '../config';
-import { exportStl, download, normalizeImported, parseStl, UNIT_TO_MM, type ImportUnit, type ParsedStl } from '../io';
-import { printableNodes, runPrintCheck } from '../printCheck';
+import { exportStl, download, normalizeImported, parseStl, UNIT_TO_MM, type ImportUnit, type ParsedStl } from '../lib/io';
+import { printableNodes, runPrintCheck } from '../lib/printCheck';
 import type { PrintReport, PrintRequestReceipt, SceneNode, Snapshot } from '../types';
 import { Alert, LevelBadge, Modal } from './ui';
 

@@ -4,6 +4,7 @@ import { OrbitControls, useGLTF, Grid, ContactShadows, Html } from '@react-three
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import { useAuthedUrl } from '../lib/authed';
 
 export type RenderMode = 'textured' | 'clay' | 'wireframe';
 export type ViewerHandle = { reset: () => void; screenshot: () => string | null };
@@ -135,6 +136,8 @@ const webglOk = (() => {
 
 export const Viewer3D = forwardRef<ViewerHandle, Props>(function Viewer3D(p, ref) {
   const rigRef = useRef<ViewerHandle>(null);
+  const model = useAuthedUrl(p.url);
+  const preview = useAuthedUrl(p.fallbackImage);
   const [h, setH] = useState(1.5);
   useImperativeHandle(ref, () => ({
     reset: () => rigRef.current?.reset(),
@@ -144,16 +147,17 @@ export const Viewer3D = forwardRef<ViewerHandle, Props>(function Viewer3D(p, ref
   const fallback = (
     <div className="vp-overlay">
       <div className="box">
-        {p.fallbackImage && <img src={p.fallbackImage} alt="Ảnh xem trước" style={{ maxHeight: 220, margin: '0 auto 12px', borderRadius: 12 }} />}
+        {preview.src && <img src={preview.src} alt="Ảnh xem trước" style={{ maxHeight: 220, margin: '0 auto 12px', borderRadius: 12 }} />}
         <h3>Không hiển thị được mô hình 3D</h3>
         <p className="muted">{webglOk ? 'Tệp GLB không tải được hoặc bị lỗi. Bạn vẫn có thể xuất tệp ở trang Xuất mô hình.' : 'Trình duyệt/thiết bị không hỗ trợ WebGL. Bạn vẫn có thể tải tệp mô hình.'}</p>
       </div>
     </div>
   );
-  if (!webglOk) return fallback;
+  if (!webglOk || model.error) return fallback;
+  if (!model.src) return <div className="vp-overlay"><div className="box"><span className="spinner" /><p className="muted">Đang tải mô hình…</p></div></div>;
 
   return (
-    <ViewerBoundary fallback={fallback} resetKey={p.url}>
+    <ViewerBoundary fallback={fallback} resetKey={model.src}>
       <Canvas
         gl={{ preserveDrawingBuffer: true, antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
         camera={{ position: [2.6, 2, 3.4], fov: 38, near: 0.01, far: 200 }}
@@ -167,7 +171,7 @@ export const Viewer3D = forwardRef<ViewerHandle, Props>(function Viewer3D(p, ref
         <Env on={p.studioLight} />
         <Suspense fallback={<Loading />}>
           <Model
-            url={p.url}
+            url={model.src}
             mode={p.mode}
             bbox={p.bbox}
             onStats={p.onStats}

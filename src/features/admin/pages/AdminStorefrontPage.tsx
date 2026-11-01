@@ -1,7 +1,7 @@
 import { BadgeCheck, CreditCard, RefreshCw, ShieldCheck, Store, Zap } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { StatusPill } from '../../../shared/ui/kit'
 import { useOpsList } from '../../ops/hooks/useOps'

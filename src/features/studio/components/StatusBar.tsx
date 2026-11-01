@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { AlertCircle, CheckCircle2, Info, TriangleAlert, X } from 'lucide-react';
 import { useStudio } from '../store';
-import { triangleCount } from '../geometry';
+import { triangleCount } from '../lib/geometry';
 import { CAPABILITIES } from '../config';
 
 export function StatusBar() {

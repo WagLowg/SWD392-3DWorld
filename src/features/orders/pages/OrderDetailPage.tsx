@@ -2,7 +2,7 @@ import { ArrowLeft, Boxes, CheckCircle2, History, MapPin, Truck, Undo2, XCircle 
 import { type ReactNode, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { Breadcrumbs } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'

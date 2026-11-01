@@ -1,9 +1,9 @@
 import { Bell, Box, LogOut, ShoppingBag } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useSession } from '../../../shared/session/useSession'
-import { goLogin, logout } from '../../auth/services/session'
+import { goLogin, logout } from '../../../shared/session/session'
 import { useCart } from '../hooks/useCart'
-import { ModuleSwitcher } from '../../../shared/ModuleSwitcher'
+import { ModuleSwitcher } from '../../../shared/ui/ModuleSwitcher'
 
 export function MarketplaceHeader() {
   const { data: user, isLoading: sessionLoading } = useSession()

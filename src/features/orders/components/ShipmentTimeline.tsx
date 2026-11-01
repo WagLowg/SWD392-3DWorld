@@ -1,5 +1,5 @@
 import { CheckCircle2, MapPin, Navigation, Package, PackageCheck, Truck, XCircle } from 'lucide-react'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import type { Shipment } from '../types/order.types'
 
 type StepState = 'done' | 'current' | 'todo' | 'failed'

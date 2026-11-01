@@ -1,6 +1,6 @@
 import { CheckCircle2, Clock, PackageCheck, RotateCcw, Truck } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import {
   Btn,
   CellTitle,

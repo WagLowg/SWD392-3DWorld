@@ -1,6 +1,6 @@
 import { Box, ExternalLink, Menu, X } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { MODULES } from '../../../shared/modules'
+import { MODULES } from '../../../shared/config/modules'
 import { useUiStore } from '../../../shared/stores/ui.store'
 import { features } from '../requirements'
 

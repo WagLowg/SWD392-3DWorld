@@ -1,4 +1,4 @@
-import { fetchMe } from '../../features/auth/services/session'
+import { fetchMe } from './session'
 
 /**
  * 401 từ một API phụ (AI Studio, 3D Studio) chưa chắc là hết phiên: nếu dịch vụ đó không chạy,

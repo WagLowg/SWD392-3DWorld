@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { api } from '../lib/api';
+import { aiStudio } from '../lib/backend';
+import type { ConfigOptions } from '../lib/api';
 import { dateTime, num } from '../lib/format';
 import { useAuth, useToast } from '../lib/app-state';
 import { useCrumb } from '../components/AppShell';
@@ -9,10 +10,7 @@ import { Empty } from '../components/ui';
 const TYPE_LABEL: Record<string, string> = {
   GRANT: 'Tặng', TOPUP: 'Nạp', HOLD: 'Giữ cho tác vụ', RELEASE: 'Hoàn', SETTLE: 'Đã tính phí',
 };
-const PRICES = [
-  ['Meshy 7.1 · Chỉ Mesh', 20], ['Meshy 7.1 · Mesh + Texture 2K/4K', 30], ['Meshy 7.1 · Texture 8K', 35],
-  ['Meshy 6 Lite · Chỉ Mesh', 5], ['Meshy 6 Lite · Mesh + Texture', 15], ['Hình học 2K/4K (cộng thêm)', 5],
-] as const;
+type Price = ConfigOptions['pricing'][number];
 
 export default function Credits() {
   useCrumb(<><span>Tài khoản</span><span>/</span><b>Tín dụng</b></>);
@@ -20,11 +18,14 @@ export default function Credits() {
   const toast = useToast();
   const [busy, setBusy] = useState<number | null>(null);
   useEffect(() => { refreshWallet(); }, [refreshWallet]);
+  // Bảng giá công bố trong config-options.pricing
+  const [prices, setPrices] = useState<Price[] | null>(null);
+  useEffect(() => { aiStudio.configOptions().then((o) => setPrices(o.pricing)).catch(() => setPrices([])); }, []);
 
   const topup = async (amount: number) => {
     setBusy(amount);
     try {
-      await api('/api/ai-studio/wallet/topup', { body: { amount } });
+      await aiStudio.topup(amount);
       toast('success', `Đã nạp ${amount} tín dụng (demo)`);
       refreshWallet();
     } catch (e) { toast('error', 'Không nạp được', (e as Error).message); } finally { setBusy(null); }
@@ -35,8 +36,8 @@ export default function Credits() {
       <div className="page-head"><div><h1>Tín dụng & sử dụng</h1><p>Tín dụng AI dùng cho tạo mô hình. Chi phí in 3D được thanh toán riêng.</p></div></div>
       <div className="stat-grid">
         <div className="stat"><span>Số dư khả dụng</span><b style={{ color: 'var(--primary)' }}>{num(wallet?.balance)}</b></div>
-        <div className="stat"><span>Đang giữ cho tác vụ</span><b>{num(wallet?.held)}</b></div>
-        <div className="stat"><span>Đã sử dụng</span><b>{num(wallet?.spent)}</b></div>
+        <div className="stat"><span>Tác vụ đã chạy</span><b>{num(wallet?.totalTasks)}</b></div>
+        <div className="stat"><span>Tác vụ thành công</span><b>{num(wallet?.successfulTasks)}</b></div>
       </div>
       <div className="two-col">
         <div className="card" style={{ padding: 0 }}>
@@ -57,12 +58,12 @@ export default function Credits() {
                 </tbody>
               </table>
             </div>
-          ) : <Empty icon={<Plus />} title="Chưa có giao dịch" />}
+          ) : <Empty icon={<Plus />} title="Chưa có lịch sử" text="Backend chưa có API sổ cái tín dụng AI." />}
         </div>
         <div className="stack lg">
           <div className="card">
             <h3>Nạp thêm tín dụng</h3>
-            <p className="sub">Bản demo: chưa tích hợp cổng thanh toán, nạp trực tiếp để thử nghiệm.</p>
+            <p className="sub">Nạp demo chỉ chạy khi Backend bật chế độ thử nghiệm; chưa có API mua tín dụng qua cổng thanh toán.</p>
             <div className="pkg-grid">
               {[100, 500, 1000].map((a) => (
                 <button key={a} className="btn outline" style={{ height: 64, flexDirection: 'column', gap: 0 }} onClick={() => topup(a)} disabled={busy !== null}>
@@ -75,8 +76,15 @@ export default function Credits() {
             <h3>Bảng giá tạo mô hình</h3>
             <p className="sub">Giá được máy chủ tính lại trước mỗi lần tạo.</p>
             <dl className="kv">
-              {PRICES.map(([l, c]) => <Fragment key={l}><dt>{l}</dt><dd style={{ textAlign: 'right' }}>{c}</dd></Fragment>)}
+              {prices?.map((p) => (
+                <Fragment key={p.label}>
+                  <dt>{p.label}{p.texture === false ? ' · Chỉ Mesh' : ''}</dt>
+                  <dd style={{ textAlign: 'right' }}>{num(p.credits)}</dd>
+                </Fragment>
+              ))}
             </dl>
+            {prices && !prices.length && <p className="muted small" style={{ margin: 0 }}>Chưa tải được bảng giá.</p>}
+            {!prices && <div className="skeleton" style={{ height: 80 }} />}
           </div>
         </div>
       </div>

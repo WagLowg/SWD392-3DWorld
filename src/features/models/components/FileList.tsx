@@ -1,6 +1,6 @@
 import { Download, FileBox, Star } from 'lucide-react'
 import { ApiClientError } from '../../../shared/api'
-import { formatBytes } from '../../../shared/format'
+import { formatBytes } from '../../../shared/lib/format'
 import { useToast } from '../../../shared/ui/toast'
 import { useDownloadModelFile } from '../hooks/useModels'
 import { FILE_ROLE } from '../lib/labels'

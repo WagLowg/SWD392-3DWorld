@@ -1,6 +1,6 @@
 import { Lock, ShieldCheck, Wallet } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { formatVnd } from '../../../shared/format'
+import { formatVnd } from '../../../shared/lib/format'
 import { Btn, CellTitle, DataTable, FilterTabs, Hero, RuleBox, StatCard, StatGrid, StatusPill, Toolbar } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import type { EarningStatus } from '../data/seller.fixtures'

@@ -6,25 +6,34 @@
 
 ```text
 SWD392-3DWorld/
+├── entries/                    # HTML khởi động cho từng module (ai, studio, marketplace, pod, login, portal)
+├── index.html                  # Trang Landing
+├── public/                     # Tệp tĩnh (favicon…)
+├── docs/                       # Tài liệu kiến trúc, hướng dẫn nhóm, danh sách API còn thiếu
 ├── src/
-│   ├── app/                    # Provider và cấu hình cấp ứng dụng
-│   ├── features/               # Code theo từng nghiệp vụ
-│   │   ├── landing/
-│   │   ├── auth/
-│   │   ├── ai-studio/
-│   │   ├── studio/
-│   │   ├── marketplace/
-│   │   ├── pod/
-│   │   └── ...
-│   ├── shared/                 # API client, UI và tiện ích dùng chung
-│   └── test/
-├── entries/                    # HTML entry cho từng module
-├── public/
-├── backend/                    # Spring Boot hiện có, giữ nguyên
-├── AI/server/                  # Node AI service hiện có, giữ nguyên
-├── docs/
+│   ├── app/providers/          # Provider dùng chung (React Query, router…)
+│   ├── features/               # Mỗi thư mục là một nghiệp vụ, tự chứa pages/components/hooks/services/lib
+│   │   ├── landing/            # Trang giới thiệu 3D
+│   │   ├── auth/               # Đăng nhập, đăng ký, quên mật khẩu
+│   │   ├── ai-studio/          # Ảnh → mô hình 3D (/api/ai-studio)
+│   │   ├── studio/             # Trình dựng 3D (/api/studio)
+│   │   ├── marketplace/        # Danh mục, giỏ hàng, thanh toán
+│   │   ├── pod/                # Đặt in theo yêu cầu
+│   │   ├── portal/             # Khung Portal: người mua, người bán, quản trị
+│   │   └── account, buyer, models, ops, orders, seller
+│   ├── shared/                 # Không phụ thuộc feature nào
+│   │   ├── api/                # HTTP client, kiểu envelope, lỗi
+│   │   ├── config/             # Biến môi trường, danh sách module
+│   │   ├── lib/                # Hàm tiện ích (format, query string)
+│   │   ├── mock/               # Dữ liệu mẫu cho màn chưa có API
+│   │   ├── session/            # Token, người dùng hiện tại
+│   │   ├── stores/             # State UI dùng chung
+│   │   └── ui/                 # Component và theme dùng chung
+│   ├── drafts/                 # Màn đã dựng nhưng chưa có route vì Backend chưa có API (ví, thiết kế, khiếu nại…)
+│   └── test/                   # Cấu hình test
 ├── package.json
-└── vite.config.ts
+├── vite.config.ts
+└── vitest.config.ts
 ```
 
 `entries/` chỉ chứa HTML khởi động. Toàn bộ code React nằm trong `src/`; không tạo thêm project Vite hay `package.json` bên trong từng feature.
@@ -59,4 +68,6 @@ npm run test
 npm run build
 ```
 
-Không commit `.env`, `node_modules`, `dist`, `target` hoặc dữ liệu runtime. Xem cách tổ chức và luồng code ở [Frontend Team Guide](docs/FRONTEND_TEAM_GUIDE.md).
+Không commit `.env`, `node_modules`, `dist`, `target` hoặc dữ liệu runtime. Xem cách tổ chức và luồng code ở [Frontend Team Guide](docs/FRONTEND_TEAM_GUIDE.md), API Backend còn thiếu ở [MISSING_APIS](docs/MISSING_APIS.md).
+
+`src/drafts/` vẫn được typecheck và lint nhưng không được import từ module nào. Khi Backend có API, chuyển màn tương ứng về `src/features/<module>/pages` và khai báo route.

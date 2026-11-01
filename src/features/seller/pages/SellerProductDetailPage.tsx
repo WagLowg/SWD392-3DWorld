@@ -1,7 +1,7 @@
 import { Archive, EyeOff, Pencil, Play, Send } from 'lucide-react'
 import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { formatDateTime, formatVnd } from '../../../shared/format'
+import { formatDateTime, formatVnd } from '../../../shared/lib/format'
 import {
   AuditTimeline,
   Btn,

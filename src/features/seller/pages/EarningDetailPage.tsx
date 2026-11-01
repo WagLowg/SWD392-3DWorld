@@ -1,7 +1,7 @@
 import { Wallet } from 'lucide-react'
 import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { formatDateTime, formatVnd } from '../../../shared/format'
+import { formatDateTime, formatVnd } from '../../../shared/lib/format'
 import { Btn, DataTable, DetailLayout, Hero, KeyValues, MoneyRows, Pill, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { useEarning, useEarnings } from '../hooks/useSeller'

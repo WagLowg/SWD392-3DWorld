@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { goLogin, hasStoredSession } from '../../auth/services/session'
+import { goLogin, hasStoredSession } from '../../../shared/session/session'
 import { useSession } from '../../../shared/session/useSession'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { LoginRequired } from '../../../shared/ui/LoginRequired'
@@ -70,4 +70,3 @@ export function StaffAccessGate({ children }: { children?: ReactNode }) {
 
   return <>{children ?? <Outlet />}</>
 }
-

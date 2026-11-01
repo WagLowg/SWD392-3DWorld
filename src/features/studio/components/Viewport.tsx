@@ -7,7 +7,7 @@ import {
 import CameraControlsImpl from 'camera-controls';
 import { AlertTriangle, Box as BoxIcon, Plus } from 'lucide-react';
 import { useStudio } from '../store';
-import { buildGeometry, decompose, worldBox } from '../geometry';
+import { buildGeometry, decompose, worldBox } from '../lib/geometry';
 import type { SceneNode } from '../types';
 
 const DEG = Math.PI / 180;

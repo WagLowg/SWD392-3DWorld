@@ -1,7 +1,7 @@
 import { ArrowLeft, Camera, PackageSearch } from 'lucide-react'
 import { type ReactNode, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { ApiNote, Breadcrumbs } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'

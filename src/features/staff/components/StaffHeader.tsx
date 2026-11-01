@@ -1,6 +1,6 @@
 import { ArrowLeft, Box, LogOut, Shield } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { logout } from '../../auth/services/session'
+import { logout } from '../../../shared/session/session'
 import { useSession } from '../../../shared/session/useSession'
 
 export function StaffHeader({

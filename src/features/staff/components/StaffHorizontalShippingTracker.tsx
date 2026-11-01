@@ -1,5 +1,5 @@
 import { Check, MapPin, Package, PackageCheck, Truck, XCircle } from 'lucide-react'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import type { ShipmentStatus, StaffShipment } from '../types/staff.types'
 
 const FLOW: { status: ShipmentStatus; label: string; icon: typeof Package }[] = [

@@ -12,7 +12,7 @@ import {
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
-import { formatDateTime, formatVnd } from '../../../shared/format'
+import { formatDateTime, formatVnd } from '../../../shared/lib/format'
 import { DetailLayout, KeyValues, MoneyRows, Pill, Section } from '../../../shared/ui/kit'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { formatAttributes } from '../../marketplace/lib/format'

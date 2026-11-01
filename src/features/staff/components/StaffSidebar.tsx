@@ -7,7 +7,7 @@ import {
   Truck,
 } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { logout } from '../../auth/services/session'
+import { logout } from '../../../shared/session/session'
 import { useSession } from '../../../shared/session/useSession'
 import { useStaffRefunds, useStaffShipments } from '../services/staff.service'
 

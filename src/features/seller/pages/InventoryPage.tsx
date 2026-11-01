@@ -1,6 +1,6 @@
 import { Minus, Plus, Tag } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
-import { formatVnd } from '../../../shared/format'
+import { formatVnd } from '../../../shared/lib/format'
 import { inputClass } from '../../../shared/ui/form'
 import { Btn, CellTitle, DataTable, FilterTabs, Hero, Pill, RuleBox, Section, Toolbar } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'

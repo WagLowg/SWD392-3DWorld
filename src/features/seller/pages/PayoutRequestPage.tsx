@@ -1,6 +1,6 @@
 import { CheckCircle2, Landmark, Wallet } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { formatVnd } from '../../../shared/format'
+import { formatVnd } from '../../../shared/lib/format'
 import { inputClass } from '../../../shared/ui/form'
 import { Btn, Hero, Section } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'

@@ -8,7 +8,7 @@ import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { VerifyEmailPage } from './pages/VerifyEmailPage'
-import './login.css'
+import './auth.css'
 
 const rootElement = document.getElementById('root')
 if (!rootElement) throw new Error('Không tìm thấy phần tử #root để khởi tạo trang đăng nhập.')

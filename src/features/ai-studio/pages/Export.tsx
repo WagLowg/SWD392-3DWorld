@@ -1,22 +1,28 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CheckCircle2, Circle, Lock, Download, AlertTriangle, Cuboid } from 'lucide-react';
-import { api, ApiError } from '../lib/api';
+import { ApiError } from '../lib/api';
+import { aiStudio } from '../lib/backend';
+import { downloadAuthed } from '../lib/authed';
+import { AuthedImg } from '../components/AuthedImg';
 import { bytes, num } from '../lib/format';
 import { useToast } from '../lib/app-state';
 import { useCrumb } from '../components/AppShell';
 import { Badge, Empty, Progress, SelectField } from '../components/ui';
 import { ProjectPicker, useVersion } from '../components/ProjectPicker';
 
-type ExportResult = { downloadUrl: string; sizeBytes: number; packaging?: 'zip'; files?: { name: string; sizeBytes: number | null }[]; texturesIncluded?: boolean };
+type ExportResult = { downloadUrl: string; sizeBytes: number; fileName?: string | null; checksum?: string | null; packaging?: 'zip'; files?: { name: string; sizeBytes: number | null }[]; texturesIncluded?: boolean };
+
+/** Định dạng Backend xuất được (chuyển đổi từ GLB khi chưa có sẵn). */
+const EXPORTABLE = new Set(['glb', 'stl', 'obj', 'fbx']);
 
 const FORMATS = [
   { id: 'glb', use: 'Web & trình xem 3D', desc: 'Gói Mesh và Texture trong một tệp.' },
   { id: 'stl', use: 'In 3D', desc: 'Chỉ hình học, không chứa vật liệu.' },
-  { id: 'obj', use: 'Chỉnh sửa mô hình', desc: 'Gói ZIP: OBJ + MTL + ảnh texture (màu, PBR).' },
+  { id: 'obj', use: 'Chỉnh sửa mô hình', desc: 'OBJ, hoặc gói ZIP gồm OBJ + MTL + ảnh texture khi có.' },
   { id: 'fbx', use: 'Nhân vật & trò chơi', desc: 'Dùng cho Unity, Unreal, Maya.' },
-  { id: '3mf', use: 'In tương thích', desc: 'Giữ đơn vị và thông tin vật liệu.' },
-  { id: 'usdz', use: 'AR & thiết bị Apple', desc: 'Xem AR trên iOS / macOS.' },
+  { id: '3mf', use: 'In tương thích', desc: 'Chưa hỗ trợ: Backend chưa xuất 3MF.', unsupported: true },
+  { id: 'usdz', use: 'AR & thiết bị Apple', desc: 'Chưa hỗ trợ: Backend chưa xuất USDZ.', unsupported: true },
   { id: 'gltf', use: 'Web · tài nguyên tách rời', desc: 'Chưa hỗ trợ: chưa có bộ chuyển đổi.', unsupported: true },
   { id: 'blend', use: 'Blender', desc: 'Chưa hỗ trợ: không có bộ chuyển đổi Blender.', unsupported: true },
 ];
@@ -31,7 +37,9 @@ export default function ExportPage() {
   useCrumb(detail ? <><span>{detail.project.title}</span><span>/</span><b>Xuất · {version?.label.split(' ')[0]}</b></> : <b>Xuất mô hình</b>, [detail?.project.title, version?.label]);
 
   const available = new Map(version?.assets.filter((a) => a.kind === 'model').map((a) => [a.format, a]) || []);
-  useEffect(() => { if (version && !available.has(fmt)) setFmt('glb'); }, [version]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Có GLB là xuất được STL/OBJ/FBX (Backend tự chuyển đổi); tệp sẵn có thì luôn xuất được.
+  const canExport = (id: string) => available.has(id) || (EXPORTABLE.has(id) && available.has('glb'));
+  useEffect(() => { if (version && !canExport(fmt)) setFmt('glb'); }, [version]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!versionId) {
     return (
@@ -48,15 +56,19 @@ export default function ExportPage() {
   const download = async () => {
     setJob({ format: fmt, state: 'running' });
     try {
-      const r = await api<ExportResult>(`/api/ai-studio/versions/${version.id}/exports`, { body: { format: fmt } });
-      const a = document.createElement('a');
-      a.href = r.downloadUrl;
-      a.click();
+      const r: ExportResult = await aiStudio.exportVersion(version.id, fmt);
+      // URL tải cần Bearer token → tải qua fetch rồi lưu file
+      const ext = r.packaging === 'zip' ? 'zip' : fmt;
+      await downloadAuthed(r.downloadUrl, r.fileName || `${detail.project.title}_${version.label}.${ext}`);
       setJob({ format: fmt, state: 'done', result: r });
-      if (r.packaging === 'zip' && !r.texturesIncluded) toast('warning', 'Đã tải OBJ nhưng thiếu texture', 'Nhà cung cấp không còn cung cấp ảnh texture cho phiên bản này.');
-      else toast('success', `Đã bắt đầu tải ${fmt.toUpperCase()}${r.packaging === 'zip' ? ' (ZIP)' : ''}`);
+      toast('success', `Đã bắt đầu tải ${fmt.toUpperCase()}${r.packaging === 'zip' ? ' (ZIP)' : ''}`);
     } catch (e) {
-      setJob({ format: fmt, state: 'error', msg: e instanceof ApiError ? e.message : 'Xuất thất bại' });
+      const raw = e instanceof ApiError ? e.message : 'Xuất thất bại';
+      // Backend chỉ chuyển đổi GLB → STL/OBJ/FBX khi có Blender (CONVERSION_ENABLED=true).
+      const msg = /FORMAT_UNAVAILABLE/.test(raw)
+        ? `Meshy không có sẵn ${fmt.toUpperCase()} cho phiên bản này và máy chủ chưa bật chuyển đổi định dạng. Hãy dùng GLB, hoặc nhờ quản trị bật chuyển đổi (cần cài Blender).`
+        : raw;
+      setJob({ format: fmt, state: 'error', msg });
     }
   };
 
@@ -76,7 +88,7 @@ export default function ExportPage() {
       <div className="two-col">
         <div className="stack lg">
           <div className="card summary-card">
-            {version.thumbnailUrl ? <img src={version.thumbnailUrl} alt="" /> : <span className="ph" style={{ display: 'grid', placeItems: 'center' }}><Cuboid /></span>}
+            {version.thumbnailUrl ? <AuthedImg src={version.thumbnailUrl} alt="" /> : <span className="ph" style={{ display: 'grid', placeItems: 'center' }}><Cuboid /></span>}
             <div className="grow">
               <h3 style={{ fontSize: 18 }}>{detail.project.title}</h3>
               <p className="muted small" style={{ margin: '4px 0 8px' }}>{version.label} · {num(stats?.triangles)} tam giác · {version.metadata.texture ? `Texture ${version.metadata.texture}` : 'Không texture'}</p>
@@ -86,14 +98,13 @@ export default function ExportPage() {
           </div>
           <div className="fmt-grid" role="radiogroup" aria-label="Định dạng xuất">
             {FORMATS.map((f) => {
-              const has = available.has(f.id);
-              const disabled = f.unsupported || !has;
+              const disabled = f.unsupported || !canExport(f.id);
               return (
                 <button key={f.id} className="fmt" role="radio" aria-checked={fmt === f.id} disabled={disabled} onClick={() => setFmt(f.id)}>
                   <span className="radio">{disabled ? <Lock size={18} /> : fmt === f.id ? <CheckCircle2 size={20} /> : <Circle size={20} />}</span>
                   <h3>{f.id === 'gltf' ? 'glTF' : f.id.toUpperCase()}</h3>
                   <p className="use">{f.use}</p>
-                  <p>{f.unsupported ? f.desc : has ? f.desc : 'Chưa được tạo cho phiên bản này. Chọn định dạng này trong Cài đặt nâng cao khi Generate.'}</p>
+                  <p>{f.unsupported || canExport(f.id) ? f.desc : 'Phiên bản chưa có tệp GLB để chuyển đổi.'}</p>
                 </button>
               );
             })}
@@ -105,17 +116,17 @@ export default function ExportPage() {
             <h3>Tệp {fmt.toUpperCase()}</h3>
             <p className="sub">Tệp được lưu trong kho riêng của bạn tại 3DWorld.</p>
             <dl className="kv">
-              <dt>Dung lượng</dt><dd>{bytes(asset?.sizeBytes)}{fmt === 'obj' && <span className="muted small"> (chưa nén, chưa gồm texture)</span>}</dd>
-              {fmt === 'obj' && <><dt>Đóng gói</dt><dd>ZIP · model.obj, model.mtl, ảnh texture</dd></>}
+              <dt>Dung lượng</dt><dd>{asset ? bytes(asset.sizeBytes) : <span className="muted">Tạo khi xuất (chuyển đổi từ GLB)</span>}</dd>
+              {fmt === 'obj' && <><dt>Đóng gói</dt><dd>OBJ, hoặc ZIP (OBJ + MTL + texture) nếu mô hình có texture</dd></>}
               <dt>Kích thước in</dt><dd>{version.dimensions ? `${version.dimensions.lengthMm} × ${version.dimensions.widthMm} × ${version.dimensions.heightMm} mm` : <span className="muted">Chưa xác nhận</span>}</dd>
               <dt>Texture</dt><dd>{fmt === 'stl' ? 'Không (chỉ hình học)' : version.metadata.texture || 'Không'}</dd>
-              <dt>SHA-256</dt><dd style={{ fontSize: 11, wordBreak: 'break-all' }} className="muted">{asset?.checksum.slice(0, 24)}…</dd>
+              {!!asset?.checksum && <><dt>SHA-256</dt><dd style={{ fontSize: 11, wordBreak: 'break-all' }} className="muted">{asset.checksum.slice(0, 24)}…</dd></>}
             </dl>
             {fmt === 'stl' && !version.dimensions && (
               <div className="banner warning" style={{ marginTop: 16 }}>STL không lưu đơn vị. Hãy <Link to={`/print/${version.id}`}>xác nhận kích thước thật</Link> trước khi in.</div>
             )}
             <hr className="divider" />
-            <button className="btn primary block" onClick={download} disabled={!asset || job?.state === 'running'}>
+            <button className="btn primary block" onClick={download} disabled={!canExport(fmt) || job?.state === 'running'}>
               {job?.state === 'running' ? <span className="spinner" /> : <Download size={17} />}Xuất {fmt.toUpperCase()}
             </button>
           </div>
@@ -123,7 +134,7 @@ export default function ExportPage() {
             <div className="card">
               <h3>Tác vụ xuất</h3>
               <div className="row small" style={{ margin: '10px 0' }}>
-                <span className="grow">{detail.project.title}.{job.result?.packaging === 'zip' ? 'zip' : job.format}</span>{job.result && <span className="muted">{bytes(job.result.sizeBytes)}</span>}
+                <span className="grow">{job.result?.fileName || `${detail.project.title}.${job.result?.packaging === 'zip' ? 'zip' : job.format}`}</span>{job.result && <span className="muted">{bytes(job.result.sizeBytes)}</span>}
                 {job.state === 'running' && <span style={{ color: 'var(--primary)' }}>Đang chuẩn bị…</span>}
               </div>
               <Progress value={job.state === 'running' ? 40 : 100} indeterminate={job.state === 'running'} />

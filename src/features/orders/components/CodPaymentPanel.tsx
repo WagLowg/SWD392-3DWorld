@@ -1,5 +1,5 @@
 import { Banknote, RefreshCw } from 'lucide-react'
-import { formatDateTime, formatVnd } from '../../../shared/format'
+import { formatDateTime, formatVnd } from '../../../shared/lib/format'
 import { useCodPayment } from '../hooks/useOrders'
 import type { CodPayment, PaymentMethod } from '../types/order.types'
 

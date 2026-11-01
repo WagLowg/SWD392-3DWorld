@@ -27,7 +27,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { formatDateTime, formatVnd } from '../../../shared/format'
+import { formatDateTime, formatVnd } from '../../../shared/lib/format'
 import {
   AuditTimeline,
   DetailLayout,

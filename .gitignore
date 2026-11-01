@@ -2,8 +2,6 @@
 **/node_modules/
 **/dist/
 **/target/
-backend/data/
-AI/server/data/
 *.tsbuildinfo
 
 # secrets (keep committed templates)

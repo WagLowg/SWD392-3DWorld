@@ -1,5 +1,5 @@
 import { LogIn } from 'lucide-react'
-import { goLogin } from '../../features/auth/services/session'
+import { goLogin } from '../session/session'
 
 export function LoginRequired({ title, body }: { title: string; body: string }) {
   return (

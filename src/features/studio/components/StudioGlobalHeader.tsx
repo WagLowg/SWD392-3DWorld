@@ -1,6 +1,6 @@
 import { Bell, Box, LogOut } from 'lucide-react';
-import { ModuleSwitcher } from '../../../shared/ModuleSwitcher';
-import { logout } from '../../auth/services/session';
+import { ModuleSwitcher } from '../../../shared/ui/ModuleSwitcher';
+import { logout } from '../../../shared/session/session';
 import { href } from '../router';
 import { sessionUser } from '../session';
 

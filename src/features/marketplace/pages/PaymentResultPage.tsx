@@ -3,7 +3,7 @@ import { CheckCircle2, Clock, CreditCard, Loader2, RefreshCw, XCircle } from 'lu
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { useSession } from '../../../shared/session/useSession'
 import { LoginRequired } from '../../../shared/ui/LoginRequired'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'

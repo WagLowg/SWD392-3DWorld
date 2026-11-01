@@ -5,5 +5,5 @@
 @layer theme, base, legacy, components, utilities;
 
 @import "tailwindcss";
-@import "./styles.css" layer(legacy);
+@import "./portal-legacy.css" layer(legacy);
 @import "../../shared/ui/theme.css";

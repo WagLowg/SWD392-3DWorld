@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { Hero, Pill, Section, StatCard, StatGrid } from '../../../shared/ui/kit'
 import { StaffHeader } from '../components/StaffHeader'
 import { StaffRefundBadge, StaffShipmentBadge } from '../components/StaffStatusBadge'

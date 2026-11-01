@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Alert, Modal } from '../components/ui';
-import { createProject, deleteProject, renameProject, validateProjectName, type ProjectMeta } from '../projects';
-import { TEMPLATES } from '../scene';
+import { createProject, deleteProject, renameProject, validateProjectName, type ProjectMeta } from '../services/projects';
+import { TEMPLATES } from '../lib/scene';
 import { CAPABILITIES } from '../config';
 
 export const PRESETS = [

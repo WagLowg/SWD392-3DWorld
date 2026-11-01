@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, SlidersHorizontal, Sparkles } from 'lucide-react';
-import type { ConfigOptions, Estimate, GenConfig } from '../lib/api';
+import type { ConfigOptions, Estimate, GenConfig, SourceMode } from '../lib/api';
 import { num } from '../lib/format';
 import { Segmented, SelectField, Switch, TextField } from './ui';
 
@@ -33,13 +33,15 @@ const FORMATS = ['glb', 'stl', 'obj', 'fbx', 'usdz', '3mf'];
 
 type Props = {
   options: ConfigOptions | null;
-  mode: 'single' | 'multi';
+  mode: SourceMode;
   cfg: GenConfig;
   setCfg: (c: GenConfig) => void;
   preset: Preset;
   setPreset: (p: Preset) => void;
   variants: number;
   setVariants: (n: number) => void;
+  /** Giới hạn số biến thể Backend cho phép (mặc định 3). */
+  maxVariants?: number;
   title: string;
   setTitle: (t: string) => void;
   showTitle: boolean;
@@ -182,7 +184,7 @@ export function GeneratePanel(p: Props) {
 
       <div>
         <p className="label">Số biến thể</p>
-        <Segmented value={String(p.variants)} onChange={(v) => p.setVariants(Number(v))} label="Số biến thể" options={['1', '2', '3'].map((v) => ({ value: v, label: v }))} />
+        <Segmented value={String(p.variants)} onChange={(v) => p.setVariants(Number(v))} label="Số biến thể" options={['1', '2', '3'].slice(0, p.maxVariants ?? 3).map((v) => ({ value: v, label: v }))} />
         <div className="field-hint">Mỗi biến thể là một lần tạo riêng, lưu thành một phiên bản.</div>
       </div>
 
@@ -190,7 +192,7 @@ export function GeneratePanel(p: Props) {
 
       <label className="check">
         <input type="checkbox" checked={p.consent} onChange={(e) => p.setConsent(e.target.checked)} />
-        <span>Tôi xác nhận có quyền sử dụng ảnh này và tuân thủ chính sách nội dung của 3DWorld.</span>
+        <span>{p.mode === 'text' ? 'Tôi xác nhận mô tả này tuân thủ chính sách nội dung của 3DWorld.' : 'Tôi xác nhận có quyền sử dụng ảnh này và tuân thủ chính sách nội dung của 3DWorld.'}</span>
       </label>
 
       <div className="stack" style={{ gap: 10 }}>

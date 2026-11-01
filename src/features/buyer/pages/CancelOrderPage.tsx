@@ -1,7 +1,7 @@
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { formatVnd } from '../../../shared/format'
+import { formatVnd } from '../../../shared/lib/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { inputClass } from '../../../shared/ui/form'
 import { Btn, DetailLayout, Hero, MoneyRows, Section } from '../../../shared/ui/kit'

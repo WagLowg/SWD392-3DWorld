@@ -5,14 +5,14 @@ import type {
 } from './types';
 import {
   bakedGeometry, decompose, descendants, encodeFloat32, hashFloats, localMatrix, validateParams, worldBox, worldMatrix,
-} from './geometry';
-import { analyzeTopology } from './printCheck';
-import { runBoolean, type BoolOp } from './csg';
+} from './lib/geometry';
+import { analyzeTopology } from './lib/printCheck';
+import { runBoolean, type BoolOp } from './lib/csg';
 import { CAPABILITIES } from './config';
-import { DEFAULT_PARAMS, makeNode, uid } from './scene';
+import { DEFAULT_PARAMS, makeNode, uid } from './lib/scene';
 import {
   createPrintRequest, draftKey, fetchProject, getPrintRequest, listSnapshots, patchSnapshot, saveProjectContent, StudioApiError, uploadSnapshot,
-} from './projects';
+} from './services/projects';
 
 export type Tool = 'select' | 'move' | 'rotate' | 'scale' | 'measure';
 export type Modal = null | 'import' | 'export' | 'check' | 'send' | 'shortcuts' | 'onboarding' | 'boolean';
@@ -20,7 +20,7 @@ export type ViewPreset = 'perspective' | 'top' | 'front' | 'right';
 
 export interface Toast { id: number; kind: 'info' | 'success' | 'warning' | 'error'; title: string; text?: string }
 
-export { uid, makeNode, keychainTemplate, TEMPLATES, DEFAULT_PARAMS } from './scene';
+export { uid, makeNode, keychainTemplate, TEMPLATES, DEFAULT_PARAMS } from './lib/scene';
 
 let PID = '';
 const DRAFT_KEY = () => draftKey(PID);
@@ -438,7 +438,7 @@ export const useStudio = create<State>((set, get) => ({
       if (!stillHere()) return;
       if (e instanceof StudioApiError && e.code === 'REVISION_CONFLICT') {
         set({ saveState: 'conflict' });
-        get().toast({ kind: 'error', title: 'Xung đột revision (409)', text: `Server đã ở revision ${String(e.data?.currentRevision ?? '?')}. Tải lại hoặc lưu bản sao.` });
+        get().toast({ kind: 'error', title: 'Xung đột revision (409)', text: `Server đã ở revision ${String(e.data?.currentRevision ?? /server version (\d+)/.exec(e.message)?.[1] ?? '?')}. Tải lại hoặc lưu bản sao.` });
         return;
       }
       if (e instanceof StudioApiError && e.status === 0) { set({ saveState: 'offline' }); return; }
@@ -467,25 +467,34 @@ export const useStudio = create<State>((set, get) => ({
   updateSnapshot(id, patch) {
     set({ snapshots: get().snapshots.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
     // Đồng bộ trạng thái lên server (snapshot chỉ tồn tại ở server sau khi đã upload STL)
-    if (uploaded.has(`${PID}/${id}`) && (patch.state || patch.consentVersion)) void patchSnapshot(PID, id, patch).catch(() => { /* server giữ trạng thái cũ */ });
+    const merged = get().snapshots.find((x) => x.id === id);
+    if (merged && uploaded.has(`${PID}/${id}`) && (patch.state || patch.consentVersion)) void patchSnapshot(PID, merged).catch(() => { /* server giữ trạng thái cũ */ });
   },
   async uploadSnapshot(snap, stl) {
-    const saved = await uploadSnapshot(PID, snap, stl);
+    const { snapshot: saved, serverRevision } = await uploadSnapshot(PID, snap, stl);
     uploaded.add(`${PID}/${snap.id}`);
     set({ snapshots: get().snapshots.map((x) => (x.id === snap.id ? { ...x, ...saved } : x)) });
+    // Snapshot sao chép cảnh đã lưu thành phiên bản mới ở Backend → dời baseRevision theo để lần Lưu sau không bị 409.
+    if (serverRevision && serverRevision > get().revision) {
+      set({ revision: serverRevision });
+      try {
+        const raw = localStorage.getItem(draftKey(PID));
+        if (raw) localStorage.setItem(draftKey(PID), JSON.stringify({ ...JSON.parse(raw), baseRevision: serverRevision }));
+      } catch { /* quota */ }
+    }
   },
 
   async submitPrintRequest(input) {
     const snap = get().snapshots.find((x) => x.id === input.snapshotId);
     if (!snap || snap.state !== 'READY') throw new Error('Snapshot chưa READY');
     // Idempotency: thử lại với cùng khóa trả về đúng yêu cầu ban đầu (server kiểm tra)
-    const receipt = await createPrintRequest({ ...input, projectId: PID, consentVersion: CAPABILITIES.consentVersion });
+    const receipt = await createPrintRequest({ ...input, projectId: PID, consentVersion: CAPABILITIES.consentVersion, snapshot: snap });
     set((s) => ({ requests: [...s.requests.filter((r) => r.id !== receipt.id), receipt] }));
     return receipt;
   },
   async refreshRequest(id) {
     try {
-      const r = await getPrintRequest(id);
+      const r = await getPrintRequest(id, PID);
       set((s) => ({ requests: s.requests.map((x) => (x.id === id ? r : x)) }));
     } catch (e) {
       get().toast({ kind: 'error', title: 'Không làm mới được', text: (e as Error).message });

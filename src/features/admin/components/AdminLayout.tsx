@@ -1,7 +1,7 @@
 import { Box, Boxes, ChevronRight, LayoutDashboard, LogOut, Menu, ShieldCheck, Store, Truck, UsersRound } from 'lucide-react'
 import { type ReactNode, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { hasStoredSession, isAdmin, logout } from '../../auth/services/session'
+import { hasStoredSession, isAdmin, logout } from '../../../shared/session/session'
 import { useSession } from '../../../shared/session/useSession'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { LoginRequired } from '../../../shared/ui/LoginRequired'

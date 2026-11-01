@@ -24,14 +24,14 @@ import {
 } from 'lucide-react'
 import { type ReactNode, useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { hasStoredSession, isAdmin, isSeller, logout } from '../../auth/services/session'
+import { hasStoredSession, isAdmin, isSeller, logout } from '../../../shared/session/session'
 import { http } from '../../../shared/api'
-import { loginHref } from '../../../shared/modules'
+import { loginHref } from '../../../shared/config/modules'
 import { useSession } from '../../../shared/session/useSession'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { LoginRequired } from '../../../shared/ui/LoginRequired'
 import { Toaster } from '../../../shared/ui/toast'
-import { ModuleSwitcher } from '../../../shared/ModuleSwitcher'
+import { ModuleSwitcher } from '../../../shared/ui/ModuleSwitcher'
 
 const BUYER_TABS = [
   { to: '/orders', label: 'Đơn hàng của tôi', icon: ClipboardList },

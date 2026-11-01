@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PropsWithChildren } from 'react'
 import { ApiClientError } from '../../shared/api'
-import { PodNavigationGuard } from '../../shared/PodNavigationGuard'
+import { PodNavigationGuard } from '../../shared/ui/PodNavigationGuard'
 
 const queryClient = new QueryClient({
   defaultOptions: {

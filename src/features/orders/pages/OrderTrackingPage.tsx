@@ -2,7 +2,7 @@ import { ArrowLeft, CheckCircle2, Copy, PackageSearch, ShieldCheck, Undo2 } from
 import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { ApiNote, Breadcrumbs } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'

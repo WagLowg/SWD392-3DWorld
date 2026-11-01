@@ -1,7 +1,7 @@
 import { Flag, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { formatDateTime } from '../../../shared/format'
+import { formatDateTime } from '../../../shared/lib/format'
 import { Btn, FilterTabs, Hero, Pill, RuleBox, StatusPill, Toolbar } from '../../../shared/ui/kit'
 import { ApiNote } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'
