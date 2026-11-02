@@ -1,4 +1,4 @@
-import {
+﻿import {
   ArrowLeft,
   CheckCircle2,
   CircleDollarSign,
@@ -30,6 +30,7 @@ import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { formatAttributes } from '../../marketplace/lib/format'
 import { StaffHorizontalShippingTracker } from '../../staff/components/StaffHorizontalShippingTracker'
 import { StaffShipmentBadge } from '../../staff/components/StaffStatusBadge'
+import { CodOperationsPanel } from '../../staff/components/CodOperationsPanel'
 import type { ShipmentStatus, StaffShipment } from '../../staff/types/staff.types'
 import { useAdminShipments } from '../services/admin-shipment.service'
 
@@ -402,6 +403,11 @@ export function AdminShipmentDetailPage() {
         }
         aside={
           <>
+            <CodOperationsPanel
+              orderId={shipment.orderId}
+              paymentMethod={shipment.paymentMethod}
+              fulfillmentStatus={shipment.status}
+            />
             <Section title="Đối soát thanh toán & COD">
               <MoneyRows
                 rows={[

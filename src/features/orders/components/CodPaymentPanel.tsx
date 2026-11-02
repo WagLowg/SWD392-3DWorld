@@ -4,10 +4,10 @@ import { useCodPayment } from '../hooks/useOrders'
 import type { CodPayment, PaymentMethod } from '../types/order.types'
 
 export function codPaymentLabel(payment: CodPayment) {
-  if (payment.collectionStatus === 'CANCELLED') return 'Nghĩa vụ COD đã huỷ'
-  if (payment.collectionStatus === 'SETTLED' || payment.status === 'SUCCESS') return 'Đã đối soát COD'
-  if (payment.collectionStatus === 'PENDING_SETTLEMENT') return 'Đã thu tiền, chờ đối soát về nền tảng'
-  return 'Chờ đơn vị vận chuyển thu tiền'
+  if (payment.collectionStatus === 'CANCELLED') return 'Đã huỷ thanh toán COD'
+  if (payment.collectionStatus === 'SETTLED' || payment.status === 'SUCCESS') return 'Đã thanh toán thành công'
+  if (payment.collectionStatus === 'PENDING_SETTLEMENT') return 'Đã thu tiền, đang xử lý'
+  return 'Thanh toán khi nhận hàng'
 }
 
 export function CodPaymentPanel({
@@ -67,7 +67,7 @@ export function CodPaymentPanel({
           )}
           {payment.settledAt && (
             <div className="flex justify-between gap-3">
-              <dt className="text-ink-soft">Đối soát lúc</dt>
+              <dt className="text-ink-soft">Hoàn tất lúc</dt>
               <dd className="text-right font-semibold">{formatDateTime(payment.settledAt)}</dd>
             </div>
           )}
@@ -76,4 +76,3 @@ export function CodPaymentPanel({
     </div>
   )
 }
-

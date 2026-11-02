@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Store,
   Truck,
+  RotateCcw,
   UsersRound,
 } from 'lucide-react'
 import { type ReactNode, useEffect, useState } from 'react'
@@ -23,6 +24,7 @@ const NAVIGATION = [
   { label: 'Quản lý gian hàng', icon: Store, to: '/admin/storefronts' },
   { label: 'Đối soát vận chuyển & COD', icon: Truck, to: '/admin/shipments' },
   { label: 'Kiểm duyệt sản phẩm', icon: Boxes, to: '/admin/products' },
+  { label: 'Quản lý hoàn tiền', icon: RotateCcw, to: '/admin/refunds' },
   { label: 'Quản lý người dùng', icon: UsersRound, disabled: true },
   { label: 'Báo cáo vi phạm', icon: ShieldCheck, disabled: true },
 ]

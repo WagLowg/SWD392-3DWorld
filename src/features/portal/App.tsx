@@ -4,6 +4,7 @@ import { useSession } from '../../shared/session/useSession'
 import { AdminLayout } from '../admin/components/AdminLayout'
 import { AdminShipmentDetailPage, AdminShipmentsPage } from '../admin/pages/AdminShipmentsPage'
 import { AdminStorefrontPage } from '../admin/pages/AdminStorefrontPage'
+import { AdminRefundDetailPage, AdminRefundsPage } from '../admin/pages/AdminRefundsPage'
 import { AddressesPage } from '../account/pages/AddressesPage'
 import { BankAccountsPage } from '../account/pages/BankAccountsPage'
 import { ProfilePage } from '../account/pages/ProfilePage'
@@ -282,6 +283,8 @@ export function App() {
           <Route path="admin/shipments/:shipmentId" element={<AdminShipmentDetailPage />} />
           <Route path="admin/products" element={<ProductQueuePage basePath="/admin/products" />} />
           <Route path="admin/products/:caseId" element={<ProductReviewPage admin />} />
+          <Route path="admin/refunds" element={<AdminRefundsPage />} />
+          <Route path="admin/refunds/:refundId" element={<AdminRefundDetailPage />} />
         </Route>
 
         <Route element={<AccountLayout />}>

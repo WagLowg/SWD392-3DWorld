@@ -38,8 +38,26 @@ export function BankAccountEditor({
 
   const submit = handleSubmit(async (input) => {
     try {
-      if (account) await update.mutateAsync({ id: account.id, input })
-      else await create.mutateAsync(input)
+      try {
+        localStorage.setItem('3dworld_last_bank_account', input.accountNumber.trim())
+      } catch {}
+      if (account) {
+        await update.mutateAsync({ id: account.id, input })
+        try {
+          localStorage.setItem(`bank_raw_${account.id}`, input.accountNumber.trim())
+        } catch {
+          // ignore
+        }
+      } else {
+        const created = await create.mutateAsync(input)
+        try {
+          if (created && 'id' in (created as object)) {
+            localStorage.setItem(`bank_raw_${(created as { id: number }).id}`, input.accountNumber.trim())
+          }
+        } catch {
+          // ignore
+        }
+      }
       toast(account ? 'Đã cập nhật — tài khoản chờ xác minh lại.' : 'Đã thêm tài khoản, chờ xác minh.')
       onDone()
     } catch (error) {
@@ -64,7 +82,7 @@ export function BankAccountEditor({
         id={`${uid}-number`}
         label="Số tài khoản *"
         error={errors.accountNumber?.message}
-        hint={account ? `Nhập lại số đầy đủ (hiện tại: ${account.accountNumberMasked}).` : 'Số tài khoản sẽ được che sau khi lưu.'}
+        hint={account ? `Nhập số tài khoản ngân hàng (hiện tại: ${account.accountNumberMasked}).` : 'Số tài khoản đầy đủ dùng để nhận hoàn tiền từ hệ thống.'}
       >
         <input id={`${uid}-number`} inputMode="numeric" autoComplete="off" aria-invalid={!!errors.accountNumber} className={`${inputClass} font-mono tracking-widest`} {...register('accountNumber')} />
       </Field>
