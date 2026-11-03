@@ -7,6 +7,7 @@ export type ApplicationStatus = 'DRAFT' | 'PENDING' | 'NEEDS_INFO' | 'VERIFIED' 
 
 export type SellerApplication = {
   id: string
+  userId?: number
   status: ApplicationStatus
   storefrontName: string
   description: string
