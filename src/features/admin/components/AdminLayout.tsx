@@ -20,7 +20,7 @@ import { LoginRequired } from '../../../shared/ui/LoginRequired'
 import { Toaster } from '../../../shared/ui/toast'
 
 const NAVIGATION = [
-  { label: 'Tổng quan', icon: LayoutDashboard, disabled: true },
+  { label: 'Tổng quan', icon: LayoutDashboard, to: '/admin', end: true },
   { label: 'Quản lý gian hàng', icon: Store, to: '/admin/storefronts' },
   { label: 'Đối soát vận chuyển & COD', icon: Truck, to: '/admin/shipments' },
   { label: 'Kiểm duyệt sản phẩm', icon: Boxes, to: '/admin/products' },
@@ -125,6 +125,7 @@ export function AdminLayout() {
                 <NavLink
                   key={item.label}
                   to={to}
+                  end={item.end}
                   className={({ isActive }) =>
                     `flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition ${
                       isActive
