@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+﻿import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiClientError, type ApiEnvelope, http } from '../../../shared/api'
 import { parseShippingAddressSnapshot } from '../../orders/lib/shippingAddress'
@@ -137,7 +137,9 @@ export function normalizeShipmentApi(raw: StaffShipmentApi | null | undefined, o
   const carrierCode = raw?.carrierCode ?? raw?.carrier?.code ?? 'GHTK'
   const carrierName = raw?.carrierName ?? raw?.carrier?.name ?? 'Giao Hàng Tiết Kiệm'
   const orderCode = String(raw?.orderCode ?? order?.orderCode ?? `ORD-${String(orderId || id || 0).padStart(5, '0')}`)
-  const status = normalizeShipmentStatus(raw?.status ?? raw?.shipmentStatus)
+  const rawStatus = normalizeShipmentStatus(raw?.status ?? raw?.shipmentStatus)
+  const isOrderReceived = String(order?.status).toUpperCase() === 'RECEIVED'
+  const status: ShipmentStatus = isOrderReceived || rawStatus === 'RECEIVED' ? 'RECEIVED' : rawStatus
   const address = parseShippingAddressSnapshot(order?.shippingAddressSnapshot)
   const addressParts = [address?.addressLine, address?.ward, address?.district, address?.province].filter(Boolean)
   const createdAt = raw?.createdAt ?? new Date().toISOString()
@@ -186,7 +188,17 @@ export function normalizeShipmentApi(raw: StaffShipmentApi | null | undefined, o
     codAmount: order?.paymentMethod === 'COD' ? Number(order.totalAmount) : 0,
     deliveryAttempts: 0,
     notes: String(raw?.notes ?? ''),
-    events: [],
+    events: isOrderReceived
+      ? [
+          {
+            id: 'ev-rec-' + (id || orderId),
+            title: 'Khách hàng xác nhận đã nhận hàng',
+            description: 'Người mua đã kiểm tra kiện hàng và bấm xác nhận đã nhận hàng thành công.',
+            timestamp: order?.receivedAt ?? new Date().toISOString(),
+            status: 'RECEIVED' as const,
+          },
+        ]
+      : [],
     auditHistory: [],
   }
 }
