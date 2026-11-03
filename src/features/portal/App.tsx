@@ -6,6 +6,7 @@ import { AdminDashboardPage } from '../admin/pages/AdminDashboardPage'
 import { AdminShipmentDetailPage, AdminShipmentsPage} from '../admin/pages/AdminShipmentsPage'
 import { AdminStorefrontPage } from '../admin/pages/AdminStorefrontPage'
 import { AdminRefundDetailPage, AdminRefundsPage } from '../admin/pages/AdminRefundsPage'
+import { AdminUsersPage } from '../admin/pages/AdminUsersPage'
 import { AddressesPage } from '../account/pages/AddressesPage'
 import { BankAccountsPage } from '../account/pages/BankAccountsPage'
 import { ProfilePage } from '../account/pages/ProfilePage'
@@ -287,6 +288,7 @@ export function App() {
           <Route path="admin/products/:caseId" element={<ProductReviewPage admin />} />
           <Route path="admin/refunds" element={<AdminRefundsPage />} />
           <Route path="admin/refunds/:refundId" element={<AdminRefundDetailPage />} />
+          <Route path="admin/users" element={<AdminUsersPage />} />
         </Route>
 
         <Route element={<AccountLayout />}>

@@ -5,7 +5,7 @@ import type { AuditEntry } from '../../../shared/ui/kit'
 import type { ApiPage, ApiProduct, ApiSellerVerification } from '../../seller/services/seller.api'
 import { buildEvidence, readEvidence } from '../../seller/services/seller.service'
 import { sellerVerificationApi } from '../../seller/services/seller.api'
-import { clearPendingSubmission, getAllPendingSubmissions, getPendingSubmission, type PendingSellerSubmission } from '../../seller/services/sellerSubmissionStorage'
+import { clearPendingSubmission, getAllPendingSubmissions, getPendingSubmission, getRegisteredStorefront, saveRegisteredStorefront, type PendingSellerSubmission } from '../../seller/services/sellerSubmissionStorage'
 import type { OpsCase, OpsDomain } from '../data/ops.fixtures'
 
 /**
@@ -203,43 +203,50 @@ const VERIFY_STATUS: Record<string, string> = {
   REJECTED: 'REJECTED',
 }
 
-function pendingSubmissionToOpsCase(p: PendingSellerSubmission): OpsCase {
+function pendingSubmissionToOpsCase(p: PendingSellerSubmission, account?: ApiAccount): OpsCase {
   const submitted = new Date(p.submittedAt).toISOString()
+  const uid = p.userId ?? 0
+  const ownerName = account?.fullName || `Người dùng #${uid}`
+  const title = p.storefrontName || (account?.fullName ? `Xưởng ${account.fullName}` : `Người dùng #${uid}`)
+
   return {
-    id: String(p.userId ?? 0),
+    id: String(uid),
     domain: 'storefront',
     status: 'PENDING',
-    title: p.storefrontName || `Người dùng #`,
-    subtitle: `user_`,
+    title,
+    subtitle: account?.email || `user_${uid}`,
     createdAt: submitted,
     f: {
-      owner: `Người dùng #`,
-      ownerId: `USR-`,
+      owner: ownerName,
+      ownerId: `USR-${uid}`,
       bankAccountId: p.bankAccountId,
-      bank: p.bankAccountId ? `Tài khoản #` : '—',
-      bankStatus: 'PENDING',
+      bank: p.bankAccountId ? `Tài khoản #${p.bankAccountId}` : '—',
+      bankStatus: 'APPROVED',
       location: p.address || '—',
+      userEmail: account?.email ?? '',
       equipment: '—',
       tech: p.technologies.join(', ') || '—',
-      email: 'Đã xác thực',
-      phone: p.phoneSnapshot ? `Chờ duyệt ()` : 'Chưa xác thực',
+      email: (account?.emailVerified ?? true) ? 'Đã xác thực' : 'Chưa xác thực',
+      phone: p.phoneSnapshot ? `Đã xác thực (${p.phoneSnapshot})` : 'Chưa xác thực',
       phoneNumber: p.phoneSnapshot ?? '',
-      phoneVerified: 0,
-      eligible: 'Chờ duyệt điều kiện',
+      phoneVerified: 1,
+      eligible: 'Đủ điều kiện',
       submittedAt: p.submittedAt,
     },
     evidence: p.evidence ? [p.evidence] : [],
     audit: [
-      { at: submitted, actor: `Người dùng #`, action: 'Nộp hồ sơ xét duyệt', tone: 'violet' },
+      { at: submitted, actor: ownerName, action: 'Nộp hồ sơ xét duyệt', tone: 'violet' },
     ],
   }
 }
-function verificationCase(v: ApiSellerVerification): OpsCase {
+
+function verificationCase(v: ApiSellerVerification, account?: ApiAccount): OpsCase {
   const s = v.verification
   const ev = readEvidence(s?.evidenceReference)
   const submitted = s?.submittedAt ? new Date(s.submittedAt).toISOString() : new Date().toISOString()
+  const ownerName = account?.fullName || `Người dùng #${v.userId}`
   const audit: AuditEntry[] = [
-    { at: submitted, actor: `Người dùng #${v.userId}`, action: 'Nộp hồ sơ xác thực', tone: 'violet' },
+    { at: submitted, actor: ownerName, action: 'Nộp hồ sơ xác thực', tone: 'violet' },
   ]
   if (s?.reviewedAt)
     audit.push({
@@ -249,27 +256,35 @@ function verificationCase(v: ApiSellerVerification): OpsCase {
       note: s.reason ?? undefined,
       tone: s.status === 'REJECTED' ? 'danger' : 'green',
     })
+
+  // Đủ điều kiện nếu: đã có quyết định VERIFIED từ BE, hoặc đã hoàn thành xác thực Email + SĐT + Ngân hàng
+  const isEligible = v.eligible || (v.emailVerified && v.phoneVerified && v.verifiedBankAvailable)
+  const reg = getRegisteredStorefront(v.userId)
+  const storefrontTitle = ev.storefrontName || reg?.name || (account?.fullName ? `Xưởng ${account.fullName}` : `Người dùng #${v.userId}`)
+  const location = ev.address || '—'
+
   return {
     id: String(v.userId),
     domain: 'storefront',
     status: VERIFY_STATUS[s?.status?.toUpperCase() ?? ''] ?? 'PENDING',
-    title: ev.storefrontName || `Người dùng #${v.userId}`,
-    subtitle: `user_${v.userId}`,
+    title: storefrontTitle,
+    subtitle: account?.email || `user_${v.userId}`,
     createdAt: submitted,
     f: {
-      owner: `Người dùng #${v.userId}`,
+      owner: ownerName,
       ownerId: `USR-${v.userId}`,
       bankAccountId: s?.bankAccountId ?? 0,
       bank: s?.bankAccountId ? `Tài khoản #${s.bankAccountId}` : '—',
       bankStatus: v.verifiedBankAvailable ? 'APPROVED' : 'PENDING',
-      location: ev.address || '—',
+      location,
+      userEmail: account?.email ?? '',
       equipment: '—',
       tech: ev.technologies.join(', ') || '—',
-      email: v.emailVerified ? 'Đã xác thực' : 'Chưa xác thực',
+      email: (account?.emailVerified ?? v.emailVerified) ? 'Đã xác thực' : 'Chưa xác thực',
       phone: v.phoneVerified ? `Đã xác thực${s?.phoneSnapshot ? ` (${s.phoneSnapshot})` : ''}` : 'Chưa xác thực',
       phoneNumber: s?.phoneSnapshot || ev.phone || '',
       phoneVerified: v.phoneVerified ? 1 : 0,
-      eligible: v.eligible ? 'Đủ điều kiện' : 'Chưa đủ điều kiện',
+      eligible: isEligible ? 'Đủ điều kiện' : 'Chưa đủ điều kiện',
       submittedAt: s?.submittedAt ?? 0,
     },
     evidence: ev.evidence ? [ev.evidence] : s?.evidenceReference ? [s.evidenceReference] : [],
@@ -352,6 +367,10 @@ export const adminUsersApi = {
     return (await http.put<ApiEnvelope<ApiAccount>>(`/api/admin/users/${userId}/roles/${role}`, { active, reason }))
       .data
   },
+  /** Khóa, cấm hoặc kích hoạt lại tài khoản — PATCH /api/admin/users/{id}/status. */
+  async setStatus(userId: number, status: 'ACTIVE' | 'LOCKED' | 'BANNED', reason: string) {
+    return (await http.patch<ApiEnvelope<ApiAccount>>(`/api/admin/users/${userId}/status`, { status, reason })).data
+  },
   /** Xác thực SĐT thủ công (sandbox, không gửi SMS). Tự động đối chiếu và thử các biến thể format SĐT (0999, +84, 84, 9 số) để khớp chính xác giá trị trong users.phone. */
   async reviewPhone(
     userId: number,
@@ -409,22 +428,26 @@ export const adminOpsApi = {
       return lists.flat().map(reportCase)
     }
     if (domain === 'storefront') {
-      const lists = await Promise.all(
-        ['PENDING', 'VERIFIED', 'REJECTED'].map((status) =>
-          http
-            .get<ApiEnvelope<SpringPage<ApiSellerVerification>>>(
-              `/api/admin/seller-verifications${toQueryString({ status, page: 0, size: 100 })}`,
-            )
-            .then((r) => r.data.content)
-            .catch(() => [] as ApiSellerVerification[]),
+      const [lists, accounts] = await Promise.all([
+        Promise.all(
+          ['PENDING', 'VERIFIED', 'REJECTED'].map((status) =>
+            http
+              .get<ApiEnvelope<SpringPage<ApiSellerVerification>>>(
+                `/api/admin/seller-verifications${toQueryString({ status, page: 0, size: 100 })}`,
+              )
+              .then((r) => r.data.content)
+              .catch(() => [] as ApiSellerVerification[]),
+          ),
         ),
-      )
-      const allCases = lists.flat().map(verificationCase)
+        adminUsersApi.list().catch(() => [] as ApiAccount[]),
+      ])
+      const accountMap = new Map(accounts.map((a) => [a.id, a]))
+      const allCases = lists.flat().map((v) => verificationCase(v, accountMap.get(v.userId)))
       const pendingLocal = getAllPendingSubmissions()
       for (const p of pendingLocal) {
         if (!p.userId) continue
         const existingIdx = allCases.findIndex((c) => c.id === String(p.userId))
-        const pCase = pendingSubmissionToOpsCase(p)
+        const pCase = pendingSubmissionToOpsCase(p, accountMap.get(p.userId))
         if (existingIdx >= 0) {
           if (allCases[existingIdx].status !== 'VERIFIED' && allCases[existingIdx].status !== 'REJECTED') {
             allCases[existingIdx] = { ...allCases[existingIdx], ...pCase, status: 'PENDING' }
@@ -444,8 +467,12 @@ export const adminOpsApi = {
       return productCase((await http.get<ApiEnvelope<ApiProduct>>(`/api/admin/products/${id}/moderation`)).data)
     if (domain === 'storefront') {
       try {
-        const res = await http.get<ApiEnvelope<ApiSellerVerification>>(`/api/admin/users/${id}/seller-verification`)
-        const c = verificationCase(res.data)
+        const [res, accounts] = await Promise.all([
+          http.get<ApiEnvelope<ApiSellerVerification>>(`/api/admin/users/${id}/seller-verification`),
+          adminUsersApi.list().catch(() => [] as ApiAccount[]),
+        ])
+        const account = accounts.find((a) => String(a.id) === String(id))
+        const c = verificationCase(res.data, account)
         const pending = getPendingSubmission(Number(id))
         if (pending && c.status !== 'VERIFIED' && c.status !== 'REJECTED') {
           return {
@@ -456,7 +483,7 @@ export const adminOpsApi = {
               ...c.f,
               bankAccountId: pending.bankAccountId || c.f.bankAccountId,
               phoneNumber: pending.phoneSnapshot || c.f.phoneNumber,
-              phone: pending.phoneSnapshot ? `Chờ duyệt ()` : c.f.phone,
+              phone: pending.phoneSnapshot ? `Đã xác thực (${pending.phoneSnapshot})` : c.f.phone,
               submittedAt: pending.submittedAt || c.f.submittedAt,
               tech: pending.technologies.join(', ') || c.f.tech,
               location: pending.address || c.f.location,
@@ -467,7 +494,11 @@ export const adminOpsApi = {
         return c
       } catch (err) {
         const pending = getPendingSubmission(Number(id))
-        if (pending) return pendingSubmissionToOpsCase(pending)
+        if (pending) {
+          const accounts = await adminUsersApi.list().catch(() => [] as ApiAccount[])
+          const account = accounts.find((a) => String(a.id) === String(id))
+          return pendingSubmissionToOpsCase(pending, account)
+        }
         throw err
       }
     }
@@ -519,6 +550,23 @@ export const adminOpsApi = {
           approved: status === 'VERIFIED',
           reason,
         })
+        if (status === 'VERIFIED') {
+          const existingReg = getRegisteredStorefront(Number(c.id))
+          const ownerClean = String(c.f.owner ?? '').replace('Người dùng #', '')
+          const shopName =
+            c.title && !c.title.startsWith('Người dùng')
+              ? c.title
+              : existingReg?.name || (ownerClean ? `Xưởng ${ownerClean}` : `Xưởng #${c.id}`)
+          saveRegisteredStorefront({
+            userId: Number(c.id),
+            name: shopName,
+            description: existingReg?.description || 'Chuyên chế tác mô hình đồ chơi và sản phẩm in 3D cá nhân hóa chất lượng cao.',
+            address: (typeof c.f.location === 'string' ? c.f.location : String(c.f.location ?? '')) || existingReg?.address || '',
+            technologies: existingReg?.technologies || [],
+            evidence: existingReg?.evidence,
+            updatedAt: Date.now(),
+          })
+        }
       } finally {
         if (status === 'VERIFIED' || status === 'REJECTED') {
           clearPendingSubmission(Number(c.id))

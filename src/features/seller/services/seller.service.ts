@@ -93,7 +93,7 @@ import { orderService } from '../../orders/services/order.service'
 ﻿import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
 import type { AuditEntry } from '../../../shared/ui/kit'
 import { addressService, bankAccountService, profileService } from '../../account/services/account.service'
-import { clearPendingSubmission, getPendingSubmission, savePendingSubmission } from './sellerSubmissionStorage'
+import { clearPendingSubmission, getPendingSubmission, getRegisteredStorefront, savePendingSubmission, saveRegisteredStorefront } from './sellerSubmissionStorage'
 import { formatStructuredAddress, isGhtkReadyAddress } from '../../account/lib/address'
 import { rememberPaymentAttempt } from '../../marketplace/lib/payment'
 import {
@@ -375,6 +375,7 @@ const BANK_STATUS: Record<string, 'PENDING' | 'APPROVED' | 'REJECTED'> = {
 export function buildEvidence(input: {
   evidence?: string
   storefrontName: string
+  description?: string
   address: string
   technologies: string[]
   phone?: string
@@ -383,6 +384,7 @@ export function buildEvidence(input: {
     input.phone?.trim() && `SĐT: ${input.phone.trim()}`,
     input.evidence?.trim() && `Minh chứng: ${input.evidence.trim()}`,
     `Xưởng: ${input.storefrontName.trim()}`,
+    input.description?.trim() && `Mô tả: ${input.description.trim()}`,
     input.address.trim() && `Địa chỉ: ${input.address.trim()}`,
     input.technologies.length && `Công nghệ: ${input.technologies.join(', ')}`,
   ]
@@ -392,6 +394,31 @@ export function buildEvidence(input: {
 }
 
 export function readEvidence(ref: string | null | undefined) {
+  if (!ref) {
+    return { phone: '', evidence: '', storefrontName: '', address: '', technologies: [] }
+  }
+  // Hỗ trợ JSON nếu evidenceReference được gửi dưới dạng chuỗi JSON
+  try {
+    const parsed = JSON.parse(ref)
+    if (parsed && typeof parsed === 'object') {
+      return {
+        phone: String(parsed.phone ?? parsed.phoneSnapshot ?? ''),
+        evidence: String(parsed.evidence ?? parsed.evidenceReference ?? ''),
+        storefrontName: String(parsed.storefrontName ?? parsed.shopName ?? parsed.name ?? ''),
+        description: String(parsed.description ?? parsed.desc ?? parsed.bio ?? ''),
+        address: String(parsed.address ?? parsed.pickupAddress ?? ''),
+        technologies: Array.isArray(parsed.technologies)
+          ? parsed.technologies.map(String)
+          : String(parsed.technologies ?? '')
+              .split(',')
+              .map((x: string) => x.trim())
+              .filter(Boolean),
+      }
+    }
+  } catch {
+    // Không phải JSON, xử lý định dạng chuẩn pipe-separated
+  }
+
   const part = (label: string) =>
     ref
       ?.split(' | ')
@@ -401,6 +428,7 @@ export function readEvidence(ref: string | null | undefined) {
     phone: part('SĐT'),
     evidence: part('Minh chứng'),
     storefrontName: part('Xưởng'),
+    description: part('Mô tả'),
     address: part('Địa chỉ'),
     technologies: part('Công nghệ')
       .split(',')
@@ -439,7 +467,9 @@ export const sellerService = {
       addressService.list(),
       profileService.get().catch(() => null),
     ])
-    const pending = getPendingSubmission(profile?.userId ?? v.userId)
+    const userId = profile?.userId ?? v.userId
+    const pending = getPendingSubmission(userId)
+    const regSaved = getRegisteredStorefront(userId)
     const ver = v.verification
     const draft = readEvidence(ver?.evidenceReference)
     const pickup = addresses.find((address) => address.isDefault)
@@ -473,10 +503,37 @@ export const sellerService = {
     }
     const status = isLocalPending ? 'PENDING' : (VERIFICATION_STATUS[ver?.status?.toUpperCase() ?? ''] ?? 'DRAFT')
     const submittedTimestamp = isLocalPending ? pending.submittedAt : ver?.submittedAt
-    const evidenceLink = draft.evidence || pending?.evidence
-    const storefrontName = shop?.name ?? (draft.storefrontName || pending?.storefrontName || '')
-    const technologies = draft.technologies.length ? draft.technologies : (pending?.technologies ?? [])
-    const address = pickup ? formatStructuredAddress(pickup) : (draft.address || pending?.address || '')
+    const evidenceLink = draft.evidence || pending?.evidence || regSaved?.evidence
+    const storefrontName =
+      shop?.name ??
+      (draft.storefrontName ||
+        pending?.storefrontName ||
+        regSaved?.name ||
+        (profile?.fullName ? `Xưởng ${profile.fullName}` : ''))
+    const description =
+      shop?.description ??
+      (draft.description ||
+        pending?.description ||
+        regSaved?.description ||
+        (status === 'VERIFIED' ? 'Chuyên chế tác mô hình đồ chơi và sản phẩm in 3D cá nhân hóa chất lượng cao.' : ''))
+    const technologies = draft.technologies.length
+      ? draft.technologies
+      : (pending?.technologies ?? regSaved?.technologies ?? [])
+    const address = pickup
+      ? formatStructuredAddress(pickup)
+      : (draft.address || pending?.address || regSaved?.address || '')
+
+    if (storefrontName && (description || regSaved?.description)) {
+      saveRegisteredStorefront({
+        userId,
+        name: storefrontName,
+        description: description || regSaved?.description || '',
+        address,
+        technologies,
+        evidence: evidenceLink,
+        updatedAt: Date.now(),
+      })
+    }
 
     if (submittedTimestamp)
       audit.push({ at: new Date(submittedTimestamp).toISOString(), actor: 'Bạn', action: 'Nộp hồ sơ xác thực người bán', tone: 'violet' })
@@ -490,9 +547,10 @@ export const sellerService = {
       })
     return {
       id: `VER-${v.userId}`,
+      userId: v.userId,
       status,
       storefrontName,
-      description: shop?.description ?? (pending?.description || ''),
+      description,
       address,
       technologies,
       emailVerified: v.emailVerified,
@@ -541,6 +599,16 @@ export const sellerService = {
     }
     const phone = patch.phone || pickup.phone || profile?.phone || ''
     const evidenceRef = buildEvidence({ ...patch, phone })
+
+    saveRegisteredStorefront({
+      userId: profile?.userId,
+      name: patch.storefrontName,
+      description: patch.description,
+      address: patch.address,
+      technologies: patch.technologies,
+      evidence: patch.evidence,
+      updatedAt: Date.now(),
+    })
 
     if (phone && (!profile?.phone || profile.phone !== phone)) {
       try {

@@ -25,7 +25,7 @@ const NAVIGATION = [
   { label: 'Đối soát vận chuyển & COD', icon: Truck, to: '/admin/shipments' },
   { label: 'Kiểm duyệt sản phẩm', icon: Boxes, to: '/admin/products' },
   { label: 'Quản lý hoàn tiền', icon: RotateCcw, to: '/admin/refunds' },
-  { label: 'Quản lý người dùng', icon: UsersRound, disabled: true },
+  { label: 'Quản lý người dùng & Nhân sự', icon: UsersRound, to: '/admin/users' },
   { label: 'Báo cáo vi phạm', icon: ShieldCheck, disabled: true },
 ]
 
