@@ -11,7 +11,7 @@ import { LoginRequired } from '../../../shared/ui/LoginRequired'
  * Tiêu chí thẩm định:
  * - Khách vãng lai (Guest): Chuyển hướng tới trang /login/?next=... bảo lưu đích đến an toàn.
  * - Phiên hết hạn (Session Expired): Hiển thị ErrorScreen kind="session".
- * - Người dùng chỉ có quyền CUSTOMER / SELLER / ADMIN (không có PRINT_STAFF): Hiển thị ErrorScreen kind="403".
+ * - Người dùng không có quyền PRINT_STAFF hoặc ADMIN: Hiển thị ErrorScreen kind="403".
  * - Người dùng có quyền PRINT_STAFF (độc lập hoặc kết hợp CUSTOMER + PRINT_STAFF): Cho phép truy cập.
  */
 export function StaffAccessGate({ children }: { children?: ReactNode }) {
@@ -62,8 +62,9 @@ export function StaffAccessGate({ children }: { children?: ReactNode }) {
   // Kiểm tra vai trò PRINT_STAFF
   const roles = user.roles ?? (user.role ? [user.role] : [])
   const isPrintStaff = roles.includes('PRINT_STAFF')
+  const isAdministrator = roles.includes('ADMIN')
 
-  if (!isPrintStaff) {
+  if (!isPrintStaff && !isAdministrator) {
     return <ErrorScreen kind="403" />
   }
 

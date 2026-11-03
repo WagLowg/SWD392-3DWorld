@@ -10,6 +10,32 @@ export type OrderItem = {
   attributes?: string | null
 }
 
+export type PaymentMethod = 'COD' | 'GATEWAY'
+
+export type CodCollectionStatus = 'PENDING_COLLECTION' | 'PENDING_SETTLEMENT' | 'SETTLED' | 'CANCELLED' | string
+
+export type CodPayment = {
+  orderId: number
+  transactionId: number
+  paymentMethod: 'COD'
+  status: string
+  collectionStatus: CodCollectionStatus
+  expectedAmount: number
+  amountToCollect: number
+  collectedAt: string | null
+  settledAt: string | null
+  collectionReference: string | null
+  settlementReference: string | null
+}
+
+export type CodRecordInput = {
+  amount: number
+  reference: string
+  evidenceKey: string
+  reason: string
+  occurredAt: string
+}
+
 /** Đơn con vật lý — mỗi xưởng (storefront) một đơn. */
 export type Order = {
   id: number
@@ -40,6 +66,8 @@ export type Order = {
   autoConfirmDueAt?: string | null
   shippingPackageCount?: number | null
   shippingWeightGrams?: number | null
+  paymentMethod?: PaymentMethod | null
+  onlinePaymentRequired?: boolean
 }
 
 export type OrderHistoryEntry = {
@@ -85,6 +113,7 @@ export type SavePackagesInput = {
  * Máy trạng thái theo PhysicalOrder.transition (Backend):
  * CREATED → PENDING_PAYMENT → PAID → PROCESSING → SHIPPED → DELIVERED → RECEIVED
  * Nhánh thoát: CANCELLED (trước khi gửi), RETURNED (sau khi gửi).
+ * IN_TRANSIT chỉ được giữ để tương thích dữ liệu cũ; luồng mới lưu nó trong Shipment.
  */
 export type OrderStatus =
   | 'CREATED'
@@ -92,6 +121,7 @@ export type OrderStatus =
   | 'PAID'
   | 'PROCESSING'
   | 'SHIPPED'
+  | 'IN_TRANSIT'
   | 'DELIVERED'
   | 'RECEIVED'
   | 'CANCELLED'
@@ -102,14 +132,12 @@ export type Shipment = {
   physicalOrderId: number
   carrierName: string
   trackingNumber: string
-  /** Vd. SHIPPED | DELIVERED | FAILED | RETURNED */
+  /** Vd. PENDING_PICKUP | SHIPPED | IN_TRANSIT | DELIVERED | FAILED | RETURNED */
   status: string
   shippedAt?: string | null
   deliveredAt?: string | null
   createdAt: string
 }
-
-export type ShipmentEvent = 'DELIVERED' | 'FAILED' | 'RETURNED'
 
 export type Payment = {
   transactionId: number

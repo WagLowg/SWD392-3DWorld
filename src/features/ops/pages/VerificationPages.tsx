@@ -1,12 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
-import { Camera, FileText } from 'lucide-react'
+﻿import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Camera, CheckCircle2, FileText, Phone, XCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import type { BankAccount } from '../../account/types/account.types'
 import { type ApiEnvelope, http } from '../../../shared/api'
 import { formatDateTime } from '../../../shared/lib/format'
 import { Btn, CellTitle, KeyValues, MediaTile, Pill, Section } from '../../../shared/ui/kit'
+import { inputClass } from '../../../shared/ui/form'
+import { useToast } from '../../../shared/ui/toast'
 import { OpsQueue, OpsReview, statusColumn, val } from '../components/OpsScaffold'
-import { adminUsersApi } from '../services/ops.api'
+import { adminUsersApi, generatePhoneCandidates } from '../services/ops.api'
 
 type BankVerificationDetail = {
   bank: BankAccount & { verificationFingerprint: string }
@@ -100,12 +103,20 @@ export function StorefrontReviewPage() {
       code="MP 057"
       eyebrow="Thẩm định hồ sơ xưởng"
       titlePrefix="Hồ sơ xưởng"
+      backTo="/admin/storefronts"
+      backLabel="Quay về hàng chờ"
       api="PATCH /api/admin/users/{id}/seller-verification"
       closed={(c) => c.status === 'VERIFIED' || c.status === 'REJECTED'}
       main={(c) => (
         <>
           <SellerIdentity userId={Number(c.id)} />
-          <Section n={1} title="Thông tin gian hàng & cơ sở thực địa">
+          <SellerPhoneVerification
+            userId={Number(c.id)}
+            phone={String(c.f.phoneNumber ?? '')}
+            verified={Number(c.f.phoneVerified) === 1}
+          />
+          <BankVerificationEvidence bankAccountId={Number(c.f.bankAccountId) || 0} />
+          <Section n={2} title="Thông tin gian hàng & cơ sở thực địa">
             <KeyValues
               cols={3}
               items={[
@@ -118,7 +129,7 @@ export function StorefrontReviewPage() {
               ]}
             />
           </Section>
-          <Section n={2} title="Thư viện minh chứng đính kèm">
+          <Section n={3} title="Thư viện minh chứng đính kèm">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {(c.evidence ?? []).map((e) =>
                 /^https?:/.test(e) ? (
@@ -139,7 +150,6 @@ export function StorefrontReviewPage() {
           </Section>
         </>
       )}
-      aside={(c) => <BankVerificationEvidence bankAccountId={Number(c.f.bankAccountId) || 0} />}
       decisions={[
         { value: 'approve', label: 'Phê duyệt người bán', status: 'VERIFIED' },
         { value: 'reject', label: 'Từ chối (ghi lý do để bổ sung)', status: 'REJECTED', tone: 'danger' },
@@ -189,7 +199,151 @@ function SellerIdentity({ userId }: { userId: number }) {
   )
 }
 
+function SellerPhoneVerification({ userId, phone, verified }: { userId: number; phone: string; verified: boolean }) {
+  const queryClient = useQueryClient()
+  const toast = useToast()
+  const [phoneInput, setPhoneInput] = useState(phone?.trim() || '')
+  const [evidence, setEvidence] = useState('Số điện thoại trong hồ sơ đăng ký người bán')
+  const [reason, setReason] = useState('Đã đối chiếu số điện thoại với minh chứng seller cung cấp')
+
+  useEffect(() => {
+    if (phone && !phoneInput) {
+      setPhoneInput(phone.trim())
+    }
+  }, [phone])
+
+  const targetPhone = phoneInput.trim() || phone.trim()
+  const candidates = useMemo(() => generatePhoneCandidates(phoneInput || phone || ''), [phoneInput, phone])
+
+  const review = useMutation({
+    mutationFn: (approved: boolean) => {
+      if (!targetPhone) {
+        throw new Error('Vui lòng nhập số điện thoại seller để xác minh.')
+      }
+      return adminUsersApi.reviewPhone(userId, {
+        phone: targetPhone,
+        approved,
+        evidenceReference: evidence.trim(),
+        reason: reason.trim(),
+      })
+    },
+    onSuccess: async (_, approved) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['ops'] }),
+        queryClient.invalidateQueries({ queryKey: ['ops', 'seller-identity', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['ops', 'storefront', String(userId)] }),
+      ])
+      toast(approved ? 'Đã xác minh số điện thoại seller.' : 'Đã từ chối số điện thoại seller.')
+    },
+    onError: (error) => toast(error instanceof Error ? error.message : 'Không thể duyệt số điện thoại.', 'error'),
+  })
+
+  const canReview = targetPhone.length >= 8 && evidence.trim().length >= 3 && reason.trim().length >= 3
+
+  return (
+    <Section
+      title="Xác minh số điện thoại"
+      subtitle="Bước 1 · Admin đối chiếu SĐT được seller gửi trong hồ sơ."
+      aside={<Pill tone={verified ? 'green' : 'orange'}>{verified ? 'Đã xác thực' : 'Chờ xác thực'}</Pill>}
+    >
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface-low p-4">
+        <span className="grid h-10 w-10 place-items-center rounded-full bg-white text-violet">
+          <Phone size={17} />
+        </span>
+        <div className="flex-1 min-w-[220px]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+            Số điện thoại đối chiếu với tài khoản
+          </p>
+          {!verified ? (
+            <>
+              <input
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                placeholder="Nhập chính xác SĐT của user (vd: 0999999999)"
+                className="mt-1 font-mono text-base font-bold bg-white rounded-xl border border-line px-3 py-1.5 w-full max-w-sm outline-none focus:border-violet"
+              />
+              {candidates.length > 1 && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-semibold text-ink-soft">Thử định dạng:</span>
+                  {candidates.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setPhoneInput(c)}
+                      className={`rounded-lg px-2 py-0.5 font-mono text-xs font-semibold transition ${
+                        phoneInput === c
+                          ? 'bg-violet text-white shadow-sm'
+                          : 'bg-white border border-line text-ink hover:border-violet hover:text-violet'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="mt-1 font-mono text-base font-bold text-[#0f7050]">
+              {targetPhone || 'Đã xác thực'}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {!verified && (
+        <>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <label>
+              <span className="mb-1.5 block text-xs font-semibold text-ink-soft">Minh chứng đối chiếu *</span>
+              <input value={evidence} onChange={(event) => setEvidence(event.target.value)} className={inputClass} />
+            </label>
+            <label>
+              <span className="mb-1.5 block text-xs font-semibold text-ink-soft">Lý do ghi audit *</span>
+              <input value={reason} onChange={(event) => setReason(event.target.value)} className={inputClass} />
+            </label>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Btn
+              variant="primary"
+              icon={CheckCircle2}
+              disabled={!canReview || review.isPending}
+              onClick={() => review.mutate(true)}
+            >
+              {review.isPending ? 'Đang đối chiếu SĐT...' : 'Duyệt số điện thoại'}
+            </Btn>
+            <Btn
+              variant="danger"
+              icon={XCircle}
+              disabled={!canReview || review.isPending}
+              onClick={() => review.mutate(false)}
+            >
+              Từ chối
+            </Btn>
+          </div>
+          {review.isError && (
+            <div className="mt-3 rounded-xl border border-red-200 bg-[#ffe8e5] p-3 text-xs text-danger">
+              <p className="font-semibold">Lưu ý khi duyệt số điện thoại:</p>
+              <p className="mt-1">
+                Backend kiểm tra khớp chính xác với cột <code>users.phone</code> trong database. Hệ thống đã tự động thử các biến thể ({candidates.join(', ')}).
+              </p>
+              <p className="mt-1 text-ink-soft">
+                Nếu vẫn gặp lỗi &quot;Phone changed&quot;, vui lòng kiểm tra xem tài khoản seller đã có số điện thoại trong hồ sơ cá nhân hay chưa, hoặc bấm chọn một trong các định dạng gợi ý ở trên.
+              </p>
+            </div>
+          )}
+          <p className="mt-2 text-xs text-ink-soft">
+            Lưu ý: Hệ thống tự động thử các định dạng (+84, 84, 9 số) để khớp chính xác số trong database.
+          </p>
+        </>
+      )}
+    </Section>
+  )
+}
 function BankVerificationEvidence({ bankAccountId }: { bankAccountId: number }) {
+  const queryClient = useQueryClient()
+  const toast = useToast()
+  const [evidence, setEvidence] = useState('Tài khoản ngân hàng trong hồ sơ đăng ký người bán')
+  const [reason, setReason] = useState('Đã đối chiếu tên chủ tài khoản và thông tin ngân hàng')
   const query = useQuery({
     queryKey: ['ops', 'bank-verification', bankAccountId],
     queryFn: async () =>
@@ -197,6 +351,31 @@ function BankVerificationEvidence({ bankAccountId }: { bankAccountId: number }) 
         .data,
     enabled: bankAccountId > 0,
     staleTime: 30_000,
+  })
+
+  const review = useMutation({
+    mutationFn: async (approved: boolean) => {
+      if (!query.data) throw new Error('Chưa tải được thông tin ngân hàng.')
+      return (
+        await http.patch<
+          ApiEnvelope<BankAccount>,
+          { approved: boolean; reason: string; evidenceReference: string; accountFingerprint: string }
+        >(`/api/admin/bank-accounts/${bankAccountId}/verification`, {
+          approved,
+          reason: reason.trim(),
+          evidenceReference: evidence.trim(),
+          accountFingerprint: query.data.bank.verificationFingerprint,
+        })
+      ).data
+    },
+    onSuccess: async (_, approved) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['ops'] }),
+        queryClient.invalidateQueries({ queryKey: ['ops', 'bank-verification', bankAccountId] }),
+      ])
+      toast(approved ? 'Đã xác minh tài khoản ngân hàng.' : 'Đã từ chối tài khoản ngân hàng.')
+    },
+    onError: (error) => toast(error instanceof Error ? error.message : 'Không thể duyệt tài khoản ngân hàng.', 'error'),
   })
 
   if (!bankAccountId) {
@@ -208,7 +387,7 @@ function BankVerificationEvidence({ bankAccountId }: { bankAccountId: number }) 
   }
 
   return (
-    <Section title="Tài khoản nhận doanh thu">
+    <Section title="Tài khoản nhận doanh thu" subtitle="Bước 2 · Admin đối chiếu và duyệt tài khoản nhận doanh thu của xưởng.">
       {query.isLoading ? (
         <div className="h-36 animate-pulse rounded-2xl bg-surface-low" />
       ) : query.error ? (
@@ -220,7 +399,15 @@ function BankVerificationEvidence({ bankAccountId }: { bankAccountId: number }) 
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-display text-lg font-bold">{query.data.bank.bankName}</p>
-              <Pill tone={query.data.bank.verificationStatus === 'VERIFIED' ? 'green' : 'orange'}>
+              <Pill
+                tone={
+                  query.data.bank.verificationStatus === 'VERIFIED'
+                    ? 'green'
+                    : query.data.bank.verificationStatus === 'REJECTED'
+                      ? 'danger'
+                      : 'orange'
+                }
+              >
                 {query.data.bank.verificationStatus}
               </Pill>
             </div>
@@ -258,6 +445,45 @@ function BankVerificationEvidence({ bankAccountId }: { bankAccountId: number }) 
               {query.data.bank.verificationFingerprint}
             </code>
           </div>
+
+          {query.data.bank.verificationStatus === 'PENDING' && (
+            <div className="space-y-3 border-t border-line pt-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-ink-soft">
+                Bước 2 · Quyết định tài khoản ngân hàng
+              </p>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-ink-soft">Minh chứng đối chiếu *</span>
+                <input value={evidence} onChange={(event) => setEvidence(event.target.value)} className={inputClass} />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-ink-soft">Lý do ghi audit *</span>
+                <textarea
+                  rows={3}
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  className={inputClass}
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <Btn
+                  variant="primary"
+                  icon={CheckCircle2}
+                  disabled={evidence.trim().length < 3 || reason.trim().length < 3 || review.isPending}
+                  onClick={() => review.mutate(true)}
+                >
+                  Duyệt ngân hàng
+                </Btn>
+                <Btn
+                  variant="danger"
+                  icon={XCircle}
+                  disabled={evidence.trim().length < 3 || reason.trim().length < 3 || review.isPending}
+                  onClick={() => review.mutate(false)}
+                >
+                  Từ chối
+                </Btn>
+              </div>
+            </div>
+          )}
 
           <p className="text-xs leading-5 text-ink-soft">
             Backend chỉ trả số tài khoản đã che để bảo vệ dữ liệu tài chính. Admin được nhận diện từ JWT; không cần nhập

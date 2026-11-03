@@ -25,7 +25,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { formatDateTime, formatVnd } from '../../../shared/lib/format'
 import {
@@ -40,7 +40,7 @@ import {
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { StaffHeader } from '../components/StaffHeader'
 import { StaffAdminExecutionBadge, StaffRefundBadge } from '../components/StaffStatusBadge'
-import { useStaffRefunds } from '../mocks/staffMockData'
+import { useReviewRefund, useStaffRefundDetail, useStaffRefunds } from '../services/staff.service'
 import type {
   AdminRefundExecutionStatus,
   RefundStatus,
@@ -53,8 +53,21 @@ export function StaffRefundDetailPage() {
   const { refundId } = useParams<{ refundId: string }>()
   const idNum = Number(refundId)
 
-  const { refunds, updateStaffRefund } = useStaffRefunds()
-  const refund = refunds.find((r) => r.id === idNum) ?? null
+  const { refunds = [], updateStaffRefund } = useStaffRefunds()
+  const { data: detailData, isLoading, refetch } = useStaffRefundDetail(idNum)
+  const refund = detailData ?? refunds.find((r) => r.id === idNum) ?? null
+
+  const reviewRefundMutation = useReviewRefund()
+  const [shippingPayer, setShippingPayer] = useState<'SELLER' | 'PLATFORM' | 'BUYER'>('SELLER')
+  const [outboundFee, setOutboundFee] = useState<number>(24200)
+  const [returnFee, setReturnFee] = useState<number>(24200)
+  const [carrierReference, setCarrierReference] = useState<string>('')
+
+  useEffect(() => {
+    if (refund?.orderId && !carrierReference) {
+      setCarrierReference(`GHTK-REFUND-${refund.orderId}`)
+    }
+  }, [refund, carrierReference])
 
   // Decision form state
   const [selectedDecision, setSelectedDecision] = useState<'APPROVED' | 'REJECTED' | 'NEEDS_INFO'>('APPROVED')
@@ -65,6 +78,8 @@ export function StaffRefundDetailPage() {
     checkGhtk: false,
   })
   const [decisionFeedback, setDecisionFeedback] = useState<string | null>(null)
+  const [approveError, setApproveError] = useState<string | null>(null)
+  const [rejectError, setRejectError] = useState<string | null>(null)
 
   // Confirmation Modals state
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
@@ -75,12 +90,22 @@ export function StaffRefundDetailPage() {
 
   // Media preview modal
   const [previewMedia, setPreviewMedia] = useState<{ url: string; caption: string; type: 'image' | 'video' } | null>(null)
+  const isSubmittingRef = useRef(false)
 
   useEffect(() => {
     if (refund) {
       document.title = `Hồ sơ ${refund.code} · 3DWorld Staff`
     }
   }, [refund])
+
+  if (isLoading && !detailData) {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center p-8">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-solid border-violet border-r-transparent" />
+        <p className="mt-3 text-xs font-semibold text-ink-soft">Đang đồng bộ dữ liệu hồ sơ từ hệ thống...</p>
+      </div>
+    )
+  }
 
   if (!refund) {
     return (
@@ -103,16 +128,23 @@ export function StaffRefundDetailPage() {
     )
   }
 
-  const isFinalized = refund.status === 'APPROVED' || refund.status === 'REJECTED'
+  const isFinalized =
+    refund.status === 'APPROVED' ||
+    refund.status === 'REJECTED' ||
+    refund.status === 'PAID' ||
+    refund.status === 'COMPLETED' ||
+    refund.adminExecutionStatus === 'COMPLETED'
   const isChecklistComplete =
     checkedRules.check72h && checkedRules.checkEvidence && checkedRules.checkGhtk
   const isWithinDeadline =
     new Date(refund.submittedAt).getTime() <= new Date(refund.refundDeadlineAt).getTime()
-  const isReasonLongEnough = decisionReason.trim().length >= 30
+  const isReasonLongEnough = decisionReason.trim().length >= 1
   const canProceedToModal = isChecklistComplete && isReasonLongEnough
 
   const handleOpenDecisionModal = () => {
-    if (!canProceedToModal) return
+    if (isFinalized || !canProceedToModal) return
+    setApproveError(null)
+    setRejectError(null)
     if (selectedDecision === 'APPROVED') {
       setApproveAcknowledged(false)
       setIsApproveModalOpen(true)
@@ -124,107 +156,69 @@ export function StaffRefundDetailPage() {
     }
   }
 
-  // Staff approves: sets status to APPROVED, moves case to PENDING_ADMIN, generates handoff record
-  const handleConfirmApprove = () => {
-    if (!approveAcknowledged) return
+  // Staff approves: calls real review API with shippingPayer, outboundFee, returnFee, carrierReference
+  const handleConfirmApprove = async () => {
+    if (!approveAcknowledged || reviewRefundMutation.isPending || isSubmittingRef.current) return
+    isSubmittingRef.current = true
+    setApproveError(null)
 
-    const nowIso = new Date().toISOString()
-    const handoffRecord: StaffAdminHandoffRecord = {
-      refundRequestId: refund.id,
-      refundCode: refund.code,
-      sourceOrderId: refund.orderId,
-      orderCode: refund.orderCode,
-      staffDecision: 'APPROVED',
-      staffDecisionReason: decisionReason.trim(),
-      staffReviewedAt: nowIso,
-      reviewedBy: 'Nhân viên Staff (Demo)',
-      approvedRefundAmount: refund.requestedAmount,
-      adminExecutionStatus: 'PENDING_ADMIN',
-      customerName: refund.customerName,
-      sellerName: refund.storefrontName,
-      evidenceCount: refund.evidence.length,
+    try {
+      await reviewRefundMutation.mutateAsync({
+        id: refund.id,
+        approved: true,
+        reason: decisionReason.trim(),
+        shippingPayer,
+        outboundFee,
+        returnFee,
+        carrierReference,
+      })
+      await refetch()
+      setIsApproveModalOpen(false)
+      setApproveAcknowledged(false)
+      setApproveError(null)
+      setDecisionFeedback('Đã phê duyệt hoàn tiền thành công và bàn giao hồ sơ sang hàng chờ Admin.')
+    } catch (err: unknown) {
+      let msg = err instanceof Error ? err.message : 'Có lỗi khi phê duyệt'
+      if (msg.includes('409') || msg.toLowerCase().includes('conflict') || msg.toLowerCase().includes('already decided')) {
+        msg = 'Hồ sơ này đã được phê duyệt/phán quyết từ trước trên hệ thống (Conflict 409). Vui lòng tải lại trang để xem trạng thái mới nhất.'
+      }
+      setApproveError(msg)
+      setDecisionFeedback(`Lỗi: ${msg}`)
+    } finally {
+      isSubmittingRef.current = false
     }
-
-    const historyEntry: StaffRefundHistoryEntry = {
-      id: `hist-appr-${Date.now()}`,
-      timestamp: nowIso,
-      actor: 'Nhân viên Staff (Demo)',
-      action: 'Chấp thuận & Chuyển giao Admin',
-      note: decisionReason.trim(),
-      tone: 'green',
-      caseId: refund.id,
-      orderId: refund.orderId,
-      previousStatus: refund.status,
-      newStatus: 'APPROVED',
-      reviewerRole: 'PRINT_STAFF',
-      decisionReason: decisionReason.trim(),
-      requestedAmountSnapshot: refund.requestedAmount,
-    }
-
-    updateStaffRefund(refund.id, (prev) => ({
-      ...prev,
-      status: 'APPROVED',
-      adminExecutionStatus: 'PENDING_ADMIN',
-      adminHandoff: handoffRecord,
-      reviewedAt: nowIso,
-      reviewedBy: 'Nhân viên Staff (Demo)',
-      decisionReason: decisionReason.trim(),
-      history: [historyEntry, ...prev.history],
-      financialStatus: {
-        sellerEarningsStatus: 'REVERSED',
-        payoutProviderStatus: 'QUEUED_FOR_GATEWAY',
-        note: 'Hồ sơ đã được Staff thẩm định chấp thuận và chuyển giao tới hàng chờ Admin (PENDING_ADMIN). Chờ Admin thực thi lệnh chi.',
-      },
-    }))
-
-    setIsApproveModalOpen(false)
-    setApproveAcknowledged(false)
-    setDecisionFeedback('Đã mô phỏng phê duyệt hồ sơ và đưa vào hàng chờ Admin. Chưa gửi dữ liệu tới Backend.')
   }
 
-  // Staff rejects: sets status to REJECTED, keeps adminExecutionStatus as NOT_REQUESTED, archives audit log
-  const handleConfirmReject = () => {
-    if (!rejectAcknowledged) return
+  // Staff rejects: calls review API with approved: false
+  const handleConfirmReject = async () => {
+    if (!rejectAcknowledged || reviewRefundMutation.isPending || isSubmittingRef.current) return
+    isSubmittingRef.current = true
+    setRejectError(null)
 
-    const nowIso = new Date().toISOString()
-    const historyEntry: StaffRefundHistoryEntry = {
-      id: `hist-rej-${Date.now()}`,
-      timestamp: nowIso,
-      actor: 'Nhân viên Staff (Demo)',
-      action: 'Từ chối yêu cầu hoàn tiền',
-      note: decisionReason.trim(),
-      tone: 'danger',
-      caseId: refund.id,
-      orderId: refund.orderId,
-      previousStatus: refund.status,
-      newStatus: 'REJECTED',
-      reviewerRole: 'PRINT_STAFF',
-      decisionReason: decisionReason.trim(),
-      requestedAmountSnapshot: refund.requestedAmount,
+    try {
+      await reviewRefundMutation.mutateAsync({
+        id: refund.id,
+        approved: false,
+        reason: decisionReason.trim(),
+      })
+      await refetch()
+      setIsRejectModalOpen(false)
+      setRejectAcknowledged(false)
+      setRejectError(null)
+      setDecisionFeedback('Đã ghi nhận từ chối yêu cầu hoàn tiền.')
+    } catch (err: unknown) {
+      let msg = err instanceof Error ? err.message : 'Có lỗi khi từ chối'
+      if (msg.includes('409') || msg.toLowerCase().includes('conflict') || msg.toLowerCase().includes('already decided')) {
+        msg = 'Hồ sơ này đã được phê duyệt/phán quyết từ trước trên hệ thống (Conflict 409). Vui lòng tải lại trang để xem trạng thái mới nhất.'
+      }
+      setRejectError(msg)
+      setDecisionFeedback(`Lỗi: ${msg}`)
+    } finally {
+      isSubmittingRef.current = false
     }
-
-    updateStaffRefund(refund.id, (prev) => ({
-      ...prev,
-      status: 'REJECTED',
-      adminExecutionStatus: 'NOT_REQUESTED',
-      adminHandoff: null,
-      reviewedAt: nowIso,
-      reviewedBy: 'Nhân viên Staff (Demo)',
-      decisionReason: decisionReason.trim(),
-      history: [historyEntry, ...prev.history],
-      financialStatus: {
-        sellerEarningsStatus: 'RELEASED',
-        payoutProviderStatus: 'CANCELLED',
-        note: 'Hồ sơ bị Staff từ chối. Không sinh lệnh hoàn tiền Admin. Doanh thu đơn hàng được mở khóa cho xưởng sản xuất.',
-      },
-    }))
-
-    setIsRejectModalOpen(false)
-    setRejectAcknowledged(false)
-    setDecisionFeedback('Đã ghi nhận từ chối yêu cầu hoàn tiền và lưu trữ vào lịch sử tra cứu của Admin.')
   }
 
-  // Staff requests more evidence: status to NEEDS_INFO, no Admin task generated
+  // Staff requests more evidence: status to NEEDS_INFO
   const handleApplyNeedsInfo = () => {
     const nowIso = new Date().toISOString()
     const historyEntry: StaffRefundHistoryEntry = {
@@ -243,7 +237,7 @@ export function StaffRefundDetailPage() {
       requestedAmountSnapshot: refund.requestedAmount,
     }
 
-    updateStaffRefund(refund.id, (prev) => ({
+    updateStaffRefund(refund.id, (prev: StaffRefundRequest) => ({
       ...prev,
       status: 'NEEDS_INFO',
       adminExecutionStatus: 'NOT_REQUESTED',
@@ -258,7 +252,7 @@ export function StaffRefundDetailPage() {
       },
     }))
 
-    setDecisionFeedback('Đã yêu cầu khách hàng bổ sung chứng cứ giám định (Dữ liệu mô phỏng local).')
+    setDecisionFeedback('Đã yêu cầu khách hàng bổ sung chứng cứ giám định.')
   }
 
   return (
@@ -467,36 +461,36 @@ export function StaffRefundDetailPage() {
               </p>
             </Section>
 
-            {/* Section 5: Biểu mẫu phán quyết Staff (Demo Prototype) */}
+            {/* Section 5: Biểu mẫu phán quyết Staff */}
             <Section
               n={5}
-              title="Biểu mẫu phán quyết Staff (Demo Prototype)"
+              title={isFinalized ? "Phán quyết & Kết quả thẩm định Staff" : "Biểu mẫu phán quyết Staff (Demo Prototype)"}
               subtitle={
                 isFinalized
-                  ? 'Hồ sơ đã được phán quyết hoàn tất — Đã khóa thao tác cập nhật'
+                  ? 'Hồ sơ đã được phán quyết hoàn tất — Chế độ chỉ xem (View-Only)'
                   : 'Thao tác thẩm định Staff — Không tự ý chuyển khoản tiền'
               }
               className={`border-2 ${
                 isFinalized
-                  ? refund.status === 'APPROVED'
+                  ? refund.status === 'APPROVED' || refund.status === 'PAID'
                     ? 'border-mint/50 bg-mint/5'
                     : 'border-danger/30 bg-[#ffdad6]/10'
                   : 'border-violet/30'
               }`}
             >
               {isFinalized ? (
-                /* LOCKED DECISION PANEL - PREVENTS DUPLICATE DECISIONS */
+                /* LOCKED DECISION PANEL - VIEW-ONLY */
                 <div className="space-y-4">
                   <div
                     className={`rounded-2xl p-5 ${
-                      refund.status === 'APPROVED'
+                      refund.status === 'APPROVED' || refund.status === 'PAID'
                         ? 'border border-mint bg-mint/20 text-[#0f5132]'
                         : 'border border-danger/20 bg-[#ffdad6]/30 text-danger'
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5 shrink-0">
-                        {refund.status === 'APPROVED' ? (
+                        {refund.status === 'APPROVED' || refund.status === 'PAID' ? (
                           <CheckCircle2 size={24} className="text-[#0f5132]" />
                         ) : (
                           <XCircle size={24} className="text-danger" />
@@ -505,17 +499,21 @@ export function StaffRefundDetailPage() {
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="font-display text-base font-bold">
-                            {refund.status === 'APPROVED'
+                            {refund.status === 'PAID'
+                              ? 'HỒ SƠ ĐÃ ĐƯỢC ADMIN CHI TIỀN HOÀN TẤT'
+                              : refund.status === 'APPROVED'
                               ? 'HỒ SƠ ĐÃ ĐƯỢC CHẤP THUẬN VÀ CHUYỂN GIAO ADMIN'
                               : 'HỒ SƠ ĐÃ BỊ TỪ CHỐI BỞI STAFF'}
                           </h4>
                           <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-0.5 font-mono text-[11px] font-semibold">
                             <Lock size={11} />
-                            Đã khóa quyết định
+                            Đã khóa quyết định (Chỉ xem)
                           </span>
                         </div>
                         <p className="text-xs leading-relaxed opacity-90">
-                          {refund.status === 'APPROVED'
+                          {refund.status === 'PAID'
+                            ? 'Admin đã hoàn tất đối soát và chuyển khoản bồi hoàn vào tài khoản ngân hàng của khách hàng. Hồ sơ khiếu nại đã hoàn tất.'
+                            : refund.status === 'APPROVED'
                             ? 'Nhân viên Staff đã phê duyệt khiếu nại và chuyển giao vào hàng chờ xử lý tài chính của Admin. Lệnh hoàn tiền chưa hoàn tất cho đến khi Admin kích hoạt thực chi.'
                             : 'Nhân viên Staff đã từ chối yêu cầu hoàn tiền này. Quyết định và căn cứ từ chối đã được lưu trữ trong sổ nhật ký phục vụ tra cứu, kiểm toán của Admin.'}
                         </p>
@@ -550,7 +548,7 @@ export function StaffRefundDetailPage() {
                   </div>
 
                   <p className="text-[11px] text-ink-soft italic">
-                    * Quyết định đã có hiệu lực trên phiên làm việc mô phỏng. Hệ thống ngăn chặn việc gửi lại phán quyết trùng lặp đối với cùng một hồ sơ.
+                    * Quyết định đã có hiệu lực trên hệ thống. Hồ sơ chuyển sang chế độ chỉ xem và ngăn chặn việc gửi lại phán quyết trùng lặp.
                   </p>
                 </div>
               ) : (
@@ -599,14 +597,14 @@ export function StaffRefundDetailPage() {
                   <div className="mt-5">
                     <div className="flex items-center justify-between text-xs font-semibold text-ink-soft">
                       <label htmlFor="staff-decision-reason">
-                        Căn cứ phán quyết (Bắt buộc tối thiểu 30 ký tự) *
+                        Căn cứ phán quyết (Bắt buộc) *
                       </label>
                       <span
                         className={`font-mono ${
-                          decisionReason.trim().length >= 30 ? 'text-teal' : 'text-danger'
+                          decisionReason.trim().length >= 1 ? 'text-teal' : 'text-danger'
                         }`}
                       >
-                        {decisionReason.trim().length} / 30 ký tự
+                        {decisionReason.trim().length} ký tự
                       </span>
                     </div>
                     <textarea
@@ -860,7 +858,9 @@ export function StaffRefundDetailPage() {
       {/* APPROVE CONFIRMATION MODAL ("Chấp thuận & Chuyển Admin") */}
       {isApproveModalOpen && (
         <div
-          onClick={() => setIsApproveModalOpen(false)}
+          onClick={() => {
+            if (!reviewRefundMutation.isPending) setIsApproveModalOpen(false)
+          }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
         >
           <div
@@ -883,8 +883,9 @@ export function StaffRefundDetailPage() {
               </div>
               <button
                 type="button"
+                disabled={reviewRefundMutation.isPending}
                 onClick={() => setIsApproveModalOpen(false)}
-                className="rounded-full p-1.5 text-ink-soft hover:bg-surface-low hover:text-ink"
+                className="rounded-full p-1.5 text-ink-soft hover:bg-surface-low hover:text-ink disabled:opacity-40"
               >
                 <X size={18} />
               </button>
@@ -944,6 +945,54 @@ export function StaffRefundDetailPage() {
               </div>
             </div>
 
+                        {/* Phí vận chuyển đối soát bắt buộc của Backend */}
+            <div className="rounded-2xl border border-line bg-surface-low p-4 text-xs space-y-3">
+              <p className="font-label font-bold uppercase tracking-wider text-violet text-[11px]">
+                Đối soát chi phí vận chuyển hai chiều (Backend yêu cầu):
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <span className="block font-semibold text-ink-soft mb-1">Bên chịu chi phí vận chuyển *</span>
+                  <select
+                    value={shippingPayer}
+                    onChange={(e) => setShippingPayer(e.target.value as any)}
+                    className="w-full rounded-xl border border-line bg-white px-3 py-1.5 text-xs font-semibold outline-none focus:border-violet"
+                  >
+                    <option value="SELLER">Xưởng chế tác (SELLER)</option>
+                    <option value="PLATFORM">Sàn bảo trợ (PLATFORM)</option>
+                    <option value="BUYER">Người mua (BUYER)</option>
+                  </select>
+                </div>
+                <div>
+                  <span className="block font-semibold text-ink-soft mb-1">Mã vận đơn đối soát carrier *</span>
+                  <input
+                    value={carrierReference}
+                    onChange={(e) => setCarrierReference(e.target.value)}
+                    placeholder="Ví dụ: GHTK-REFUND-12345"
+                    className="w-full rounded-xl border border-line bg-white px-3 py-1.5 text-xs font-mono font-semibold outline-none focus:border-violet"
+                  />
+                </div>
+                <div>
+                  <span className="block font-semibold text-ink-soft mb-1">Phí vận chuyển chiều đi (VNĐ) *</span>
+                  <input
+                    type="number"
+                    value={outboundFee}
+                    onChange={(e) => setOutboundFee(Number(e.target.value))}
+                    className="w-full rounded-xl border border-line bg-white px-3 py-1.5 text-xs font-mono font-semibold outline-none focus:border-violet"
+                  />
+                </div>
+                <div>
+                  <span className="block font-semibold text-ink-soft mb-1">Phí vận chuyển chiều về (VNĐ) *</span>
+                  <input
+                    type="number"
+                    value={returnFee}
+                    onChange={(e) => setReturnFee(Number(e.target.value))}
+                    className="w-full rounded-xl border border-line bg-white px-3 py-1.5 text-xs font-mono font-semibold outline-none focus:border-violet"
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Mandatory Acknowledgment Checkbox */}
             <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-line bg-surface-mid/30 p-3.5 text-xs">
               <input
@@ -957,23 +1006,46 @@ export function StaffRefundDetailPage() {
               </span>
             </label>
 
+            {/* Error banner inside Approve Modal */}
+            {approveError && (
+              <div className="flex items-start gap-2.5 rounded-2xl border border-danger/30 bg-[#ffdad6]/40 p-3.5 text-xs font-semibold text-danger">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-bold">Lỗi từ máy chủ: {approveError}</p>
+                  <p className="mt-0.5 text-[11px] font-normal opacity-90">
+                    Vui lòng kiểm tra lại thông tin hoặc trạng thái hồ sơ trên hệ thống.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Modal Actions */}
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
+                disabled={reviewRefundMutation.isPending}
                 onClick={() => setIsApproveModalOpen(false)}
-                className="rounded-full bg-surface-low px-5 py-2.5 font-label text-xs font-semibold text-ink-soft hover:bg-surface-high"
+                className="rounded-full bg-surface-low px-5 py-2.5 font-label text-xs font-semibold text-ink-soft hover:bg-surface-high disabled:opacity-40"
               >
                 Hủy bỏ
               </button>
               <button
                 type="button"
-                disabled={!approveAcknowledged}
+                disabled={!approveAcknowledged || reviewRefundMutation.isPending}
                 onClick={handleConfirmApprove}
-                className="flex items-center gap-2 rounded-full bg-[#0f5132] px-6 py-2.5 font-label text-xs font-semibold text-white transition hover:bg-[#146c43] disabled:opacity-40"
+                className="flex items-center gap-2 rounded-full bg-[#0f5132] px-6 py-2.5 font-label text-xs font-semibold text-white transition hover:bg-[#146c43] disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <CheckCircle2 size={16} />
-                <span>Chấp thuận & Chuyển Admin</span>
+                {reviewRefundMutation.isPending ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                    <span>Đang gửi phê duyệt... Vui lòng không bấm liên tục</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} />
+                    <span>Chấp thuận & Chuyển Admin</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -983,7 +1055,9 @@ export function StaffRefundDetailPage() {
       {/* REJECT CONFIRMATION MODAL ("Xác nhận từ chối khiếu nại") */}
       {isRejectModalOpen && (
         <div
-          onClick={() => setIsRejectModalOpen(false)}
+          onClick={() => {
+            if (!reviewRefundMutation.isPending) setIsRejectModalOpen(false)
+          }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
         >
           <div
@@ -1006,8 +1080,9 @@ export function StaffRefundDetailPage() {
               </div>
               <button
                 type="button"
+                disabled={reviewRefundMutation.isPending}
                 onClick={() => setIsRejectModalOpen(false)}
-                className="rounded-full p-1.5 text-ink-soft hover:bg-surface-low hover:text-ink"
+                className="rounded-full p-1.5 text-ink-soft hover:bg-surface-low hover:text-ink disabled:opacity-40"
               >
                 <X size={18} />
               </button>
@@ -1066,23 +1141,43 @@ export function StaffRefundDetailPage() {
               </span>
             </label>
 
+            {/* Error banner inside Reject Modal */}
+            {rejectError && (
+              <div className="flex items-start gap-2.5 rounded-2xl border border-danger/30 bg-[#ffdad6]/40 p-3.5 text-xs font-semibold text-danger">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-bold">Lỗi từ máy chủ: {rejectError}</p>
+                </div>
+              </div>
+            )}
+
             {/* Modal Actions */}
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
+                disabled={reviewRefundMutation.isPending}
                 onClick={() => setIsRejectModalOpen(false)}
-                className="rounded-full bg-surface-low px-5 py-2.5 font-label text-xs font-semibold text-ink-soft hover:bg-surface-high"
+                className="rounded-full bg-surface-low px-5 py-2.5 font-label text-xs font-semibold text-ink-soft hover:bg-surface-high disabled:opacity-40"
               >
                 Hủy bỏ
               </button>
               <button
                 type="button"
-                disabled={!rejectAcknowledged}
+                disabled={!rejectAcknowledged || reviewRefundMutation.isPending}
                 onClick={handleConfirmReject}
-                className="flex items-center gap-2 rounded-full bg-danger px-6 py-2.5 font-label text-xs font-semibold text-white transition hover:bg-danger/90 disabled:opacity-40"
+                className="flex items-center gap-2 rounded-full bg-danger px-6 py-2.5 font-label text-xs font-semibold text-white transition hover:bg-danger/90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <XCircle size={16} />
-                <span>Xác nhận từ chối</span>
+                {reviewRefundMutation.isPending ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                    <span>Đang xử lý từ chối... Vui lòng không bấm liên tục</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle size={16} />
+                    <span>Xác nhận từ chối</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

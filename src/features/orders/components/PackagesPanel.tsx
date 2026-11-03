@@ -1,16 +1,17 @@
 import { Boxes } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { findBestFittingBox } from '../../shipping/lib/boxFitting'
 import { ApiClientError } from '../../../shared/api'
 import { useOrderPackages, usePackagingProfiles, useSavePackages } from '../hooks/useOrders'
 import type { Order } from '../types/order.types'
 
-/** Trạng thái còn được đóng gói lại (trước khi tạo vận đơn). */
+/** Trạng thái còn được đóng gói lại trước khi Seller bàn giao vận chuyển. */
 const PACKABLE = ['PAID', 'PROCESSING']
 
 type Mode = 'single' | 'perItem'
 
 /**
- * Đóng gói đơn trước khi tạo vận đơn — GET/POST /api/orders/{id}/packages, GET /api/shipping/packaging-profiles.
+ * Đóng gói đơn trước khi bàn giao — GET/POST /api/orders/{id}/packages, GET /api/shipping/packaging-profiles.
  * Hai cách phân bổ nhanh: tất cả vào 1 kiện, hoặc mỗi dòng hàng 1 kiện. Backend kiểm tra kích thước / khối lượng.
  */
 export function PackagesPanel({ order }: { order: Order }) {
@@ -21,7 +22,22 @@ export function PackagesPanel({ order }: { order: Order }) {
   const [profileId, setProfileId] = useState<number>()
   const [mode, setMode] = useState<Mode>('single')
   const [error, setError] = useState('')
-  const chosen = profileId ?? profiles.data?.[0]?.id
+  // Tự động tính toán hộp tối ưu dựa trên kích thước ước lượng của đơn hàng
+  const autoBestBox = useMemo(() => {
+    if (!profiles.data?.length) return null
+    const totalQty = order.items.reduce((s, i) => s + i.quantity, 0)
+    const totalWeight = Math.max(300, totalQty * 250)
+    const estDimensions = {
+      lengthCm: totalQty > 3 ? 30 : totalQty > 1 ? 20 : 12,
+      widthCm: totalQty > 3 ? 25 : totalQty > 1 ? 15 : 10,
+      heightCm: totalQty > 3 ? 20 : totalQty > 1 ? 12 : 8,
+      weightGrams: totalWeight,
+      fragile: true,
+    }
+    return findBestFittingBox(estDimensions, profiles.data) ?? profiles.data[0]
+  }, [order.items, profiles.data])
+
+  const chosen = profileId ?? autoBestBox?.id ?? profiles.data?.[0]?.id
 
   const submit = () => {
     if (!chosen) return
@@ -59,7 +75,8 @@ export function PackagesPanel({ order }: { order: Order }) {
                 <strong>{p.packageWeightGrams} g</strong>
               </p>
               <p className="text-xs text-ink-soft">
-                {p.items.reduce((s, i) => s + i.quantity, 0)} món · chi phí bao bì {p.packagingCost.toLocaleString('vi-VN')}₫
+                {p.items.reduce((s, i) => s + i.quantity, 0)} món · chi phí bao bì{' '}
+                {p.packagingCost.toLocaleString('vi-VN')}₫
               </p>
             </li>
           ))}
@@ -81,7 +98,7 @@ export function PackagesPanel({ order }: { order: Order }) {
               {(profiles.data ?? []).map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} ({p.lengthCm}×{p.widthCm}×{p.heightCm} cm, ≤ {p.maxProductWeightGrams} g
-                  {p.supportsFragile ? ', hàng dễ vỡ' : ''})
+                  {p.supportsFragile ? ', hàng dễ vỡ' : ''}){p.id === autoBestBox?.id ? ' — ★ Vừa khít tối ưu' : ''}
                 </option>
               ))}
             </select>

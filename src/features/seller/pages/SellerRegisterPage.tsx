@@ -1,4 +1,4 @@
-import { Link2, MapPin, Pencil, Store } from 'lucide-react'
+﻿import { Link2, MapPin, Pencil, Store } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { AddressEditor } from '../../account/components/AddressEditor'
 import { useAddressList } from '../../account/hooks/useAccount'
@@ -58,6 +58,8 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
   }, [pickup, pickupReady])
 
   const locked = app.status === 'PENDING' || app.status === 'VERIFIED'
+  // Nghiep vu moi: seller nop ca bo ho so gom SDT da luu + ngan hang dang hoat dong (PENDING OK) + ho so xuong.
+  // SDT va ngan hang duoc Admin xac minh SAU khi ho so duoc nop - khong can verified truoc.
   const valid =
     form.storefrontName.trim().length >= 3 &&
     form.address.trim() &&
@@ -65,8 +67,7 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
     form.evidence.trim().length >= 5 &&
     pickupReady &&
     app.emailVerified &&
-    app.phoneVerified &&
-    app.verifiedBankAvailable !== false
+    !!app.bank
 
   return (
     <DetailLayout
@@ -193,7 +194,7 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
 
           {!locked && (
             <div className="flex justify-end">
-              <Btn variant="primary" disabled={!valid || submit.isPending} onClick={() => submit.mutate(form)}>
+              <Btn variant="primary" disabled={!valid || submit.isPending} onClick={() => submit.mutate({ ...form, phone: pickup?.phone ?? undefined })}>
                 {app.status === 'NEEDS_INFO' ? 'Nộp lại hồ sơ bổ sung' : 'Nộp hồ sơ xét duyệt'}
               </Btn>
             </div>
@@ -204,7 +205,7 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
         <>
           <Section title="Quy trình xét duyệt">
             <ol className="space-y-3 text-sm">
-              {['Nộp hồ sơ & minh chứng', 'Chuyên viên thẩm định (24–48h)', 'Xác minh tài khoản ngân hàng', 'Mở gian hàng & chọn gói'].map((s, i) => (
+              {['Nộp SĐT, ngân hàng & hồ sơ xưởng', 'Admin xác minh số điện thoại', 'Admin xác minh tài khoản ngân hàng', 'Admin duyệt hồ sơ gian hàng'].map((s, i) => (
                 <li key={s} className="flex gap-3">
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-violet-soft font-display text-xs font-bold text-violet">{i + 1}</span>
                   {s}

@@ -89,7 +89,13 @@ export function SellerPrerequisites({ application }: { application: SellerApplic
           )}
         </PrerequisiteCard>
 
-        <PrerequisiteCard icon={Phone} title="Xác thực số điện thoại" ok={application.phoneVerified}>
+        {/* SĐT: ok khi đã lưu vào profile (chờ Admin xác minh cũng OK để nộp hồ sơ) */}
+        <PrerequisiteCard
+          icon={Phone}
+          title="Xác thực số điện thoại"
+          ok={application.phoneVerified || !!profile.data?.phone}
+          okLabel={application.phoneVerified ? 'Đã xác thực' : 'Đã lưu · chờ Admin xác minh'}
+        >
           {application.phoneVerified ? (
             <><p className="text-sm font-medium">{profile.data?.phone}</p><VerifiedLabel /></>
           ) : (
@@ -99,23 +105,29 @@ export function SellerPrerequisites({ application }: { application: SellerApplic
                 <input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="0901234567" className={inputClass} />
               </label>
               {phoneError && <p className="text-xs text-danger">{phoneError}</p>}
-              <p className="text-xs leading-5 text-ink-soft">Sau khi lưu, số điện thoại chờ Admin xác minh. Backend hiện chưa có luồng OTP/SMS cho người dùng.</p>
+              <p className="text-xs leading-5 text-ink-soft">Số điện thoại đã lưu sẽ được gửi kèm hồ sơ để Admin xác minh trên màn thẩm định gian hàng.</p>
               <button type="button" disabled={!phone.trim() || !phoneChanged || updateProfile.isPending} onClick={savePhone} className="rounded-full bg-ink px-4 py-2.5 font-label text-xs font-semibold text-white hover:bg-violet disabled:opacity-40">
                 {updateProfile.isPending ? 'Đang lưu…' : profile.data?.phone ? 'Cập nhật số điện thoại' : 'Lưu vào hồ sơ'}
               </button>
-              {!!profile.data?.phone && !phoneChanged && <span className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-deep"><Clock3 size={13} /> Đã lưu · chờ xác minh</span>}
+              {!!profile.data?.phone && !phoneChanged && <span className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-deep"><Clock3 size={13} /> Đã lưu · chờ Admin xác minh</span>}
             </>
           )}
         </PrerequisiteCard>
 
-        <PrerequisiteCard icon={Landmark} title="Tài khoản ngân hàng" ok={!!approved}>
+        {/* Ngân hàng: ok khi có bank đang hoạt động (pending OK để nộp hồ sơ — Admin xác minh sau) */}
+        <PrerequisiteCard
+          icon={Landmark}
+          title="Tài khoản ngân hàng"
+          ok={!!currentBank && !bankRejected}
+          okLabel={approved ? 'Đã xác thực' : 'Sẵn sàng nộp'}
+        >
           {approved ? (
             <><p className="text-sm font-semibold">{approved.bankName}</p><p className="font-mono text-sm text-ink-soft">{approved.accountNumberMasked}</p><VerifiedLabel /></>
           ) : currentBank && !editingBank && !bankRejected ? (
             <>
               <p className="text-sm font-semibold">{currentBank.bankName}</p>
               <p className="font-mono text-sm text-ink-soft">{currentBank.accountNumberMasked}</p>
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-deep"><Clock3 size={13} /> Đã lưu · chờ Admin xác minh</span>
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-deep"><Clock3 size={13} /> Chờ Admin xác minh — sẽ gửi kèm hồ sơ</span>
               <button type="button" onClick={() => setEditingBank(true)} className="inline-flex items-center gap-1.5 self-start rounded-full bg-surface-high px-3 py-2 font-label text-xs font-semibold"><Pencil size={13} /> Sửa thông tin</button>
             </>
           ) : (
@@ -131,12 +143,12 @@ export function SellerPrerequisites({ application }: { application: SellerApplic
   )
 }
 
-function PrerequisiteCard({ icon: Icon, title, ok, children }: { icon: typeof Mail; title: string; ok: boolean; children: ReactNode }) {
+function PrerequisiteCard({ icon: Icon, title, ok, okLabel = 'Đã xác thực', children }: { icon: typeof Mail; title: string; ok: boolean; okLabel?: string; children: ReactNode }) {
   return (
     <section className={`flex min-w-0 flex-col gap-3 rounded-2xl border p-4 ${ok ? 'border-mint bg-mint/25' : 'border-orange/20 bg-surface-low'}`}>
       <div className="flex items-center gap-3">
         <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${ok ? 'bg-mint text-[#0f5132]' : 'bg-peach text-orange-deep'}`}>{ok ? <CheckCircle2 size={17} /> : <Icon size={17} />}</span>
-        <div><p className="text-sm font-semibold">{title}</p><p className="text-xs text-ink-soft">{ok ? 'Đã xác thực' : 'Cần hoàn tất'}</p></div>
+        <div><p className="text-sm font-semibold">{title}</p><p className="text-xs text-ink-soft">{ok ? okLabel : 'Cần hoàn tất'}</p></div>
       </div>
       {children}
     </section>

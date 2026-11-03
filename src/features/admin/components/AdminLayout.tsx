@@ -1,4 +1,16 @@
-import { Box, Boxes, ChevronRight, LayoutDashboard, LogOut, Menu, ShieldCheck, Store, UsersRound } from 'lucide-react'
+import {
+  Box,
+  Boxes,
+  ChevronRight,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  ShieldCheck,
+  Store,
+  Truck,
+  RotateCcw,
+  UsersRound,
+} from 'lucide-react'
 import { type ReactNode, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { hasStoredSession, isAdmin, logout } from '../../../shared/session/session'
@@ -10,7 +22,9 @@ import { Toaster } from '../../../shared/ui/toast'
 const NAVIGATION = [
   { label: 'Tổng quan', icon: LayoutDashboard, to: '/admin', end: true },
   { label: 'Quản lý gian hàng', icon: Store, to: '/admin/storefronts' },
-  { label: 'Kiểm duyệt sản phẩm', icon: Boxes, disabled: true },
+  { label: 'Đối soát vận chuyển & COD', icon: Truck, to: '/admin/shipments' },
+  { label: 'Kiểm duyệt sản phẩm', icon: Boxes, to: '/admin/products' },
+  { label: 'Quản lý hoàn tiền', icon: RotateCcw, to: '/admin/refunds' },
   { label: 'Quản lý người dùng', icon: UsersRound, disabled: true },
   { label: 'Báo cáo vi phạm', icon: ShieldCheck, disabled: true },
 ]

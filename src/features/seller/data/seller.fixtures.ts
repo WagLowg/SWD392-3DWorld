@@ -20,7 +20,7 @@ export type SellerApplication = {
   evidenceLink?: string
   reviewerNote?: string
   submittedAt?: string
-  /** Đủ điều kiện nộp (email + SĐT + ngân hàng đã xác thực). */
+    /** Đủ điều kiện giao dịch sau khi Admin duyệt toàn bộ hồ sơ. */
   eligible?: boolean
   verifiedBankAvailable?: boolean
   /** Có khi đã tạo gian hàng. */
@@ -327,7 +327,7 @@ export const disputes: Dispute[] = [
 
 /* -------------------------------------------------------------- earnings */
 
-export type EarningStatus = 'PENDING' | 'RELEASED' | 'HELD'
+export type EarningStatus = 'PENDING' | 'RELEASED' | 'HELD' | 'REFUNDED'
 
 export type Earning = {
   id: string
@@ -336,6 +336,10 @@ export type Earning = {
   sku: string
   gross: number
   feeRate: number
+  commissionAmount?: number
+  netAmount?: number
+  returnShippingFee?: number
+  isRefunded?: boolean
   status: EarningStatus
   receivedAt?: string
   releaseAt?: string

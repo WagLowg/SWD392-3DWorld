@@ -14,7 +14,7 @@ const risk = (c: OpsCase) =>
   )
 
 /** MP 058 · Hàng Chờ Kiểm Duyệt Sản Phẩm */
-export function ProductQueuePage() {
+export function ProductQueuePage({ basePath = '/ops/products' }: { basePath?: string }) {
   return (
     <OpsQueue
       domain="product"
@@ -22,26 +22,48 @@ export function ProductQueuePage() {
       eyebrow="Kiểm duyệt sản phẩm"
       title="Hàng Chờ Kiểm Duyệt Sản Phẩm"
       accent="Phẩm Chất, Bản Quyền & Lưới In."
+      titleSuffix={basePath.startsWith('/admin/') ? 'Admin 3DWorld' : undefined}
       api="GET /api/admin/products/pending"
       columns={[
-        { key: 'p', header: 'Sản phẩm', render: (c) => <CellTitle title={c.title} sub={`prd_${c.id} · ${c.subtitle}`} to={`/ops/products/${c.id}`} /> },
-        { key: 'c', header: 'Phân loại', render: (c) => `${categoryLabel(String(c.f.category))} · ${c.f.variants} SKU` },
+        {
+          key: 'p',
+          header: 'Sản phẩm',
+          render: (c) => <CellTitle title={c.title} sub={`prd_${c.id} · ${c.subtitle}`} to={`${basePath}/${c.id}`} />,
+        },
+        {
+          key: 'c',
+          header: 'Phân loại',
+          render: (c) => `${categoryLabel(String(c.f.category))} · ${c.f.variants} SKU`,
+        },
         { key: 's', header: 'Gian hàng', render: (c) => val(c, 'store') },
         { key: 'pr', header: 'Giá từ', render: (c) => val(c, 'price') },
         statusColumn('product'),
         { key: 't', header: 'Gửi lúc', render: (c) => <span className="text-xs">{formatDateTime(c.createdAt)}</span> },
-        { key: 'x', header: '', render: (c) => <Btn to={`/ops/products/${c.id}`} size="sm" variant="primary">Thẩm định</Btn> },
+        {
+          key: 'x',
+          header: '',
+          render: (c) => (
+            <Btn to={`${basePath}/${c.id}`} size="sm" variant="primary">
+              {c.status === 'PENDING' ? 'Thẩm định' : 'Xem chi tiết'}
+            </Btn>
+          ),
+        },
       ]}
       rules={{
         title: 'Quy trình kiểm soát phẩm chất & bản quyền',
-        items: ['Ảnh sản phẩm phải chụp mẫu in thực tế.', 'Lưới 3D phải kín (manifold) và đối soát mã băm chống in lậu.', 'Giá niêm yết và tồn kho từng biến thể phải hợp lệ.', 'Lý do thẩm định bắt buộc ghi moderation_reason.'],
+        items: [
+          'Ảnh sản phẩm phải chụp mẫu in thực tế.',
+          'Lưới 3D phải kín (manifold) và đối soát mã băm chống in lậu.',
+          'Giá niêm yết và tồn kho từng biến thể phải hợp lệ.',
+          'Lý do thẩm định bắt buộc ghi moderation_reason.',
+        ],
       }}
     />
   )
 }
 
 /** MP 059 · Chi Tiết Thẩm Định Sản Phẩm */
-export function ProductReviewPage() {
+export function ProductReviewPage({ admin = false }: { admin?: boolean }) {
   const id = useParams().caseId ?? ''
   return (
     <OpsReview
@@ -50,6 +72,9 @@ export function ProductReviewPage() {
       code="MP 059"
       eyebrow="Thẩm định sản phẩm"
       titlePrefix="Sản phẩm"
+      titleSuffix={admin ? 'Admin 3DWorld' : undefined}
+      backTo={admin ? '/admin/products' : '/ops/products'}
+      backLabel="Quay về hàng chờ"
       api="POST /api/admin/products/{id}/approve | reject"
       closed={(c) => c.status === 'APPROVED' || c.status === 'REJECTED'}
       main={(c) => (
@@ -58,7 +83,12 @@ export function ProductReviewPage() {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {(c.evidence ?? []).map((e) =>
                 /^(https?:|\/)/.test(e) ? (
-                  <img key={e} src={resolveMediaUrl(e)} alt="" className="aspect-square w-full rounded-2xl object-cover" />
+                  <img
+                    key={e}
+                    src={resolveMediaUrl(e)}
+                    alt=""
+                    className="aspect-square w-full rounded-2xl object-cover"
+                  />
                 ) : (
                   <MediaTile key={e} label={e} icon={/caliper|thước/i.test(e) ? Ruler : Camera} tone="violet" />
                 ),
@@ -78,7 +108,9 @@ export function ProductReviewPage() {
                 { label: 'Bản sửa đổi', value: <code className="text-xs">{val(c, 'revision')}</code> },
               ]}
             />
-            {c.f.description && <p className="mt-4 whitespace-pre-line text-sm text-ink-soft">{String(c.f.description)}</p>}
+            {c.f.description && (
+              <p className="mt-4 whitespace-pre-line text-sm text-ink-soft">{String(c.f.description)}</p>
+            )}
             {c.f.specs && c.f.specs !== '—' && (
               <p className="mt-3 whitespace-pre-line rounded-2xl bg-surface-low p-3 text-sm">{String(c.f.specs)}</p>
             )}
@@ -105,11 +137,27 @@ export function ReportQueuePage() {
       accent="Tác Quyền, Nội Dung Cấm & Chế Tài."
       api="GET /api/admin/reports"
       columns={[
-        { key: 'id', header: 'Mã báo cáo & thời gian', render: (c) => <CellTitle title={`#${c.id}`} sub={formatDateTime(c.createdAt)} to={`/ops/reports/${c.id}`} /> },
+        {
+          key: 'id',
+          header: 'Mã báo cáo & thời gian',
+          render: (c) => <CellTitle title={`#${c.id}`} sub={formatDateTime(c.createdAt)} to={`/ops/reports/${c.id}`} />,
+        },
         { key: 't', header: 'Đối tượng', render: (c) => <CellTitle title={c.title} sub={val(c, 'description')} /> },
-        { key: 'r', header: 'Lý do & bằng chứng', render: (c) => <CellTitle title={val(c, 'reason')} sub={`${c.evidence?.length ?? 0} bằng chứng`} /> },
+        {
+          key: 'r',
+          header: 'Lý do & bằng chứng',
+          render: (c) => <CellTitle title={val(c, 'reason')} sub={`${c.evidence?.length ?? 0} bằng chứng`} />,
+        },
         statusColumn('report'),
-        { key: 'x', header: '', render: (c) => <Btn to={`/ops/reports/${c.id}`} size="sm" variant="primary">Thẩm định</Btn> },
+        {
+          key: 'x',
+          header: '',
+          render: (c) => (
+            <Btn to={`/ops/reports/${c.id}`} size="sm" variant="primary">
+              Thẩm định
+            </Btn>
+          ),
+        },
       ]}
     />
   )
@@ -145,7 +193,9 @@ export function ReportReviewPage() {
                 { label: 'Lý do', value: val(c, 'reason') },
               ]}
             />
-            {c.f.description && <p className="mt-3 whitespace-pre-line text-sm text-ink-soft">{String(c.f.description)}</p>}
+            {c.f.description && (
+              <p className="mt-3 whitespace-pre-line text-sm text-ink-soft">{String(c.f.description)}</p>
+            )}
           </Section>
           <Section n={2} title="Giám định kỹ thuật & bằng chứng">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -176,12 +226,30 @@ export function EscalationQueuePage() {
       accent="Vi Phạm Nghiêm Trọng & Chế Tài."
       api="GET /api/admin/escalations"
       columns={[
-        { key: 'id', header: 'Hồ sơ & thực thể', render: (c) => <CellTitle title={c.title} sub={`${c.id} · ${val(c, 'entity')}`} to={`/ops/escalations/${c.id}`} /> },
-        { key: 'l', header: 'Mức độ & nguồn', render: (c) => <CellTitle title={val(c, 'level')} sub={val(c, 'source')} /> },
+        {
+          key: 'id',
+          header: 'Hồ sơ & thực thể',
+          render: (c) => (
+            <CellTitle title={c.title} sub={`${c.id} · ${val(c, 'entity')}`} to={`/ops/escalations/${c.id}`} />
+          ),
+        },
+        {
+          key: 'l',
+          header: 'Mức độ & nguồn',
+          render: (c) => <CellTitle title={val(c, 'level')} sub={val(c, 'source')} />,
+        },
         { key: 'k', header: 'Rủi ro', render: (c) => risk(c) },
         moneyColumn('Dòng tiền liên quan'),
         statusColumn('escalation'),
-        { key: 'x', header: '', render: (c) => <Btn to={`/ops/escalations/${c.id}`} size="sm" variant="primary">Thẩm định</Btn> },
+        {
+          key: 'x',
+          header: '',
+          render: (c) => (
+            <Btn to={`/ops/escalations/${c.id}`} size="sm" variant="primary">
+              Thẩm định
+            </Btn>
+          ),
+        },
       ]}
     />
   )
@@ -203,10 +271,22 @@ export function EscalationReviewPage() {
       main={(c) => (
         <>
           <Section n={1} title="Thực thể bị tố giác">
-            <KeyValues cols={3} items={[{ label: 'Thực thể', value: val(c, 'entity') }, { label: 'Mức độ', value: val(c, 'level') }, { label: 'Nguồn leo thang', value: val(c, 'source') }]} />
+            <KeyValues
+              cols={3}
+              items={[
+                { label: 'Thực thể', value: val(c, 'entity') },
+                { label: 'Mức độ', value: val(c, 'level') },
+                { label: 'Nguồn leo thang', value: val(c, 'source') },
+              ]}
+            />
           </Section>
           <Section n={2} title="Tiền sử vi phạm & bằng chứng">
-            <KeyValues items={[{ label: 'Lịch sử', value: val(c, 'history') }, { label: 'Niêm yết đang mở', value: val(c, 'listings') }]} />
+            <KeyValues
+              items={[
+                { label: 'Lịch sử', value: val(c, 'history') },
+                { label: 'Niêm yết đang mở', value: val(c, 'listings') },
+              ]}
+            />
             <div className="mt-3 flex flex-wrap gap-2">
               {(c.evidence ?? []).map((e) => (
                 <Pill key={e} tone="danger">
@@ -219,7 +299,10 @@ export function EscalationReviewPage() {
       )}
       aside={(c) => (
         <Section title="Tác động dòng tiền & đơn">
-          <MoneyRows rows={[{ label: 'Đơn đang chạy', value: String(c.f.orders) }]} total={{ label: 'Ký quỹ có thể đóng băng', value: formatVnd(c.amount ?? 0) }} />
+          <MoneyRows
+            rows={[{ label: 'Đơn đang chạy', value: String(c.f.orders) }]}
+            total={{ label: 'Ký quỹ có thể đóng băng', value: formatVnd(c.amount ?? 0) }}
+          />
         </Section>
       )}
       decisions={[
@@ -227,7 +310,11 @@ export function EscalationReviewPage() {
         { value: 'freeze', label: 'Đóng băng ví ký quỹ', status: 'FROZEN', tone: 'danger' },
         { value: 'dismiss', label: 'Bác bỏ khiếu nại', status: 'DISMISSED' },
       ]}
-      checklist={['Đã xem toàn bộ tiền sử vi phạm', 'Đã thông báo cho bên bị xử lý', 'Đã đánh giá tác động tới đơn của người mua']}
+      checklist={[
+        'Đã xem toàn bộ tiền sử vi phạm',
+        'Đã thông báo cho bên bị xử lý',
+        'Đã đánh giá tác động tới đơn của người mua',
+      ]}
     />
   )
 }

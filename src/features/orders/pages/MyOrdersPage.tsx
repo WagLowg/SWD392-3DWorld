@@ -2,7 +2,7 @@ import { ArrowRight, Calendar, CheckCircle2, RotateCcw, Search, ShieldCheck, Tru
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { formatDateTime, formatVnd } from '../../../shared/lib/format'
-import { ApiNote, PageHeading } from '../../../shared/ui/primitives'
+import { PageHeading } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { OrderItemRow, OrderStatusBadge, orderCode, REFUNDABLE, StorefrontLabel } from '../components/OrderParts'
@@ -135,7 +135,7 @@ export function MyOrdersPage() {
 }
 
 function OrderCard({ order: o }: { order: Order }) {
-  const shipped = ['SHIPPED', 'DELIVERED', 'RECEIVED', 'RETURNED'].includes(o.status)
+  const shipped = ['SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'RECEIVED', 'RETURNED'].includes(o.status)
   return (
     <article className="rounded-[2rem] bg-white/95 p-5 shadow-soft sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -144,6 +144,11 @@ function OrderCard({ order: o }: { order: Order }) {
             {orderCode(o.id)}
           </Link>
           <StorefrontLabel id={o.storefrontId} />
+          {o.paymentMethod === 'COD' && (
+            <span className="rounded-full bg-peach px-2.5 py-1 font-label text-[10px] font-semibold text-orange-deep">
+              COD
+            </span>
+          )}
         </div>
         <OrderStatusBadge status={o.status} />
       </header>
@@ -163,13 +168,12 @@ function OrderCard({ order: o }: { order: Order }) {
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-peach/50 p-4 text-sm">
           <CheckCircle2 size={18} className="text-orange-deep" />
           <span className="flex-1">Kiện hàng đã giao. Kiểm tra sản phẩm và gửi yêu cầu hoàn tiền nếu có sự cố.</span>
-          <ApiNote>Chưa có API để người mua tự xác nhận "Đã nhận hàng" (RECEIVED).</ApiNote>
         </div>
       )}
       <footer className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
         {REFUNDABLE.includes(o.status) && (
           <Link
-            to={`/refunds/new?orderId=${o.id}`}
+            to={`/refunds?orderId=${o.id}`}
             className="inline-flex items-center gap-1.5 rounded-full bg-surface-low px-4 py-2.5 font-label text-xs font-semibold hover:bg-surface-high"
           >
             <Undo2 size={14} /> Yêu cầu hoàn tiền
@@ -183,7 +187,9 @@ function OrderCard({ order: o }: { order: Order }) {
             <Truck size={14} /> Tra cứu kiện hàng
           </Link>
         )}
-        {o.status === 'PENDING_PAYMENT' && <PayOrderButton orderId={o.id} amount={o.totalAmount} />}
+        {o.status === 'PENDING_PAYMENT' && o.paymentMethod !== 'COD' && o.onlinePaymentRequired !== false && (
+          <PayOrderButton orderId={o.id} amount={o.totalAmount} />
+        )}
         <Link
           to={`/orders/${o.id}`}
           className="inline-flex items-center gap-2 rounded-full bg-ink py-1.5 pl-4 pr-1.5 font-label text-xs font-semibold text-white hover:bg-violet"

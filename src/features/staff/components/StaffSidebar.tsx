@@ -1,31 +1,28 @@
 import {
-  ChevronRight,
-  ClipboardList,
   Flame,
   LayoutDashboard,
   LogOut,
-  Package,
   RotateCcw,
   ShieldCheck,
   Truck,
-  Users,
 } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { logout } from '../../../shared/session/session'
 import { useSession } from '../../../shared/session/useSession'
-import { INITIAL_STAFF_REFUNDS, INITIAL_STAFF_SHIPMENTS } from '../mocks/staffMockData'
+import { useStaffRefunds, useStaffShipments } from '../services/staff.service'
 
 export function StaffSidebar() {
   const { pathname } = useLocation()
   const { data: user } = useSession()
+  const role = user?.roles?.includes('ADMIN') ? 'ADMIN' : 'PRINT_STAFF'
+  const { shipments } = useStaffShipments()
+  const { refunds } = useStaffRefunds()
 
-  const pendingShipments = INITIAL_STAFF_SHIPMENTS.filter(
-    (s) => s.status === 'SHIPPED' || s.status === 'FAILED',
+  const pendingShipments = shipments.filter((s) =>
+    ['HANDED_TO_CARRIER', 'SHIPPED', 'IN_TRANSIT', 'FAILED'].includes(s.status),
   ).length
 
-  const pendingRefunds = INITIAL_STAFF_REFUNDS.filter(
-    (r) => r.status === 'SUBMITTED' || r.status === 'UNDER_REVIEW',
-  ).length
+  const pendingRefunds = refunds.filter((r) => r.status === 'PENDING').length
 
   const isOverviewActive = pathname === '/staff' || pathname === '/staff/'
   const isShippingActive = pathname.includes('/staff/shipments')
@@ -175,14 +172,6 @@ export function StaffSidebar() {
 
       <div className="my-3 h-px bg-line" />
 
-      {/* Demo helper banner */}
-      <div className="rounded-2xl border border-dashed border-violet/30 bg-violet-soft/30 p-3.5 text-xs text-ink-soft">
-        <p className="font-semibold text-violet">Chế độ Demo UI</p>
-        <p className="mt-1 text-[11px] leading-relaxed">
-          Giao diện xem trước dành cho thẩm định và đối soát. Các thao tác cập nhật là mô phỏng phía trình duyệt.
-        </p>
-      </div>
-
       {/* 4. Staff Identity & Logout */}
       <div className="border-t border-line pt-3">
         <div className="mb-2 flex items-center gap-2.5 rounded-2xl bg-surface-low p-2.5">
@@ -191,7 +180,7 @@ export function StaffSidebar() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-bold text-ink">{user?.name ?? 'Nhân viên vận hành'}</p>
-            <p className="truncate font-mono text-[10px] font-semibold text-teal">Role: PRINT_STAFF</p>
+            <p className="truncate font-mono text-[10px] font-semibold text-teal">Role: {role}</p>
           </div>
         </div>
 
