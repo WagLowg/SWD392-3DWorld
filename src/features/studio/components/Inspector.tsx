@@ -165,7 +165,7 @@ function MaterialPanel({ node }: { node: SceneNode }) {
       <div className="row wrap">
         {SWATCHES.map((c) => (
           <button key={c} aria-label={`Màu ${c}`} title={c} onClick={() => setA({ color: c })}
-            style={{ width: 28, height: 28, borderRadius: 14, background: c, cursor: 'pointer', border: node.appearance.color.toUpperCase() === c ? '2px solid var(--text)' : '2px solid transparent', outline: '1px solid var(--border)' }} />
+            style={{ width: 28, height: 28, borderRadius: 14, background: c, cursor: 'pointer', border: node.appearance.color.toUpperCase() === c ? '2px solid var(--st-text)' : '2px solid transparent', outline: '1px solid var(--st-border)' }} />
         ))}
       </div>
       <span className="label">HEX</span>
@@ -248,7 +248,7 @@ function AlignPanel({ ids }: { ids: string[] }) {
       <h3>Căn chỉnh & phân bố</h3>
       {(['X', 'Y', 'Z'] as const).map((a, i) => (
         <div className="row" key={a} style={{ marginBottom: 6 }}>
-          <span style={{ width: 18, color: 'var(--text-2)' }}>{a}</span>
+          <span style={{ width: 18, color: 'var(--st-text-2)' }}>{a}</span>
           <button className="btn sm icon" title={`Căn min ${a}`} onClick={() => st().align(i as 0 | 1 | 2, 'min')}><AlignStartHorizontal size={13} /></button>
           <button className="btn sm icon" title={`Căn giữa ${a}`} onClick={() => st().align(i as 0 | 1 | 2, 'center')}><AlignCenterHorizontal size={13} /></button>
           <button className="btn sm icon" title={`Căn max ${a}`} onClick={() => st().align(i as 0 | 1 | 2, 'max')}><AlignEndHorizontal size={13} /></button>

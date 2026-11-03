@@ -129,13 +129,16 @@ export const useStudio = create<State>((set, get) => ({
 
   async init(projectId) {
     if (initialized === projectId) return true;
+    // Tải dự án và snapshot song song (độc lập nhau) — mỗi request tới DB ở xa tốn ~1 giây.
+    const snapshotsJob = listSnapshots(projectId).catch(() => null);
     const server = await fetchProject(projectId);
     if (!server) return false;
     initialized = projectId;
     PID = projectId;
     let snapshots: Snapshot[] = [];
     let requests: PrintRequestReceipt[] = [];
-    try { ({ snapshots, requests } = await listSnapshots(projectId)); } catch { /* hiển thị rỗng, không chặn editor */ }
+    const listed = await snapshotsJob; // lỗi → hiển thị rỗng, không chặn editor
+    if (listed) ({ snapshots, requests } = listed);
     snapshots.forEach((x) => uploaded.add(`${projectId}/${x.id}`));
     set({
       projectId, projectName: server.name, nodes: server.nodes, revision: server.revision, lastSavedAt: server.savedAt,
@@ -150,6 +153,9 @@ export const useStudio = create<State>((set, get) => ({
         get().toast({ kind: 'info', title: 'Đã khôi phục bản nháp chưa lưu', text: `Dựa trên revision ${server.revision}. Bấm Lưu để ghi lên server.` });
       }
     } catch { /* ignore */ }
+    if (server.foreignCount) {
+      get().toast({ kind: 'info', title: 'Dự án có mô hình từ AI Studio', text: `${server.foreignCount} mô hình không dựng được trong 3D Studio nên đang ẩn (vẫn được giữ khi lưu). Mở dự án này trong AI Studio để xem.` });
+    }
     if (!localStorage.getItem('3dw.onboarded')) set({ modal: 'onboarding' });
     return true;
   },

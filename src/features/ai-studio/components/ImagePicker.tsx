@@ -129,7 +129,7 @@ export function ImagePicker({ mode, images, onChange, recent, disabled }: {
           <div className="stack" style={{ gap: 8 }}>
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <span className="label-up">Ảnh tham chiếu</span>
-              <button className="btn ghost sm" style={{ color: 'var(--primary)', padding: 0, height: 'auto' }} onClick={() => { setSlotTarget(0); slotInput.current?.click(); }} disabled={disabled}>Thay ảnh</button>
+              <button className="btn ghost sm" style={{ color: 'var(--ai-primary)', padding: 0, height: 'auto' }} onClick={() => { setSlotTarget(0); slotInput.current?.click(); }} disabled={disabled}>Thay ảnh</button>
             </div>
             <AuthedImg className="ref-img" src={main.url} alt={main.name} />
             <div className="row small"><span className="muted grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{main.name}</span>{main.width > 0 && <span className="tabular">{main.width} × {main.height}</span>}</div>
@@ -161,7 +161,7 @@ export function ImagePicker({ mode, images, onChange, recent, disabled }: {
               );
             })}
           </div>
-          <span className="small" style={{ color: images[0] ? 'var(--muted)' : 'var(--warning)' }}>
+          <span className="small" style={{ color: images[0] ? 'var(--ai-muted)' : 'var(--ai-warning)' }}>
             {images[0] ? 'Ảnh đầu tiên là góc nhìn chính. Các ảnh phải cùng một vật thể.' : '● Cần ảnh góc Trước (ảnh chính).'}
           </span>
         </div>

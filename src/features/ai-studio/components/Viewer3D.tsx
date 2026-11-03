@@ -1,10 +1,10 @@
 import { Component, Suspense, forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Grid, ContactShadows, Html } from '@react-three/drei';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, useGLTF, Grid, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useAuthedUrl } from '../lib/authed';
+import { Pedestal, StageLights, StudioEnv, VIOLET, fitDistance, reducedMotion } from './Stage';
 
 export type RenderMode = 'textured' | 'clay' | 'wireframe';
 export type ViewerHandle = { reset: () => void; screenshot: () => string | null };
@@ -22,8 +22,15 @@ type Props = {
 };
 
 const TARGET_SIZE = 2;
-const clayMat = new THREE.MeshStandardMaterial({ color: '#c9ced8', roughness: 0.72, metalness: 0.02 });
-const wireMat = new THREE.MeshBasicMaterial({ color: '#72d6f7', wireframe: true, transparent: true, opacity: 0.55 });
+const clayMat = new THREE.MeshStandardMaterial({ color: '#e4defa', roughness: 0.62, metalness: 0.02 });
+const wireMat = new THREE.MeshBasicMaterial({ color: VIOLET, wireframe: true, transparent: true, opacity: 0.5 });
+
+/** Hiệu ứng "hiện hình" mỗi khi mở một mô hình: khung lưới mọc từ dưới lên → đất sét → vật liệu thật. */
+type Phase = 'build' | 'clay' | 'done';
+const BUILD_MS = 1400;
+const CLAY_MS = 900;
+const clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+const ease = (x: number) => 1 - (1 - x) ** 3;
 
 function Model({ url, mode, bbox, onStats, onReady }: { url: string; mode: RenderMode; bbox: boolean; onStats?: Props['onStats']; onReady: (h: number) => void }) {
   const { scene } = useGLTF(url);
@@ -57,20 +64,52 @@ function Model({ url, mode, bbox, onStats, onReady }: { url: string; mode: Rende
     cb.current.onReady(fit.size.y * fit.s);
   }, [fit]);
 
+  const [phase, setPhase] = useState<Phase>(() => (reducedMotion() ? 'done' : 'build'));
+  const startedAt = useRef(0);
+  const gl = useThree((s) => s.gl);
+  // Đồng hồ bắt đầu ở khung hình đầu tiên được vẽ (không phải lúc mount), để máy chậm
+  // — biên dịch shader, parse GLB lớn — không làm người xem lỡ mất đoạn đầu hiệu ứng.
+  useEffect(() => {
+    startedAt.current = 0;
+    clipPlane.constant = 0;
+    setPhase(reducedMotion() ? 'done' : 'build');
+  }, [root]);
+
   useLayoutEffect(() => {
+    const show = phase === 'build' ? 'wireframe' : phase === 'clay' ? 'clay' : mode;
+    gl.localClippingEnabled = true;
+    wireMat.clippingPlanes = phase === 'build' ? [clipPlane] : null;
+    wireMat.needsUpdate = true;
     root.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
-      m.material = mode === 'clay' ? clayMat : mode === 'wireframe' ? wireMat : m.userData.original;
+      m.material = show === 'clay' ? clayMat : show === 'wireframe' ? wireMat : m.userData.original;
     });
-  }, [root, mode]);
+  }, [root, mode, phase, gl]);
+
+  // Vòng quét sáng chạy dọc mô hình trong lúc hiện hình
+  const height = fit.size.y * fit.s;
+  const scanR = Math.max(fit.size.x, fit.size.z) * fit.s * 0.62 + 0.12;
+  const scan = useRef<THREE.Mesh>(null);
+  useFrame(() => {
+    if (phase === 'done') { if (scan.current) scan.current.visible = false; return; }
+    if (!startedAt.current) startedAt.current = performance.now();
+    const ms = performance.now() - startedAt.current;
+    if (phase === 'build' && ms >= BUILD_MS) setPhase('clay');
+    else if (phase === 'clay' && ms >= BUILD_MS + CLAY_MS) setPhase('done');
+    const el = ms / 1000;
+    if (phase === 'build') clipPlane.constant = ease(Math.min(1, el / (BUILD_MS / 1000))) * height * 1.02;
+    if (!scan.current) return;
+    scan.current.visible = true;
+    scan.current.position.y = phase === 'build' ? clipPlane.constant : ease(Math.min(1, (el - BUILD_MS / 1000) / (CLAY_MS / 1000))) * height;
+  });
 
   const helper = useMemo(() => {
     const b = new THREE.Box3(
       new THREE.Vector3(-fit.size.x / 2, 0, -fit.size.z / 2).multiplyScalar(fit.s),
       new THREE.Vector3(fit.size.x / 2, fit.size.y, fit.size.z / 2).multiplyScalar(fit.s),
     );
-    return new THREE.Box3Helper(b, new THREE.Color('#a78bfa'));
+    return new THREE.Box3Helper(b, new THREE.Color(VIOLET));
   }, [fit]);
 
   return (
@@ -79,33 +118,26 @@ function Model({ url, mode, bbox, onStats, onReady }: { url: string; mode: Rende
         <primitive object={root} />
       </group>
       {bbox && <primitive object={helper} />}
+      <mesh ref={scan} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
+        <ringGeometry args={[scanR * 0.92, scanR, 96]} />
+        <meshBasicMaterial color={VIOLET} transparent opacity={0.85} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
+      </mesh>
     </group>
   );
 }
 
-function Env({ on }: { on: boolean }) {
-  const { gl, scene } = useThree();
-  useEffect(() => {
-    if (!on) { scene.environment = null; return; }
-    const pm = new THREE.PMREMGenerator(gl);
-    const env = pm.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environment = env;
-    scene.environmentIntensity = 0.6;
-    return () => { scene.environment = null; env.dispose(); pm.dispose(); };
-  }, [gl, scene, on]);
-  return null;
-}
-
 const CameraRig = forwardRef<ViewerHandle, { height: number }>(function CameraRig({ height }, ref) {
   const { camera, gl } = useThree();
+  const aspect = useThree((s) => s.size.width / Math.max(s.size.height, 1));
   const controls = useThree((s) => s.controls) as unknown as OrbitControlsImpl | null;
   const reset = () => {
     const h = height || 1.5;
-    camera.position.set(3.3, h * 0.7 + 1.1, 4.4);
+    const k = fitDistance(1, aspect); // khung hẹp → lùi camera để mô hình nằm trọn
+    camera.position.set(3.3 * k, h / 2 + (h * 0.2 + 0.85) * k, 4.4 * k);
     controls?.target.set(0, h / 2, 0);
     controls?.update();
   };
-  useEffect(reset, [height, controls]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(reset, [height, controls, aspect]); // eslint-disable-line react-hooks/exhaustive-deps
   useImperativeHandle(ref, () => ({
     reset,
     screenshot: () => { try { return gl.domElement.toDataURL('image/png'); } catch { return null; } },
@@ -113,11 +145,19 @@ const CameraRig = forwardRef<ViewerHandle, { height: number }>(function CameraRi
   return null;
 });
 
+/**
+ * Chỉ báo đang tải vẽ ngay trong cảnh 3D (vòng cung xoay trên bệ).
+ * Không dùng <Html> của drei: nó tạo một React root riêng, và khi Suspense xong React 19 gỡ root đó
+ * giữa lúc đang render → lỗi "removeChild … not a child of this node" khi mở dự án.
+ */
 function Loading() {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame((_, dt) => { if (ref.current) ref.current.rotation.z -= dt * 4; });
   return (
-    <Html center>
-      <div className="row" style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}><div className="spinner" /> Đang tải mô hình…</div>
-    </Html>
+    <mesh ref={ref} position={[0, 0.9, 0]}>
+      <torusGeometry args={[0.32, 0.035, 12, 64, Math.PI * 1.4]} />
+      <meshBasicMaterial color={VIOLET} toneMapped={false} />
+    </mesh>
   );
 }
 
@@ -159,16 +199,14 @@ export const Viewer3D = forwardRef<ViewerHandle, Props>(function Viewer3D(p, ref
   return (
     <ViewerBoundary fallback={fallback} resetKey={model.src}>
       <Canvas
-        gl={{ preserveDrawingBuffer: true, antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+        gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping }}
         camera={{ position: [2.6, 2, 3.4], fov: 38, near: 0.01, far: 200 }}
         dpr={[1, 2]}
         style={{ position: 'absolute', inset: 0 }}
       >
-        <hemisphereLight intensity={p.studioLight ? 0.25 : 0.55} groundColor="#141a24" />
-        <directionalLight position={[3, 5, 4]} intensity={p.studioLight ? 1.0 : 1.5} />
-        <directionalLight position={[-4, 2.5, -3]} intensity={0.6} color="#a78bfa" />
-        <directionalLight position={[0, 3, -5]} intensity={0.4} color="#72d6f7" />
-        <Env on={p.studioLight} />
+        <StageLights soft={p.studioLight} />
+        <StudioEnv on={p.studioLight} />
+        <Pedestal />
         <Suspense fallback={<Loading />}>
           <Model
             url={model.src}
@@ -177,12 +215,12 @@ export const Viewer3D = forwardRef<ViewerHandle, Props>(function Viewer3D(p, ref
             onStats={p.onStats}
             onReady={setH}
           />
-          <ContactShadows position={[0, 0.001, 0]} opacity={0.55} scale={6} blur={2.4} far={3} />
+          <ContactShadows position={[0, 0.003, 0]} opacity={0.35} scale={6} blur={2.4} far={3} color="#4b33b8" />
         </Suspense>
         {p.grid && (
           <>
-            <Grid position={[0, -0.002, 0]} args={[20, 20]} cellSize={0.25} cellThickness={0.6} cellColor="#243042" sectionSize={1} sectionThickness={1} sectionColor="#2f4156" fadeDistance={14} infiniteGrid />
-            <axesHelper args={[0.6]} />
+            <Grid position={[0, -0.185, 0]} args={[20, 20]} cellSize={0.25} cellThickness={0.6} cellColor="#d6cdf7" sectionSize={1} sectionThickness={1} sectionColor="#b9a7ff" fadeDistance={14} infiniteGrid />
+            <axesHelper args={[0.6]} position={[0, 0.004, 0]} />
           </>
         )}
         <OrbitControls makeDefault enableDamping dampingFactor={0.08} autoRotate={p.autoRotate} autoRotateSpeed={1.2} minDistance={0.5} maxDistance={20} />

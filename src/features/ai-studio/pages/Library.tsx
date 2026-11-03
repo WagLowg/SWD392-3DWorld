@@ -10,13 +10,14 @@ import { useCrumb } from '../components/AppShell';
 import { Badge, Empty, Modal, SelectField, Segmented } from '../components/ui';
 import { Viewer3D } from '../components/Viewer3D';
 import { useGlbThumbnail } from '../lib/glbThumb';
+import { TurntableThumb } from '../../../shared/ui/TurntableThumb';
 
-/** Ảnh thẻ dự án: thumbnail thật nếu có, không thì chụp từ tệp GLB. */
+/** Ảnh thẻ dự án: thumbnail thật nếu có, không thì chụp bàn xoay từ tệp GLB (rê chuột để xoay). */
 function ProjectThumb({ p, style }: { p: ProjectSummary; style?: CSSProperties }) {
   const shot = useGlbThumbnail(p.thumbnailUrl ? null : p.modelUrl);
   if (p.thumbnailUrl) return <AuthedImg src={p.thumbnailUrl} alt="" loading="lazy" style={style} />;
-  if (shot) return <img src={shot} alt="" style={style} />;
-  return <div style={{ display: 'grid', placeItems: 'center', height: '100%', ...style }}><Cuboid size={style ? 20 : 36} className="muted" /></div>;
+  if (!p.modelUrl) return <div style={{ display: 'grid', placeItems: 'center', height: '100%', ...style }}><Cuboid size={style ? 20 : 36} className="muted" /></div>;
+  return <TurntableThumb src={shot} alt={`Xem trước ${p.title}`} style={style} />;
 }
 
 type Tab = 'all' | 'recent' | 'favorites' | 'archived';
@@ -146,14 +147,23 @@ export default function Library() {
         <div style={{ width: 200 }}><Segmented value={view} onChange={setView} label="Kiểu hiển thị" options={[{ value: 'grid', label: 'Lưới' }, { value: 'list', label: 'Danh sách' }]} /></div>
       </div>
 
-      {error && <div className="banner danger" style={{ marginBottom: 16 }}>{error} <button className="btn sm" onClick={load}>Thử lại</button></div>}
+      {error && <div className="banner danger" style={{ marginBottom: 16, alignItems: 'center' }}><span style={{ flex: 1 }}>{error}</span><button className="btn sm" onClick={load}>Thử lại</button></div>}
 
       {!data ? (
         <div className="grid-cards">{[0, 1, 2].map((i) => <div key={i} className="skeleton" style={{ height: 340 }} />)}</div>
       ) : data.items.length === 0 ? (
-        <Empty icon={<Cuboid />} title={q || status ? 'Không tìm thấy mô hình phù hợp' : 'Chưa có mô hình nào'}
-          text={q || status ? 'Thử đổi từ khóa hoặc bộ lọc.' : 'Tạo mô hình đầu tiên từ một bức ảnh.'}
-          action={<Link className="btn primary" to="/studio">Tạo mô hình đầu tiên</Link>} />
+        q || status ? (
+          <Empty icon={<Search />} title="Không tìm thấy mô hình phù hợp" text="Thử đổi từ khóa hoặc bộ lọc." />
+        ) : tab === 'favorites' ? (
+          <Empty icon={<Star />} title="Chưa có mô hình yêu thích" text="Mở menu ⋯ trên một thẻ mô hình và chọn Yêu thích để ghim nó vào đây." />
+        ) : tab === 'archived' ? (
+          <Empty icon={<Archive />} title="Chưa có mô hình lưu trữ" text="Mô hình bạn lưu trữ sẽ được cất ở đây, không hiện trong danh sách chính." />
+        ) : tab === 'recent' ? (
+          <Empty icon={<Cuboid />} title="Không có mô hình nào trong 7 ngày qua" text="Các mô hình bạn tạo hoặc chỉnh gần đây sẽ hiện ở đây." />
+        ) : (
+          <Empty icon={<Cuboid />} title="Chưa có mô hình nào" text="Tạo mô hình đầu tiên từ một bức ảnh."
+            action={<Link className="btn primary" to="/studio">Tạo mô hình đầu tiên</Link>} />
+        )
       ) : view === 'grid' ? (
         <div className="grid-cards">
           {data.items.map((p) => {
@@ -165,7 +175,7 @@ export default function Library() {
                 </div>
                 <div className="body">
                   <h3>
-                    <span className="grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.favorite && <Star size={14} fill="currentColor" style={{ color: 'var(--warning, #f5a524)', marginRight: 4, verticalAlign: -2 }} />}{p.title}</span>
+                    <span className="grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.favorite && <Star size={14} fill="currentColor" style={{ color: 'var(--ai-warning, #f5a524)', marginRight: 4, verticalAlign: -2 }} />}{p.title}</span>
                     <span style={{ position: 'relative' }} ref={menuFor === p.id ? menuRef : undefined}>
                       <button className="icon-btn" style={{ width: 28, height: 28 }} aria-label="Tùy chọn" onClick={() => setMenuFor(menuFor === p.id ? null : p.id)}><MoreHorizontal size={16} /></button>
                       {menuFor === p.id && (

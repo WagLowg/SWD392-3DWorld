@@ -52,12 +52,13 @@ function NodeObject({ node, childrenOf }: { node: SceneNode; childrenOf: Map<str
             roughness={node.appearance.roughness}
             metalness={node.appearance.metalness}
             side={node.kind === 'plane' ? THREE.DoubleSide : THREE.FrontSide}
-            emissive={selected ? '#3b2f99' : '#000000'}
-            emissiveIntensity={selected ? 0.35 : 0}
+            emissive={selected ? '#16a37b' : '#000000'}
+            emissiveIntensity={selected ? 0.16 : 0}
             transparent={tool === 'measure'}
             opacity={1}
           />
-          {selected && <Edges threshold={20} color="#a59aff" />}
+          {/* Viền mảnh cho mọi vật thể: chi tiết sáng màu (vd. chữ trắng) không hòa vào nền sáng; vật đang chọn viền xanh */}
+          <Edges threshold={30} color={selected ? '#16a37b' : '#4d5a56'} lineWidth={selected ? 2.2 : 1} />
         </mesh>
       )}
       {kids.map((k) => <NodeObject key={k.id} node={k} childrenOf={childrenOf} />)}
@@ -117,7 +118,7 @@ function SelectionBounds() {
   const top = new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y, (box.min.z + box.max.z) / 2);
   return (
     <>
-      <box3Helper args={[box, new THREE.Color('#68d9d0')]} />
+      <box3Helper args={[box, new THREE.Color('#7955ff')]} />
       <Html position={top} center style={{ transform: 'translateY(-22px)' }} zIndexRange={[5, 0]}>
         <div className="dim-label">{size.x.toFixed(2)} × {size.y.toFixed(2)} × {size.z.toFixed(2)} mm</div>
       </Html>
@@ -134,11 +135,11 @@ function Measure() {
   return (
     <>
       {pts.map((p, i) => (
-        <mesh key={i} position={p}><sphereGeometry args={[0.6, 16, 8]} /><meshBasicMaterial color="#68d9d0" depthTest={false} /></mesh>
+        <mesh key={i} position={p}><sphereGeometry args={[0.6, 16, 8]} /><meshBasicMaterial color="#7955ff" depthTest={false} /></mesh>
       ))}
       {pts.length === 2 && (
         <>
-          <Line points={[pts[0], pts[1]]} color="#68d9d0" lineWidth={2} depthTest={false} />
+          <Line points={[pts[0], pts[1]]} color="#7955ff" lineWidth={2} depthTest={false} />
           <Html position={mid} center zIndexRange={[5, 0]}>
             <div className="dim-label measure">
               {d.toFixed(2)} mm · Δx {Math.abs(pts[1].x - pts[0].x).toFixed(2)} Δy {Math.abs(pts[1].y - pts[0].y).toFixed(2)} Δz {Math.abs(pts[1].z - pts[0].z).toFixed(2)}
@@ -223,7 +224,7 @@ export default function Viewport() {
     return (
       <div className="empty-scene">
         <div>
-          <AlertTriangle size={28} color="var(--warning)" />
+          <AlertTriangle size={28} color="var(--st-warning)" />
           <h3>Thiết bị không hỗ trợ WebGL2</h3>
           <p>Hãy dùng Chrome/Edge bản mới trên desktop và bật tăng tốc phần cứng. Dữ liệu đã lưu không bị ảnh hưởng.</p>
         </div>
@@ -244,10 +245,10 @@ export default function Viewport() {
         }}
         style={{ cursor: tool === 'measure' ? 'crosshair' : 'default' }}
       >
-        <color attach="background" args={['#10141d']} />
+        {/* Không tô nền: để lộ gradient bạc hà của .viewport (giống Landing) */}
         <Cameras key={`cam-${projection}`} />
         <CameraRig key={`rig-${projection}`} />
-        <hemisphereLight args={['#dfe3ff', '#1a1d29', 0.9]} />
+        <hemisphereLight args={['#ffffff', '#cfeee0', 0.85]} />
         <directionalLight position={[80, 140, 60]} intensity={1.6} castShadow shadow-mapSize={[2048, 2048]}
           shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} />
         <directionalLight position={[-90, 60, -80]} intensity={0.5} />
@@ -256,8 +257,8 @@ export default function Viewport() {
             infiniteGrid
             cellSize={grid.size}
             sectionSize={grid.size * 10}
-            cellColor="#262c3a"
-            sectionColor="#3a4257"
+            cellColor="#c6e8da"
+            sectionColor="#8fd3b8"
             fadeDistance={600}
             fadeStrength={1.5}
             cellThickness={0.6}
@@ -266,7 +267,7 @@ export default function Viewport() {
         )}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
           <planeGeometry args={[2000, 2000]} />
-          <shadowMaterial opacity={0.25} />
+          <shadowMaterial opacity={0.18} color="#0f6b52" />
         </mesh>
         <axesHelper args={[20]} />
         <SceneContent />
@@ -274,13 +275,13 @@ export default function Viewport() {
         <Measure />
         <Gizmo />
         <GizmoHelper alignment="bottom-right" margin={[64, 64]}>
-          <GizmoViewport axisColors={['#f27681', '#44c997', '#6aa8ff']} labelColor="#0b0e15" />
+          <GizmoViewport axisColors={['#e5484d', '#12a150', '#3b6ff5']} labelColor="#ffffff" />
         </GizmoHelper>
       </Canvas>
       {nodes.length === 0 && (
         <div className="empty-scene">
           <div>
-            <BoxIcon size={28} color="var(--secondary)" />
+            <BoxIcon size={28} color="var(--st-secondary)" />
             <h3>Scene đang trống</h3>
             <p>Thêm hình khối đầu tiên, chèn mẫu từ Thư viện hoặc nhập tệp STL.</p>
             <button className="btn primary" onClick={() => useStudio.getState().addNode('box')}><Plus size={14} /> Thêm hộp 20 mm</button>
@@ -290,7 +291,7 @@ export default function Viewport() {
       {lost && (
         <div className="empty-scene">
           <div>
-            <AlertTriangle size={28} color="var(--warning)" />
+            <AlertTriangle size={28} color="var(--st-warning)" />
             <h3>Mất kết nối WebGL</h3>
             <p>Đang khôi phục ngữ cảnh đồ hoạ. Scene của bạn vẫn được giữ nguyên.</p>
           </div>

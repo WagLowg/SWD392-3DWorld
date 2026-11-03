@@ -199,7 +199,7 @@ export function GeneratePanel(p: Props) {
         <div className="row small">
           <span className="muted grow">Chi phí dự kiến</span>
           {p.estimate ? (
-            <b style={{ color: p.estimate.sufficient ? 'var(--primary)' : 'var(--danger)' }}>{num(p.estimate.total)} tín dụng</b>
+            <b style={{ color: p.estimate.sufficient ? 'var(--ai-primary)' : 'var(--ai-danger)' }}>{num(p.estimate.total)} tín dụng</b>
           ) : <span className="muted">—</span>}
         </div>
         {p.estimateError && <div className="field-hint err">{p.estimateError}</div>}

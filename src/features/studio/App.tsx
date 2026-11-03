@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Component, useEffect, useState, type ReactNode } from 'react';
 import { href, useRoute } from './router';
 import Dashboard from './dashboard/Dashboard';
 import { Monitor } from 'lucide-react';
@@ -106,7 +106,7 @@ function StudioPage({ projectId }: { projectId: string }) {
       </div>
     );
   }
-  if (found === null) return <div style={{ display: 'grid', placeItems: 'center', height: '100vh', color: '#a6adbc' }}>Đang mở dự án…</div>;
+  if (found === null) return <div style={{ display: 'grid', placeItems: 'center', height: '100vh', color: '#55556a' }}>Đang mở dự án…</div>;
   return (
     <>
       <div className="studio-editor-shell">
@@ -123,7 +123,7 @@ function StudioPage({ projectId }: { projectId: string }) {
       </div>
       <div className="mobile-block">
         <div>
-          <Monitor size={32} color="var(--primary)" />
+          <Monitor size={32} color="var(--st-primary)" />
           <h2>Studio cần màn hình desktop</h2>
           <p>Trình chỉnh sửa 3D hỗ trợ desktop từ 1280 × 720 trên Chrome/Edge. Trên thiết bị di động bạn chỉ có thể xem thông báo này; dữ liệu đã lưu không bị ảnh hưởng.</p>
         </div>
@@ -134,8 +134,35 @@ function StudioPage({ projectId }: { projectId: string }) {
   );
 }
 
+/**
+ * Lỗi bất ngờ khi dựng giao diện (vd. dữ liệu dự án hỏng) không được làm trắng cả trang:
+ * hiện thông báo kèm nút quay lại; đổi route (resetKey) thì thử dựng lại.
+ */
+class StudioErrorBoundary extends Component<{ children: ReactNode; resetKey: string }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error) { console.error('3D Studio gặp lỗi khi hiển thị', error); }
+  componentDidUpdate(prev: { resetKey: string }) {
+    if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="dash-state" style={{ height: '100vh' }}>
+        <h3>Không hiển thị được trang này</h3>
+        <p>Dữ liệu dự án có thể bị lỗi. Các dự án khác của bạn không bị ảnh hưởng.</p>
+        <a className="btn primary" href={href({ name: 'projects' })}>Về Dự án của tôi</a>
+      </div>
+    );
+  }
+}
+
 export default function App() {
   const route = useRoute();
-  if (route.name === 'studio') return <StudioPage key={route.id} projectId={route.id} />;
-  return <Dashboard route={route} />;
+  const key = route.name === 'studio' ? `studio:${route.id}` : route.name === 'template' ? `template:${route.id}` : route.name;
+  return (
+    <StudioErrorBoundary resetKey={key}>
+      {route.name === 'studio' ? <StudioPage key={route.id} projectId={route.id} /> : <Dashboard route={route} />}
+    </StudioErrorBoundary>
+  );
 }

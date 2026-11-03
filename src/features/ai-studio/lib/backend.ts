@@ -215,6 +215,27 @@ function projectStatus(versions: number, tasks: Task[]): ProjectStatus {
   return 'DRAFT';
 }
 
+/* ------------------------------------------------- Yêu thích / Lưu trữ */
+
+/**
+ * Backend nhận `favorite` / `archived` ở PATCH /projects/{id} nhưng chưa lưu (GET /projects luôn trả false,
+ * xem docs/MISSING_APIS.md mục AI Studio). Trong lúc chờ sửa, trình duyệt nhớ lựa chọn gần nhất của người dùng
+ * và áp lên dữ liệu Backend; lựa chọn này luôn ưu tiên nên vẫn đúng khi Backend đã lưu được.
+ */
+type Flags = { favorite?: boolean; archived?: boolean };
+const FLAGS_KEY = '3dw.ai.projectFlags';
+function readFlags(): Record<string, Flags> {
+  try { return JSON.parse(localStorage.getItem(FLAGS_KEY) ?? '{}') as Record<string, Flags>; } catch { return {}; }
+}
+function rememberFlags(id: string, patch: Flags) {
+  if (patch.favorite === undefined && patch.archived === undefined) return;
+  try {
+    const all = readFlags();
+    all[id] = { ...all[id], ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) };
+    localStorage.setItem(FLAGS_KEY, JSON.stringify(all));
+  } catch { /* bị chặn */ }
+}
+
 /* ---------------------------------------------------------------- service */
 
 const P = '/api/ai-studio';
@@ -403,6 +424,7 @@ export const aiStudio = {
         activeVersionId: body.activeVersionId ? Number(body.activeVersionId) : undefined,
       },
     });
+    rememberFlags(id, { favorite: body.favorite, archived: body.archived });
   },
 
   async version(id: string): Promise<Version> {
@@ -478,6 +500,7 @@ const PROJECT_STATUS_MAP: Record<string, ProjectStatus> = {
  * thumbnailUrl = link tải GLB). Chỉ tin `primaryFileId` / `downloadUrl` để biết đã có mô hình chưa.
  */
 function toSummary(p: BProjectSummary): ProjectSummary {
+  const flags = readFlags()[String(p.modelId)] ?? {};
   const hasModel = p.primaryFileId != null && !!p.downloadUrl;
   const count = hasModel ? (p.versionCount ?? p.latestVersion ?? 1) : 0;
   const reported = PROJECT_STATUS_MAP[(p.status ?? '').toUpperCase()];
@@ -489,8 +512,8 @@ function toSummary(p: BProjectSummary): ProjectSummary {
     id: String(p.modelId),
     title: p.modelName,
     sourceMode: sourceModeOf(p.sourceMode),
-    favorite: !!p.favorite,
-    archived: !!p.archived,
+    favorite: flags.favorite ?? !!p.favorite,
+    archived: flags.archived ?? !!p.archived,
     visibility: p.visibility ?? 'PRIVATE',
     status,
     // activeVersionId có thể null (chưa chọn) → trang chọn mô hình mở dự án để lấy phiên bản mới nhất.

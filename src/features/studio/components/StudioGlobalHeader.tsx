@@ -12,11 +12,11 @@ export default function StudioGlobalHeader() {
     <header className="studio-global-header">
       <a className="studio-global-brand" href={href({ name: 'welcome' })} aria-label="Trang chủ 3D Studio">
         <span className="studio-global-logo"><Box size={20} /></span>
-        <span>3DWorld<small>3D STUDIO</small></span>
+        <span>3D<em>World</em><small>3D STUDIO</small></span>
       </a>
 
       <div className="studio-global-modules">
-        <ModuleSwitcher current="studio" theme="dark" />
+        <ModuleSwitcher current="studio" theme="light" />
       </div>
 
       <div className="studio-global-user">

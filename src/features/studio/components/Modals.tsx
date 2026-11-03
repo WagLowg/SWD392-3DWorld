@@ -307,7 +307,7 @@ function SendModal({ onClose }: { onClose: () => void }) {
       {step === 'form' && snap && (
         <>
           <div className="row" style={{ alignItems: 'flex-start', gap: 14 }}>
-            {thumb && <img src={thumb} alt="Thumbnail snapshot" style={{ width: 180, height: 120, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)' }} />}
+            {thumb && <img src={thumb} alt="Thumbnail snapshot" style={{ width: 180, height: 120, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--st-border)' }} />}
             <dl className="kv" style={{ flex: 1 }}>
               <dt>Snapshot</dt><dd>{snap.id} · READY</dd>
               <dt>Revision</dt><dd>r{snap.revision}</dd>
@@ -397,8 +397,8 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
         {i < ONBOARD.length - 1 ? <button className="btn primary" onClick={() => setI(i + 1)}>Tiếp</button> : <button className="btn primary" onClick={close}>Bắt đầu</button>}
       </>}>
       <span className="badge brand">Bước {i + 1}/{ONBOARD.length}</span>
-      <h3 style={{ font: '700 20px var(--font-head)', margin: '12px 0 6px' }}>{ONBOARD[i].t}</h3>
-      <p style={{ color: 'var(--text-2)', margin: 0 }}>{ONBOARD[i].d}</p>
+      <h3 style={{ font: '700 20px var(--st-font-head)', margin: '12px 0 6px' }}>{ONBOARD[i].t}</h3>
+      <p style={{ color: 'var(--st-text-2)', margin: 0 }}>{ONBOARD[i].d}</p>
     </Modal>
   );
 }

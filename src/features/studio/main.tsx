@@ -8,7 +8,7 @@ import './studio.css';
 import './dashboard/dashboard.css';
 
 const root = createRoot(document.getElementById('root')!);
-root.render(<div style={{ display: 'grid', placeItems: 'center', height: '100vh', color: '#a6adbc' }}>Đang tải Studio…</div>);
+root.render(<div style={{ display: 'grid', placeItems: 'center', height: '100vh', color: '#55556a' }}>Đang tải Studio…</div>);
 
 // Studio cần đăng nhập (dự án lưu theo tài khoản trên server)
 fetchMe().then((user) => {

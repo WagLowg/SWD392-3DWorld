@@ -227,7 +227,7 @@ export default function PrintPage() {
             <h3>Tóm tắt bàn giao</h3>
             <dl className="kv" style={{ marginTop: 12 }}>
               <dt>Mô hình</dt><dd>{detail.project.title} · {version.label.split(' ')[0]}</dd>
-              <dt>Kích thước</dt><dd>{confirmedDims ? `${confirmedDims.l} × ${confirmedDims.w} × ${confirmedDims.h} mm` : <span style={{ color: 'var(--warning)' }}>Chưa xác nhận</span>}</dd>
+              <dt>Kích thước</dt><dd>{confirmedDims ? `${confirmedDims.l} × ${confirmedDims.w} × ${confirmedDims.h} mm` : <span style={{ color: 'var(--ai-warning)' }}>Chưa xác nhận</span>}</dd>
               <dt>Công nghệ</dt><dd>{pod.technology} · {materialName}</dd>
               <dt>Chất lượng</dt><dd>{pod.quality}</dd>
               <dt>Số lượng</dt><dd>{pod.quantity}</dd>

@@ -34,9 +34,9 @@ export function AppShell() {
       <header className="header">
         <NavLink to="/studio" className="brand" aria-label="3DWorld AI Studio">
           <span className="brand-logo"><Box size={20} /></span>
-          <span className="brand-copy">3DWorld<small>AI STUDIO</small></span>
+          <span className="brand-copy"><span>3D<em>World</em></span><small>AI STUDIO</small></span>
         </NavLink>
-        <div className="header-modules"><ModuleSwitcher current="ai" theme="dark" /></div>
+        <div className="header-modules"><ModuleSwitcher current="ai" theme="light" /></div>
         <div className="header-account">
           <button type="button" className="header-icon" aria-label="Thông báo" title="Thông báo"><Bell size={18} /></button>
           <a className="header-user" href="/portal/profile" title={user?.email ?? 'Tài khoản'}>

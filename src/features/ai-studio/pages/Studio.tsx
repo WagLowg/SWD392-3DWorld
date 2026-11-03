@@ -14,6 +14,7 @@ import { Badge, Modal, Progress, Segmented, Switch, Empty } from '../components/
 import { ImagePicker } from '../components/ImagePicker';
 import { DEFAULT_CONFIG, GeneratePanel, type Preset } from '../components/GeneratePanel';
 import { Viewer3D, type RenderMode, type ViewerHandle, type ViewerStats } from '../components/Viewer3D';
+import { EmptyStage, GeneratingStage } from '../components/Stage';
 
 const EMPTY_IMGS: (SourceImage | null)[] = [null, null, null, null];
 
@@ -53,9 +54,9 @@ export default function Studio() {
   // --- viewer ---
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [renderMode, setRenderMode] = useState<RenderMode>('textured');
-  const [grid, setGrid] = useState(true);
+  const [grid, setGrid] = useState(false);
   const [bbox, setBbox] = useState(false);
-  const [autoRotate, setAutoRotate] = useState(false);
+  const [autoRotate, setAutoRotate] = useState(true);
   const [light, setLight] = useState(true);
   const [stats, setStats] = useState<ViewerStats | null>(null);
   const [dockTab, setDockTab] = useState<'variants' | 'tasks'>('variants');
@@ -313,35 +314,41 @@ export default function Studio() {
               </div>
             </>
           ) : primaryActive ? (
-            <div className="vp-overlay">
+            <>
               {(() => { const src = detail?.images.find((i) => i.id === primaryActive.imageIds[0]); return src ? <AuthedImg className="vp-src-img" src={src.url} alt="" /> : null; })()}
-              <div className="box" style={{ position: 'relative' }}>
-                <Cuboid size={40} color="var(--primary)" style={{ margin: '0 auto' }} />
+              <GeneratingStage progress={primaryActive.progress} />
+              <div className="vp-caption" aria-live="polite">
+                <span className="eyebrow">AI đang dựng mô hình</span>
                 <h3>{project?.title} đang thành hình</h3>
-                <p className="muted" style={{ margin: '0 0 16px' }}>{TASK_STATUS[primaryActive.status].label}{primaryActive.status === 'RUNNING' ? ` · ${primaryActive.progress}%` : ''}</p>
+                <p>{TASK_STATUS[primaryActive.status].label}{primaryActive.status === 'RUNNING' ? ` · ${primaryActive.progress}%` : ''}</p>
                 <Progress value={primaryActive.progress} indeterminate={primaryActive.status !== 'RUNNING'} />
               </div>
-            </div>
+            </>
           ) : detail && detail.tasks[0] && ['FAILED', 'ASSET_ERROR', 'CANCELLED'].includes(detail.tasks[0].status) ? (
             <div className="vp-overlay">
               <div className="box">
-                <AlertTriangle size={36} color="var(--danger)" style={{ margin: '0 auto' }} />
+                <AlertTriangle size={36} color="var(--ai-danger)" style={{ margin: '0 auto' }} />
                 <h3>{TASK_STATUS[detail.tasks[0].status].label}</h3>
                 <p className="muted">{detail.tasks[0].errorMessage || 'Tác vụ đã dừng.'}{detail.tasks[0].status !== 'ASSET_ERROR' && ' Credit đã được hoàn lại.'}</p>
                 <p className="muted small">Mã hỗ trợ: {detail.tasks[0].id}</p>
                 <p className="small">Điều chỉnh ảnh hoặc cấu hình bên trái rồi Generate lại.</p>
               </div>
             </div>
+          ) : projectId && !detail ? (
+            <div className="vp-overlay"><div className="box"><span className="spinner" style={{ margin: '0 auto' }} /><p className="muted">Đang mở dự án…</p></div></div>
           ) : (
-            <div className="vp-overlay">
-              <div className="box">
-                <Sparkles size={40} color="var(--primary)" style={{ margin: '0 auto' }} />
-                <h3>Biến ảnh thành mô hình 3D</h3>
-                <p className="muted">Tải một ảnh vật thể ở bảng bên trái, chọn cấu hình và bấm Generate. Kết quả sẽ hiển thị tại đây để xoay, phóng to và kiểm tra.</p>
+            <>
+            <EmptyStage />
+            <div className="vp-caption">
+              <div>
+                <span className="eyebrow">{mode === 'text' ? 'Văn bản' : 'Ảnh'} → Mô hình 3D</span>
+                <h3>Imagine it. <span className="grad-text">Make it 3D.</span></h3>
+                <p>{mode === 'text' ? 'Mô tả vật thể ở bảng bên trái' : 'Tải một ảnh vật thể ở bảng bên trái'}, chọn cấu hình và bấm Generate. Mô hình sẽ hiện hình ngay trên bệ này để bạn xoay, phóng to và kiểm tra.</p>
                 {provider === 'unconfigured' && <div className="banner warning" style={{ textAlign: 'left', marginTop: 16 }}><AlertTriangle size={16} style={{ flex: 'none' }} /><span>Máy chủ <b>chưa cấu hình nhà cung cấp AI</b> (Meshy) nên chưa tạo được mô hình mới. Bạn vẫn xem được các mô hình đã có.</span></div>}
                 {provider === 'mock' && <div className="banner warning" style={{ textAlign: 'left', marginTop: 16 }}><AlertTriangle size={16} style={{ flex: 'none' }} /><span>Đang ở <b>chế độ mô phỏng</b>: chưa cấu hình <code>MESHY_API_KEY</code> nên kết quả là mô hình mẫu, không gọi Meshy.</span></div>}
               </div>
             </div>
+            </>
           )}
         </div>
 
@@ -460,7 +467,7 @@ export default function Studio() {
                   <dt>Định dạng</dt><dd>{modelAsset.map((a) => a.format.toUpperCase()).join(' · ')}</dd>
                 </dl>
                 <div>
-                  <p className="label" style={{ fontWeight: 600, color: 'var(--text)' }}>Hiển thị không gian</p>
+                  <p className="label" style={{ fontWeight: 600, color: 'var(--ai-text)' }}>Hiển thị không gian</p>
                   <Switch label="Lưới & trục tọa độ" checked={grid} onChange={setGrid} />
                   <Switch label="Khung bao & kích thước" checked={bbox} onChange={setBbox} />
                   <Switch label="Tự động xoay" checked={autoRotate} onChange={setAutoRotate} />
@@ -497,9 +504,9 @@ export default function Studio() {
             {estimate.breakdown.map((b) => (
               <div key={b.label} className="row small"><span className="grow muted">{b.label}</span><span>{b.credits} × {variants}</span></div>
             ))}
-            <div className="row"><b className="grow">Tổng chi phí</b><b style={{ color: 'var(--primary)' }}>{num(estimate.total)} tín dụng</b></div>
+            <div className="row"><b className="grow">Tổng chi phí</b><b style={{ color: 'var(--ai-primary)' }}>{num(estimate.total)} tín dụng</b></div>
             <div className="row small"><span className="grow muted">Số dư hiện có</span><span>{num(estimate.balance)} tín dụng</span></div>
-            {!estimate.sufficient && <div className="banner danger">Không đủ tín dụng. <Link to="/credits">Nạp thêm tín dụng</Link></div>}
+            {!estimate.sufficient && <div className="banner danger"><span>Không đủ tín dụng. <Link to="/credits">Nạp thêm tín dụng</Link></span></div>}
             <div className="banner info">Tín dụng được giữ khi gửi tác vụ và chỉ bị trừ khi mô hình được lưu thành công. Tác vụ lỗi hoặc bị hủy sẽ được hoàn tín dụng.</div>
           </div>
         </Modal>
