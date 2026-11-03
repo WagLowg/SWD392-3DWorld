@@ -130,6 +130,8 @@ export type ApiWallet = {
   availableBalance: number
   payoutHold: number
   returnShippingDebt: number
+  minimumReserve?: number
+  withdrawableBalance?: number
   earnings: ApiEarning[]
 }
 
@@ -139,6 +141,31 @@ export type ApiPayout = {
   status: string
   bankAccountId: number
   transferReference?: string | null
+}
+
+export type ApiPayoutHistory = {
+  transactionId: number
+  amount: number
+  status: string
+  bankAccountId?: number | null
+  bankName?: string | null
+  accountNumberMasked?: string | null
+  accountHolder?: string | null
+  transferReference?: string | null
+  createdAt: string
+  reason?: string | null
+}
+
+export type ApiWalletLedger = {
+  ledgerId: number
+  entryType: string
+  balanceBucket: string
+  signedAmount: number
+  balanceAfter: number
+  transactionId?: number | null
+  earningId?: number | null
+  orderId?: number | null
+  createdAt: string
 }
 
 const P = (id: number) => `/api/seller/products/${id}`
@@ -252,5 +279,11 @@ export const sellerWalletApi = {
   },
   async requestPayout(input: { amount: number; bankAccountId: number; reason: string }) {
     return (await http.post<ApiEnvelope<ApiPayout>>('/api/users/me/payouts', input)).data
+  },
+  async payouts(page = 0, size = 50) {
+    return (await http.get<ApiEnvelope<ApiPayoutHistory[]>>(`/api/users/me/payouts${toQueryString({ page, size })}`)).data
+  },
+  async ledgers(page = 0, size = 50) {
+    return (await http.get<ApiEnvelope<ApiWalletLedger[]>>(`/api/users/me/wallet/ledgers${toQueryString({ page, size })}`)).data
   },
 }

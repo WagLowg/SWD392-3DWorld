@@ -1,4 +1,4 @@
-﻿import { useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useMockAction } from '../../../shared/mock/useMockAction'
 import type { ProductStatus, SellerApplication, SellerProduct, Storefront } from '../data/seller.fixtures'
 import { sellerService, type PendingProductMedia } from '../services/seller.service'
@@ -15,6 +15,8 @@ export const sellerKeys = {
   dispute: (id: string) => ['seller', 'disputes', id] as const,
   earnings: ['seller', 'earnings'] as const,
   earning: (id: string) => ['seller', 'earnings', id] as const,
+  payouts: (page = 0, size = 50) => ['seller', 'payouts', page, size] as const,
+  walletLedgers: (page = 0, size = 50) => ['seller', 'wallet-ledgers', page, size] as const,
 }
 
 export const useApplication = () => useQuery({ queryKey: sellerKeys.application, queryFn: sellerService.application })
@@ -27,6 +29,10 @@ export const useDisputes = () => useQuery({ queryKey: sellerKeys.disputes, query
 export const useDispute = (id: string) => useQuery({ queryKey: sellerKeys.dispute(id), queryFn: () => sellerService.dispute(id) })
 export const useEarnings = () => useQuery({ queryKey: sellerKeys.earnings, queryFn: sellerService.earnings })
 export const useEarning = (id: string) => useQuery({ queryKey: sellerKeys.earning(id), queryFn: () => sellerService.earning(id) })
+export const usePayoutHistory = (page = 0, size = 50) =>
+  useQuery({ queryKey: sellerKeys.payouts(page, size), queryFn: () => sellerService.payouts(page, size) })
+export const useWalletLedgers = (page = 0, size = 50) =>
+  useQuery({ queryKey: sellerKeys.walletLedgers(page, size), queryFn: () => sellerService.ledgers(page, size) })
 
 const ALL = [sellerKeys.all]
 
@@ -94,9 +100,9 @@ export const useChangePrice = () =>
   )
 export const useRequestPayout = () =>
   useMockAction(
-    (input: { amount: number; bankAccountId: number; reason: string }) => sellerService.requestPayout(input),
-    [sellerKeys.earnings],
-    'Đã gửi yêu cầu rút tiền để quản trị viên duyệt.',
+    (input: { amount: number; bankAccountId: number; reason: string; bankInfo?: string }) => sellerService.requestPayout(input),
+    [sellerKeys.earnings, ['seller', 'payouts'], ['seller', 'wallet-ledgers']],
+    'Đã gửi yêu cầu rút tiền thành công.',
   )
 export const useRespondDispute = () =>
   useMockAction(
