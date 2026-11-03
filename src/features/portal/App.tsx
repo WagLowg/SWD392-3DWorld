@@ -2,6 +2,7 @@ import { type ReactNode, useEffect } from 'react'
 import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom'
 import { useSession } from '../../shared/session/useSession'
 import { AdminLayout } from '../admin/components/AdminLayout'
+import { AdminDashboardPage } from '../admin/pages/AdminDashboardPage'
 import { AdminStorefrontPage } from '../admin/pages/AdminStorefrontPage'
 import { AddressesPage } from '../account/pages/AddressesPage'
 import { BankAccountsPage } from '../account/pages/BankAccountsPage'
@@ -275,6 +276,7 @@ export function App() {
       {/* Ranh giới bảo vệ: Tự động chuyển hướng tài khoản Staff-only về /portal/staff khi truy cập các route không thuộc Staff */}
       <Route element={<NonStaffRouteGuard />}>
         <Route element={<AdminLayout />}>
+          <Route path="admin" element={<AdminDashboardPage />} />
           <Route path="admin/storefronts" element={<AdminStorefrontPage />} />
           <Route path="admin/storefronts/verifications/:caseId" element={<StorefrontReviewPage />} />
         </Route>
