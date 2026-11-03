@@ -103,7 +103,7 @@ function subscriptionOf(item: JsonRecord, index: number): SubscriptionRow {
 
 function commissionOf(item: JsonRecord, index: number): CommissionRow {
   const shopId = numberOf(item, 'shopId', 'storefrontId', 'shop_id', 'storefront_id')
-  const orderId = nullableNumberOf(item, 'orderId', 'order_id')
+  const orderId = nullableNumberOf(item, 'orderId', 'physicalOrderId', 'order_id', 'physical_order_id')
   return {
     id: stringOf(item, 'id', 'earningId', 'earning_id') || `${orderId ?? 'row'}-${index}`,
     orderId,
@@ -111,8 +111,24 @@ function commissionOf(item: JsonRecord, index: number): CommissionRow {
       stringOf(item, 'orderCode', 'orderNumber', 'order_code', 'order_number') || (orderId ? `#${orderId}` : '—'),
     shopId,
     shopName: stringOf(item, 'shopName', 'storefrontName', 'shop_name', 'storefront_name') || `Shop #${shopId}`,
-    orderValue: numberOf(item, 'orderValue', 'orderAmount', 'subtotal', 'order_value', 'order_amount'),
-    commissionRate: numberOf(item, 'commissionRate', 'rate', 'commission_rate'),
+    orderValue: numberOf(
+      item,
+      'orderValue',
+      'orderAmount',
+      'grossAmount',
+      'subtotal',
+      'order_value',
+      'order_amount',
+      'gross_amount',
+    ),
+    commissionRate: numberOf(
+      item,
+      'commissionRateSnapshot',
+      'commissionRate',
+      'rate',
+      'commission_rate_snapshot',
+      'commission_rate',
+    ),
     commissionAmount: numberOf(item, 'commissionAmount', 'commission', 'commission_amount'),
     sellerNetAmount: numberOf(item, 'sellerNetAmount', 'sellerEntitlement', 'seller_net_amount', 'seller_entitlement'),
     debtOffset: numberOf(item, 'debtOffset', 'shippingDebtOffset', 'debt_offset', 'shipping_debt_offset'),
