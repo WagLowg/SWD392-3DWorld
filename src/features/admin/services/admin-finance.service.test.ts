@@ -75,30 +75,53 @@ describe('adminFinanceService', () => {
     })
   })
 
-  it('normalizes the list response currently documented by the backend', async () => {
+  it('normalizes the current dashboard commission response from the backend', async () => {
     get.mockResolvedValue({
+      status: 200,
+      message: 'Success',
       data: [
         {
-          earningId: 21,
-          orderId: 105,
-          shopId: 3,
-          commissionAmount: 75_000,
+          physical_order_id: 1,
+          order_code: 'ORD-1',
+          storefront_id: 2,
+          storefront_name: 'Shop',
+          order_value: 100_000,
+          gross_amount: 100_000,
+          commission_rate_snapshot: 0.05,
+          commission_amount: 5_000,
+          seller_net_amount: 95_000,
+          debt_offset: 0,
           status: 'RECOGNIZED',
-          releasedAt: '2026-11-02T01:57:00+07:00',
+          credited_to_shop: 95_000,
+          refund_under_review: false,
+          created_at: '2026-11-03T01:00:00+07:00',
+          release_eligible_at: '2026-11-03T02:00:00+07:00',
+          released_at: '2026-11-03T03:00:00+07:00',
+          refund_deadline_at: '2026-11-10T01:00:00+07:00',
         },
       ],
+      timestamp: '2026-11-04T00:00:00+07:00',
     })
 
     const page = await adminFinanceService.commissions({ from: '2026-11-01', to: '2026-11-30' }, 0, 20)
 
     expect(page).toMatchObject({ page: 0, size: 20, totalElements: 1, totalPages: 1 })
     expect(page.items[0]).toMatchObject({
-      id: '21',
-      orderId: 105,
-      shopId: 3,
-      commissionAmount: 75_000,
+      id: '1-0',
+      orderId: 1,
+      orderCode: 'ORD-1',
+      shopId: 2,
+      shopName: 'Shop',
+      orderValue: 100_000,
+      commissionRate: 0.05,
+      commissionAmount: 5_000,
+      sellerNetAmount: 95_000,
+      debtOffset: 0,
+      creditedToShop: 95_000,
+      refundUnderReview: false,
       status: 'RECOGNIZED',
-      releasedAt: '2026-11-02T01:57:00+07:00',
+      createdAt: '2026-11-03T01:00:00+07:00',
+      releasedAt: '2026-11-03T03:00:00+07:00',
     })
   })
 
