@@ -24,13 +24,24 @@ export function EarningDetailPage() {
         {q.data &&
           (() => {
             const e = q.data
-            const fee = e.gross * e.feeRate
-            const steps = [
-              { label: 'Đơn thanh toán', done: true },
-              { label: 'Người mua nhận hàng', done: !!e.receivedAt },
-              { label: 'Hết cửa sổ khiếu nại 72h', done: e.status === 'RELEASED' },
-              { label: 'Giải ngân vào ví', done: e.status === 'RELEASED' },
-            ]
+            const isRefund = e.status === 'REFUNDED' || e.isRefunded
+            const fee = isRefund ? 0 : (e.commissionAmount && e.commissionAmount > 0 ? e.commissionAmount : e.gross * (e.feeRate > 0 ? e.feeRate : 0.05))
+            const net = isRefund ? -(e.returnShippingFee ?? 48400) : (e.netAmount && e.netAmount > 0 ? e.netAmount : e.gross - fee)
+            const isReceived = !!e.receivedAt || e.status === 'RELEASED' || isRefund
+            const isWindowPassed = e.status === 'RELEASED' || (!!e.receivedAt && new Date(e.receivedAt).getTime() + 72 * 3600 * 1000 <= Date.now())
+            const steps = isRefund
+              ? [
+                  { label: 'Đơn thanh toán', done: true },
+                  { label: 'Người mua nhận hàng', done: true },
+                  { label: 'Khách khiếu nại hoàn tiền', done: true },
+                  { label: 'Cấn trừ phí ship 2 chiều (-48.400đ)', done: true },
+                ]
+              : [
+                  { label: 'Đơn thanh toán', done: true },
+                  { label: 'Người mua nhận hàng', done: isReceived },
+                  { label: 'Hết cửa sổ khiếu nại 72h', done: isWindowPassed },
+                  { label: 'Giải ngân vào ví', done: e.status === 'RELEASED' },
+                ]
             return (
               <>
                 <Hero
@@ -48,7 +59,14 @@ export function EarningDetailPage() {
                           items={[
                             { label: 'Đơn hàng', value: `#ORD-${e.orderId}` },
                             { label: 'SKU', value: e.sku },
-                            { label: 'Nhận hàng lúc', value: formatDateTime(e.receivedAt) },
+                            {
+                              label: 'Nhận hàng lúc',
+                              value: e.receivedAt
+                                ? formatDateTime(e.receivedAt)
+                                : e.status === 'RELEASED'
+                                  ? (e.releaseAt ? formatDateTime(new Date(new Date(e.releaseAt).getTime() - 72 * 3600 * 1000).toISOString()) : 'Đã nhận')
+                                  : '—',
+                            },
                           ]}
                         />
                         {e.blocker && <p className="mt-4 rounded-2xl bg-peach/60 p-4 text-sm text-orange-deep">{e.blocker}</p>}
@@ -71,7 +89,15 @@ export function EarningDetailPage() {
                             { key: 'at', header: 'Thời điểm', render: (l) => formatDateTime(l.at) },
                             { key: 't', header: 'Loại giao dịch', render: (l) => l.type },
                             { key: 'b', header: 'Ngăn số dư', render: (l) => BUCKET[l.bucket] },
-                            { key: 'a', header: 'Số tiền', render: (l) => <strong>{formatVnd(l.amount)}</strong> },
+                            {
+                              key: 'a',
+                              header: 'Số tiền',
+                              render: (l) => (
+                                <strong className={l.amount > 0 ? 'text-teal font-bold' : l.amount < 0 ? 'text-danger font-bold' : 'text-ink'}>
+                                  {l.amount > 0 ? `+${formatVnd(l.amount)}` : formatVnd(l.amount)}
+                                </strong>
+                              ),
+                            },
                             { key: 's', header: 'Trạng thái', render: (l) => <Pill tone={l.status === 'POSTED' ? 'green' : 'orange'}>{l.status}</Pill> },
                           ]}
                         />
@@ -81,13 +107,24 @@ export function EarningDetailPage() {
                   aside={
                     <>
                       <Section title="Phân bổ dòng tiền">
-                        <MoneyRows
-                          rows={[
-                            { label: 'Doanh số gốc', value: formatVnd(e.gross) },
-                            { label: `Phí sàn (${e.feeRate * 100}%)`, value: `-${formatVnd(fee)}`, tone: 'minus' },
-                          ]}
-                          total={{ label: 'Thực nhận', value: formatVnd(e.gross - fee) }}
-                        />
+                        {isRefund ? (
+                          <MoneyRows
+                            rows={[
+                              { label: 'Doanh số gốc', value: formatVnd(e.gross) },
+                              { label: 'Thu hồi tiền hoàn khách', value: `-${formatVnd(e.gross)}`, tone: 'minus' },
+                              { label: 'Phí ship 2 chiều (Xưởng chịu)', value: `-${formatVnd(e.returnShippingFee ?? 48400)}`, tone: 'minus' },
+                            ]}
+                            total={{ label: 'Thực nhận (Sau cấn trừ)', value: `-${formatVnd(e.returnShippingFee ?? 48400)}` }}
+                          />
+                        ) : (
+                          <MoneyRows
+                            rows={[
+                              { label: 'Doanh số gốc', value: formatVnd(e.gross) },
+                              { label: `Phí sàn (${e.feeRate * 100}%)`, value: `-${formatVnd(fee)}`, tone: 'minus' },
+                            ]}
+                            total={{ label: 'Thực nhận', value: formatVnd(net) }}
+                          />
+                        )}
                       </Section>
                       {wallet && (
                         <Section title="Ví xưởng">

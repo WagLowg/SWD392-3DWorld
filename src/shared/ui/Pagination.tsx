@@ -5,19 +5,21 @@ export function Pagination({
   page,
   totalPages,
   onChange,
+  className,
 }: {
   page: number
   totalPages: number
   onChange: (page: number) => void
+  className?: string
 }) {
   if (totalPages <= 1) return null
 
   const pages = pageWindow(page, totalPages)
   const btn =
-    'grid h-10 min-w-10 place-items-center rounded-full px-3 font-label text-sm font-semibold transition-colors'
+    'grid h-9 min-w-9 place-items-center rounded-xl px-2.5 font-label text-xs font-semibold transition-colors'
 
   return (
-    <nav aria-label="Phân trang" className="mt-10 flex items-center justify-center gap-1.5">
+    <nav aria-label="Phân trang" className={className ?? 'mt-10 flex items-center justify-center gap-1.5'}>
       <button
         type="button"
         aria-label="Trang trước"

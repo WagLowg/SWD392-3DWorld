@@ -327,7 +327,7 @@ export const disputes: Dispute[] = [
 
 /* -------------------------------------------------------------- earnings */
 
-export type EarningStatus = 'PENDING' | 'RELEASED' | 'HELD'
+export type EarningStatus = 'PENDING' | 'RELEASED' | 'HELD' | 'REFUNDED'
 
 export type Earning = {
   id: string
@@ -336,6 +336,10 @@ export type Earning = {
   sku: string
   gross: number
   feeRate: number
+  commissionAmount?: number
+  netAmount?: number
+  returnShippingFee?: number
+  isRefunded?: boolean
   status: EarningStatus
   receivedAt?: string
   releaseAt?: string

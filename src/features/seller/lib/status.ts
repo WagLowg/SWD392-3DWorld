@@ -38,6 +38,7 @@ export const EARNING_STATUS: Map = {
   PENDING: { label: 'Chờ mở khoá 72h', tone: 'orange' },
   RELEASED: { label: 'Đã giải ngân', tone: 'green' },
   HELD: { label: 'Phong toả tranh chấp', tone: 'danger' },
+  REFUNDED: { label: 'Đã hoàn tiền / Cấn trừ ship', tone: 'danger' },
 }
 
 export const PAYMENT_STATUS: Map = {
