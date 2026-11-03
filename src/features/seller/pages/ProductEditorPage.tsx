@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ImagePlus, PackageCheck, Plus, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ImagePlus, PackageCheck, Plus, Trash2, X } from 'lucide-react'
+import { getRecommendedBoxForDimensions } from '../../shipping/lib/boxFitting'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -735,6 +736,41 @@ function EditorForm({ product }: { product?: SellerProduct }) {
                           Hàng dễ vỡ, yêu cầu chống sốc
                         </label>
                       </div>
+                      {(() => {
+                        const curVar = (watch('variants')?.[index] ?? {}) as {
+                          lengthCm?: number
+                          widthCm?: number
+                          heightCm?: number
+                          weightGrams?: number
+                          fragile?: boolean
+                        }
+                        const rec = getRecommendedBoxForDimensions(
+                          curVar?.lengthCm,
+                          curVar?.widthCm,
+                          curVar?.heightCm,
+                          curVar?.weightGrams,
+                          curVar?.fragile,
+                        )
+                        if (rec.status === 'EMPTY') return null
+                        if (rec.status === 'VALID' && rec.box) {
+                          return (
+                            <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-800">
+                              <PackageCheck size={16} className="shrink-0 text-emerald-600" />
+                              <span>
+                                <strong>Hộp đóng gói tự động:</strong> {rec.box.name} — vừa khít chuẩn GHTK khi khách đặt hàng.
+                              </span>
+                            </div>
+                          )
+                        }
+                        return (
+                          <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
+                            <AlertTriangle size={16} className="shrink-0 text-amber-600" />
+                            <span>
+                              <strong>Cảnh báo kích thước:</strong> Kích thước (kèm 4cm đệm lót) vượt quá cỡ hộp hiện có. Vui lòng giảm kích thước hoặc đảm bảo database có cấu hình hộp lớn hơn.
+                            </span>
+                          </div>
+                        )
+                      })()}
                     </article>
                   )
                 })}

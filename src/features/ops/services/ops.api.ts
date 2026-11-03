@@ -3,7 +3,9 @@ import { toQueryString } from '../../../shared/lib/query'
 import { formatVnd } from '../../../shared/lib/format'
 import type { AuditEntry } from '../../../shared/ui/kit'
 import type { ApiPage, ApiProduct, ApiSellerVerification } from '../../seller/services/seller.api'
-import { readEvidence } from '../../seller/services/seller.service'
+import { buildEvidence, readEvidence } from '../../seller/services/seller.service'
+import { sellerVerificationApi } from '../../seller/services/seller.api'
+import { clearPendingSubmission, getAllPendingSubmissions, getPendingSubmission, type PendingSellerSubmission } from '../../seller/services/sellerSubmissionStorage'
 import type { OpsCase, OpsDomain } from '../data/ops.fixtures'
 
 /**
@@ -25,6 +27,17 @@ export type ApiReport = {
 }
 
 type SpringPage<T> = { content: T[]; totalElements: number; totalPages: number; number: number; size: number }
+
+type ApiCatalogProduct = {
+  id: number
+  storefrontId: number
+  title: string
+  category: string
+  thumbnailUrl?: string | null
+  price?: number | null
+}
+
+type ApiCatalogPage = ApiPage<ApiCatalogProduct>
 
 export const REAL_OPS_DOMAINS = new Set<OpsDomain>(['product', 'report', 'storefront', 'user'])
 
@@ -82,6 +95,68 @@ function productCase(p: ApiProduct): OpsCase {
   }
 }
 
+/** Fallback while BE has not exposed the full Admin moderation history endpoint. */
+function publishedCatalogCase(p: ApiCatalogProduct): OpsCase {
+  return {
+    id: String(p.id),
+    domain: 'product',
+    status: 'APPROVED',
+    title: p.title,
+    subtitle: `${p.category} · Đã mở bán`,
+    createdAt: '',
+    f: {
+      store: `Xưởng #${p.storefrontId}`,
+      category: p.category,
+      variants: '—',
+      price: p.price == null ? '—' : formatVnd(p.price),
+      specs: '—',
+      shippingClass: '—',
+      description: '',
+      revision: '',
+      media: p.thumbnailUrl ? 1 : 0,
+    },
+    evidence: p.thumbnailUrl ? [p.thumbnailUrl] : [],
+    audit: [{ at: '', actor: 'Quản trị viên', action: 'Đã duyệt mở bán', tone: 'green' }],
+  }
+}
+
+async function allPendingProducts() {
+  const items: ApiProduct[] = []
+  let page = 0
+  while (true) {
+    const response = await http.get<ApiEnvelope<ApiPage<ApiProduct>>>(
+      `/api/admin/products/pending${toQueryString({ page, size: 100 })}`,
+    )
+    items.push(...response.data.items)
+    if (page + 1 >= response.data.totalPages) break
+    page += 1
+  }
+  return items
+}
+
+async function allPublishedCatalogProducts() {
+  const items: ApiCatalogProduct[] = []
+  let page = 0
+  while (true) {
+    const response = await http.get<ApiEnvelope<ApiCatalogPage>>(
+      `/api/catalog${toQueryString({ sort: 'newest', page, size: 100 })}`,
+    )
+    items.push(...response.data.items)
+    if (page + 1 >= response.data.totalPages) break
+    page += 1
+  }
+  return items
+}
+
+async function productModerationCases(): Promise<OpsCase[]> {
+  // Current BE contract: pending is the only complete private moderation list.
+  // Public catalog enrichment is best-effort and must never block Admin review.
+  const pending = await allPendingProducts()
+  const published = await allPublishedCatalogProducts().catch(() => [])
+  const merged = [...pending.map(productCase), ...published.map(publishedCatalogCase)]
+  return [...new Map(merged.map((item) => [item.id, item])).values()]
+}
+
 /* ---------------------------------------------------------------- report */
 
 const REPORT_STATUS: Record<string, string> = { OPEN: 'PENDING', RESOLVED: 'ACTION_TAKEN', REJECTED: 'DISMISSED' }
@@ -128,6 +203,37 @@ const VERIFY_STATUS: Record<string, string> = {
   REJECTED: 'REJECTED',
 }
 
+function pendingSubmissionToOpsCase(p: PendingSellerSubmission): OpsCase {
+  const submitted = new Date(p.submittedAt).toISOString()
+  return {
+    id: String(p.userId ?? 0),
+    domain: 'storefront',
+    status: 'PENDING',
+    title: p.storefrontName || `Người dùng #`,
+    subtitle: `user_`,
+    createdAt: submitted,
+    f: {
+      owner: `Người dùng #`,
+      ownerId: `USR-`,
+      bankAccountId: p.bankAccountId,
+      bank: p.bankAccountId ? `Tài khoản #` : '—',
+      bankStatus: 'PENDING',
+      location: p.address || '—',
+      equipment: '—',
+      tech: p.technologies.join(', ') || '—',
+      email: 'Đã xác thực',
+      phone: p.phoneSnapshot ? `Chờ duyệt ()` : 'Chưa xác thực',
+      phoneNumber: p.phoneSnapshot ?? '',
+      phoneVerified: 0,
+      eligible: 'Chờ duyệt điều kiện',
+      submittedAt: p.submittedAt,
+    },
+    evidence: p.evidence ? [p.evidence] : [],
+    audit: [
+      { at: submitted, actor: `Người dùng #`, action: 'Nộp hồ sơ xét duyệt', tone: 'violet' },
+    ],
+  }
+}
 function verificationCase(v: ApiSellerVerification): OpsCase {
   const s = v.verification
   const ev = readEvidence(s?.evidenceReference)
@@ -161,6 +267,8 @@ function verificationCase(v: ApiSellerVerification): OpsCase {
       tech: ev.technologies.join(', ') || '—',
       email: v.emailVerified ? 'Đã xác thực' : 'Chưa xác thực',
       phone: v.phoneVerified ? `Đã xác thực${s?.phoneSnapshot ? ` (${s.phoneSnapshot})` : ''}` : 'Chưa xác thực',
+      phoneNumber: s?.phoneSnapshot || ev.phone || '',
+      phoneVerified: v.phoneVerified ? 1 : 0,
       eligible: v.eligible ? 'Đủ điều kiện' : 'Chưa đủ điều kiện',
       submittedAt: s?.submittedAt ?? 0,
     },
@@ -191,6 +299,46 @@ function userCase(a: ApiAccount): OpsCase {
   }
 }
 
+export function generatePhoneCandidates(raw: string): string[] {
+  const trimmed = (raw || '').trim()
+  const digits = trimmed.replace(/\D/g, '')
+  const set = new Set<string>()
+
+  if (trimmed && /^\+?[0-9]{8,15}$/.test(trimmed)) {
+    set.add(trimmed)
+  }
+
+  if (digits) {
+    if (digits.startsWith('84')) {
+      const rest = digits.slice(2)
+      set.add('0' + rest)
+      set.add('+84' + rest)
+      set.add(digits)
+    } else if (digits.startsWith('0')) {
+      const rest = digits.slice(1)
+      set.add(digits)
+      set.add('+84' + rest)
+      set.add('84' + rest)
+      if (digits.length === 10) {
+        set.add(digits.slice(0, 9))
+        set.add('+84' + rest.slice(0, 8))
+        set.add('84' + rest.slice(0, 8))
+      } else if (digits.length === 9) {
+        set.add(digits + '9')
+        set.add(digits + '0')
+        set.add('+84' + rest + '9')
+        set.add('84' + rest + '9')
+      }
+    } else {
+      set.add('0' + digits)
+      set.add('+84' + digits)
+      set.add(digits)
+    }
+  }
+
+  return Array.from(set).filter((p) => /^\+?[0-9]{8,15}$/.test(p))
+}
+
 export const adminUsersApi = {
   async list() {
     return (await http.get<ApiEnvelope<SpringPage<ApiAccount>>>(`/api/admin/users${PAGE}`)).data.content
@@ -204,12 +352,30 @@ export const adminUsersApi = {
     return (await http.put<ApiEnvelope<ApiAccount>>(`/api/admin/users/${userId}/roles/${role}`, { active, reason }))
       .data
   },
-  /** Xác thực SĐT thủ công (sandbox, không gửi SMS). */
+  /** Xác thực SĐT thủ công (sandbox, không gửi SMS). Tự động đối chiếu và thử các biến thể format SĐT (0999, +84, 84, 9 số) để khớp chính xác giá trị trong users.phone. */
   async reviewPhone(
     userId: number,
     input: { phone: string; approved: boolean; evidenceReference: string; reason: string },
   ) {
-    return (await http.patch<ApiEnvelope<ApiAccount>>(`/api/admin/users/${userId}/phone-verification`, input)).data
+    const candidates = generatePhoneCandidates(input.phone)
+    let lastError: unknown = null
+
+    for (const phoneCandidate of candidates) {
+      try {
+        const res = await http.patch<ApiEnvelope<ApiAccount>>(`/api/admin/users/${userId}/phone-verification`, {
+          ...input,
+          phone: phoneCandidate,
+        })
+        return res.data
+      } catch (err) {
+        lastError = err
+        const msg = err instanceof Error ? err.message : String(err)
+        if (!/phone changed/i.test(msg) && !/refresh before reviewing/i.test(msg)) {
+          throw err
+        }
+      }
+    }
+    throw lastError
   },
 }
 
@@ -226,8 +392,7 @@ async function settle<T>(p: Promise<T[]>) {
 export const adminOpsApi = {
   async list(domain: OpsDomain): Promise<OpsCase[]> {
     if (domain === 'product') {
-      const page = (await http.get<ApiEnvelope<ApiPage<ApiProduct>>>(`/api/admin/products/pending${PAGE}`)).data
-      return page.items.map(productCase)
+      return productModerationCases()
     }
     if (domain === 'report') {
       const lists = await Promise.all(
@@ -250,10 +415,25 @@ export const adminOpsApi = {
             .get<ApiEnvelope<SpringPage<ApiSellerVerification>>>(
               `/api/admin/seller-verifications${toQueryString({ status, page: 0, size: 100 })}`,
             )
-            .then((r) => r.data.content),
+            .then((r) => r.data.content)
+            .catch(() => [] as ApiSellerVerification[]),
         ),
       )
-      return lists.flat().map(verificationCase)
+      const allCases = lists.flat().map(verificationCase)
+      const pendingLocal = getAllPendingSubmissions()
+      for (const p of pendingLocal) {
+        if (!p.userId) continue
+        const existingIdx = allCases.findIndex((c) => c.id === String(p.userId))
+        const pCase = pendingSubmissionToOpsCase(p)
+        if (existingIdx >= 0) {
+          if (allCases[existingIdx].status !== 'VERIFIED' && allCases[existingIdx].status !== 'REJECTED') {
+            allCases[existingIdx] = { ...allCases[existingIdx], ...pCase, status: 'PENDING' }
+          }
+        } else {
+          allCases.unshift(pCase)
+        }
+      }
+      return allCases
     }
     if (domain === 'user') return (await adminUsersApi.list()).map(userCase)
     return []
@@ -262,10 +442,35 @@ export const adminOpsApi = {
   async get(domain: OpsDomain, id: string): Promise<OpsCase> {
     if (domain === 'product')
       return productCase((await http.get<ApiEnvelope<ApiProduct>>(`/api/admin/products/${id}/moderation`)).data)
-    if (domain === 'storefront')
-      return verificationCase(
-        (await http.get<ApiEnvelope<ApiSellerVerification>>(`/api/admin/users/${id}/seller-verification`)).data,
-      )
+    if (domain === 'storefront') {
+      try {
+        const res = await http.get<ApiEnvelope<ApiSellerVerification>>(`/api/admin/users/${id}/seller-verification`)
+        const c = verificationCase(res.data)
+        const pending = getPendingSubmission(Number(id))
+        if (pending && c.status !== 'VERIFIED' && c.status !== 'REJECTED') {
+          return {
+            ...c,
+            title: pending.storefrontName || c.title,
+            status: 'PENDING',
+            f: {
+              ...c.f,
+              bankAccountId: pending.bankAccountId || c.f.bankAccountId,
+              phoneNumber: pending.phoneSnapshot || c.f.phoneNumber,
+              phone: pending.phoneSnapshot ? `Chờ duyệt ()` : c.f.phone,
+              submittedAt: pending.submittedAt || c.f.submittedAt,
+              tech: pending.technologies.join(', ') || c.f.tech,
+              location: pending.address || c.f.location,
+            },
+            evidence: pending.evidence ? [pending.evidence] : c.evidence,
+          }
+        }
+        return c
+      } catch (err) {
+        const pending = getPendingSubmission(Number(id))
+        if (pending) return pendingSubmissionToOpsCase(pending)
+        throw err
+      }
+    }
     // Không có GET /api/admin/reports/{id} hay /api/admin/users/{id} → tìm trong danh sách
     const found = (await adminOpsApi.list(domain)).find((c) => c.id === id)
     if (!found) throw Object.assign(new Error('Hồ sơ không tồn tại.'), { status: 404 })
@@ -295,11 +500,30 @@ export const adminOpsApi = {
       return
     }
     if (c.domain === 'storefront') {
-      await http.patch(`/api/admin/users/${c.id}/seller-verification`, {
-        submittedAt: Number(c.f.submittedAt) || undefined,
-        approved: status === 'VERIFIED',
-        reason,
-      })
+      let latestSubmittedAt: number = Number(c.f.submittedAt) || 0
+
+      // Luôn kiểm tra trạng thái thực tế mới nhất trong BE
+      const latest = await http.get<ApiEnvelope<ApiSellerVerification>>(`/api/admin/users/${c.id}/seller-verification`)
+      const ver = latest.data.verification
+      if (ver?.submittedAt) {
+        latestSubmittedAt = ver.submittedAt
+      }
+      if (!ver?.status || ver.status === 'NOT_SUBMITTED') {
+        throw new Error(
+          'Hồ sơ người bán chưa ở trạng thái PENDING trong database. Backend yêu cầu đơn phải ở trạng thái PENDING trước khi ký duyệt. Vui lòng duyệt SĐT và Ngân hàng, hoặc cập nhật trạng thái PENDING trong database.',
+        )
+      }
+      try {
+        await http.patch(`/api/admin/users/${c.id}/seller-verification`, {
+          submittedAt: latestSubmittedAt || Date.now(),
+          approved: status === 'VERIFIED',
+          reason,
+        })
+      } finally {
+        if (status === 'VERIFIED' || status === 'REJECTED') {
+          clearPendingSubmission(Number(c.id))
+        }
+      }
     }
   },
 }

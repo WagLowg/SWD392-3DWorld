@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+﻿import { useQuery } from '@tanstack/react-query'
 import { useMockAction } from '../../../shared/mock/useMockAction'
 import type { ProductStatus, SellerApplication, SellerProduct, Storefront } from '../data/seller.fixtures'
 import { sellerService, type PendingProductMedia } from '../services/seller.service'
@@ -35,10 +35,11 @@ export const useSubmitApplication = () =>
     (
       patch: Pick<SellerApplication, 'storefrontName' | 'description' | 'address' | 'technologies'> & {
         evidence?: string
+        phone?: string
       },
     ) => sellerService.submitApplication(patch),
     ALL,
-    'Đã nộp hồ sơ — chờ chuyên viên xét duyệt.',
+    'Đã nộp hồ sơ xét duyệt — chờ Admin xác minh SĐT, ngân hàng và hồ sơ xưởng.',
   )
 export const useCreateStorefront = () =>
   useMockAction(

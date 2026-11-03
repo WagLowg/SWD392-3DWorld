@@ -242,7 +242,9 @@ function CheckoutForm({
       ? 'Danh sách sản phẩm có ID trùng lặp.'
       : 'Mỗi lần checkout chỉ hỗ trợ tối đa 100 sản phẩm trong giỏ.'
     : shippingQuote.error instanceof ApiClientError
-      ? shippingQuote.error.message
+      ? shippingQuote.error.message.includes('Products do not fit available boxes')
+        ? 'Kích thước hoặc trọng lượng sản phẩm vượt quá quy cách đóng gói (hộp vận chuyển) hiện có. Vui lòng chọn sản phẩm khác hoặc kiểm tra kích thước hộp trong cấu hình.'
+        : shippingQuote.error.message
       : shippingQuote.error
         ? 'Không tính được phí vận chuyển.'
         : ''

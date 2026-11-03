@@ -240,7 +240,7 @@ export const sellerVerificationApi = {
   async get() {
     return (await http.get<ApiEnvelope<ApiSellerVerification>>('/api/users/me/seller-verification')).data
   },
-  /** Cần email, SĐT đã xác thực và một tài khoản ngân hàng VERIFIED. */
+  /** Contract onboarding: BE lưu snapshot SĐT hiện tại và bankAccountId để Admin duyệt trong cùng hồ sơ. */
   async submit(input: { bankAccountId: number; evidenceReference: string }) {
     return (await http.post<ApiEnvelope<ApiSellerVerification>>('/api/users/me/seller-verification', input)).data
   },

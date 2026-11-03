@@ -2,7 +2,7 @@ import { ArrowRight, Calendar, CheckCircle2, RotateCcw, Search, ShieldCheck, Tru
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { formatDateTime, formatVnd } from '../../../shared/lib/format'
-import { ApiNote, PageHeading } from '../../../shared/ui/primitives'
+import { PageHeading } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { OrderItemRow, OrderStatusBadge, orderCode, REFUNDABLE, StorefrontLabel } from '../components/OrderParts'
@@ -168,7 +168,6 @@ function OrderCard({ order: o }: { order: Order }) {
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-peach/50 p-4 text-sm">
           <CheckCircle2 size={18} className="text-orange-deep" />
           <span className="flex-1">Kiện hàng đã giao. Kiểm tra sản phẩm và gửi yêu cầu hoàn tiền nếu có sự cố.</span>
-          <ApiNote>Staff sẽ đối soát GHTK và cập nhật trạng thái xác nhận nhận hàng.</ApiNote>
         </div>
       )}
       <footer className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">

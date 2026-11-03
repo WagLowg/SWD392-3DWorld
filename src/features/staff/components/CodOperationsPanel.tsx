@@ -56,11 +56,22 @@ export function CodOperationsPanel({
   const canSettle = canRecordCodSettlement(admin, payment)
   const activeMutation = mode === 'settlement' ? settlement : collection
 
+  const generateCodes = (targetMode: 'collection' | 'settlement') => {
+    const suffix = Date.now().toString().slice(-4)
+    if (targetMode === 'collection') {
+      setReference(`GHTK-COD-${orderId}-${suffix}`)
+      setEvidenceKey(`EVD-SIGN-${orderId}-${suffix}`)
+      setReason('GHTK xác nhận đã thu COD')
+    } else {
+      setReference(`GHTK-SETTLE-${orderId}-${suffix}`)
+      setEvidenceKey(`EVD-BANK-${orderId}-${suffix}`)
+      setReason('Đã nhận tiền đối soát từ GHTK')
+    }
+  }
+
   const open = (nextMode: 'collection' | 'settlement') => {
     setMode(nextMode)
-    setReference('')
-    setEvidenceKey('')
-    setReason(nextMode === 'collection' ? 'GHTK xác nhận đã thu COD' : 'Đã nhận tiền đối soát từ GHTK')
+    generateCodes(nextMode)
     setOccurredAt(localDateTimeValue())
     setError('')
     setSuccess('')
@@ -163,6 +174,19 @@ export function CodOperationsPanel({
 
       {mode && (
         <div className="mt-4 space-y-3 border-t border-line pt-4">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-medium text-ink-soft">
+              ✨ Tự động tạo mã mẫu cho mô phỏng
+            </span>
+            <button
+              type="button"
+              onClick={() => generateCodes(mode)}
+              className="text-[11px] font-semibold text-violet underline hover:text-violet-deep"
+            >
+              Tạo lại mã
+            </button>
+          </div>
+
           <label className="block text-xs font-semibold">
             Số tiền
             <input className={`${inputClass} mt-1`} value={payment.expectedAmount} readOnly disabled />
@@ -208,4 +232,3 @@ export function CodOperationsPanel({
     </section>
   )
 }
-

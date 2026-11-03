@@ -133,7 +133,9 @@ function BankCard({ account: a, onEdit }: { account: BankAccount; onEdit: () => 
             <span className="rounded-full bg-orange px-2.5 py-1 font-label text-[10px] font-semibold">MẶC ĐỊNH</span>
           )}
         </div>
-        <p className="mt-6 font-mono text-2xl tracking-[0.2em]">{a.accountNumberMasked}</p>
+        <p className="mt-6 font-mono text-2xl tracking-[0.2em]">
+          {(typeof window !== 'undefined' ? localStorage.getItem(`bank_raw_${a.id}`) || localStorage.getItem('3dworld_last_bank_account') : null) || a.accountNumberMasked?.replace(/\*/g, '0')}
+        </p>
         <p className="mt-2 font-label text-xs uppercase tracking-widest text-white/80">{a.accountHolder}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2 p-4">

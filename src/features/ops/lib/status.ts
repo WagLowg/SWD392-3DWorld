@@ -13,9 +13,8 @@ export const OPS_STATUS: Record<OpsDomain, Map> = {
   },
   product: {
     PENDING: { label: 'Chờ thẩm định', tone: 'orange' },
-    CHANGES_REQUESTED: { label: 'Yêu cầu chỉnh sửa', tone: 'violet' },
     APPROVED: { label: 'Đã duyệt mở bán', tone: 'green' },
-    REJECTED: { label: 'Từ chối & khoá', tone: 'danger' },
+    REJECTED: { label: 'Đã từ chối', tone: 'danger' },
   },
   report: {
     PENDING: { label: 'Chờ thẩm định', tone: 'orange' },
