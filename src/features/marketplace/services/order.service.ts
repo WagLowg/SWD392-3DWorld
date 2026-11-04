@@ -24,9 +24,8 @@ export const addressService = {
 
 export const shippingService = {
   async quote(input: ShippingQuoteInput, signal?: AbortSignal) {
-    return (
-      await http.post<ApiEnvelope<ShippingQuote>, ShippingQuoteInput>('/api/shipping/quote', input, { signal })
-    ).data
+    return (await http.post<ApiEnvelope<ShippingQuote>, ShippingQuoteInput>('/api/shipping/quote', input, { signal }))
+      .data
   },
 }
 

@@ -33,6 +33,7 @@ import {
   resolveMediaUrl,
   shippingClassLabel,
 } from '../lib/format'
+import { rememberViewed } from '../lib/recentlyViewed'
 import { useMarketplaceUiStore } from '../stores/marketplace-ui.store'
 import type { ProductDetail, ProductVariant } from '../types/catalog.types'
 
@@ -44,7 +45,9 @@ export function ProductDetailPage() {
   const { data, isLoading, isError, error, refetch } = useProductDetail(valid ? id : undefined)
 
   useEffect(() => {
-    if (data) document.title = `${data.product.title} · Chợ Đồ Chơi 3DWorld`
+    if (!data) return
+    document.title = `${data.product.title} · Chợ Đồ Chơi 3DWorld`
+    rememberViewed(data.product)
   }, [data])
 
   const notFound =

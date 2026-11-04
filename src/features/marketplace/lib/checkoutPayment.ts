@@ -4,4 +4,3 @@ export function ordersRequiringGatewayPayment(orders: Order[], paymentMethod: Pa
   if (paymentMethod !== 'GATEWAY') return []
   return orders.filter((order) => order.paymentMethod !== 'COD' && order.onlinePaymentRequired !== false)
 }
-

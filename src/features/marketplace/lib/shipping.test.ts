@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { isShippingQuoteUsable, SHIPPING_QUOTE_EXPIRY_BUFFER_MS } from './shipping'
 import type { ShippingQuote } from '../types/catalog.types'
+import { isShippingQuoteUsable, SHIPPING_QUOTE_EXPIRY_BUFFER_MS } from './shipping'
 
 const quote: ShippingQuote = {
   quoteToken: 'quote-token',
@@ -26,4 +26,3 @@ describe('isShippingQuoteUsable', () => {
     expect(isShippingQuoteUsable({ ...quote, expiresAt: Number.NaN }, 1)).toBe(false)
   })
 })
-

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { http } from '../../../shared/api'
-import { orderService, shippingService } from './order.service'
 import type { ApiEnvelope, CheckoutInput, Order, ShippingQuote, ShippingQuoteInput } from '../types/catalog.types'
+import { orderService, shippingService } from './order.service'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -39,4 +39,3 @@ describe('orderService.checkout', () => {
     expect(post).toHaveBeenCalledWith('/api/orders/checkout', input)
   })
 })
-

@@ -1,2 +1,33 @@
 @import "tailwindcss";
 @import "../../shared/ui/theme.css";
+
+@keyframes mp-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.mp-marquee {
+  animation: mp-marquee 38s linear infinite;
+}
+
+.mp-marquee-wrap:hover .mp-marquee {
+  animation-play-state: paused;
+}
+
+.mp-rail {
+  scrollbar-width: none;
+}
+
+.mp-rail::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mp-marquee {
+    animation: none;
+  }
+}

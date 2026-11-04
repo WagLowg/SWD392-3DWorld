@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ordersRequiringGatewayPayment } from './checkoutPayment'
 import type { Order } from '../types/catalog.types'
+import { ordersRequiringGatewayPayment } from './checkoutPayment'
 
 const gateway = { id: 1, paymentMethod: 'GATEWAY', onlinePaymentRequired: true } as Order
 const cod = { id: 2, paymentMethod: 'COD', onlinePaymentRequired: false } as Order
@@ -14,4 +14,3 @@ describe('ordersRequiringGatewayPayment', () => {
     expect(ordersRequiringGatewayPayment([gateway, cod], 'GATEWAY')).toEqual([gateway])
   })
 })
-

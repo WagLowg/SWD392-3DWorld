@@ -18,12 +18,12 @@ import { useEffect, useId, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
 import { formatDateTime } from '../../../shared/lib/format'
-import { resolveMediaUrl } from '../lib/format'
 import { useSession } from '../../../shared/session/useSession'
 import { useToast } from '../../../shared/ui/toast'
 import { useMyOrders } from '../../orders/hooks/useOrders'
 import { useStorefront } from '../../seller/hooks/useSeller'
 import { useCreateReview, useProductReviews, useReplyReview } from '../hooks/useCatalog'
+import { resolveMediaUrl } from '../lib/format'
 import type { ProductReview, ProductVariant, ReviewSellerReply } from '../types/catalog.types'
 
 type FilterType = 'ALL' | '5_STAR' | '4_STAR' | '3_STAR' | '2_STAR' | '1_STAR' | 'WITH_COMMENT' | 'WITH_IMAGE'
@@ -133,8 +133,6 @@ export function ProductReviewsSection({
       (currentUser.role === 'SELLER' || currentUser.roles?.includes('SELLER')) &&
       sellerStorefront.data?.id === storefrontId,
   )
-
-
 
   // Kiểm tra điều kiện: "Chỉ người nào từng mua sản phẩm thì mới được review"
   const eligiblePurchases = useMemo(() => {
@@ -365,11 +363,7 @@ export function ProductReviewsSection({
                 <Star
                   key={s}
                   size={20}
-                  className={
-                    s <= Math.round(Number(stats.avg))
-                      ? 'fill-orange text-orange'
-                      : 'text-line/80'
-                  }
+                  className={s <= Math.round(Number(stats.avg)) ? 'fill-orange text-orange' : 'text-line/80'}
                 />
               ))}
             </div>
@@ -378,12 +372,7 @@ export function ProductReviewsSection({
 
           {/* Cột phải: Bộ lọc Shopee */}
           <div className="flex flex-1 flex-wrap gap-2.5">
-            <FilterPill
-              label="Tất cả"
-              count={stats.total}
-              active={filter === 'ALL'}
-              onClick={() => setFilter('ALL')}
-            />
+            <FilterPill label="Tất cả" count={stats.total} active={filter === 'ALL'} onClick={() => setFilter('ALL')} />
             <FilterPill
               label="5 Sao"
               count={stats.count5}
@@ -463,8 +452,8 @@ export function ProductReviewsSection({
           <div className="flex items-center gap-3 text-xs text-ink-soft">
             <ShieldCheck size={18} className="shrink-0 text-violet" />
             <span>
-              Chính sách minh bạch: Chỉ những khách hàng đã mua và xác nhận nhận hàng thành công tại 3DWorld mới có
-              thể viết đánh giá cho sản phẩm này.
+              Chính sách minh bạch: Chỉ những khách hàng đã mua và xác nhận nhận hàng thành công tại 3DWorld mới có thể
+              viết đánh giá cho sản phẩm này.
             </span>
           </div>
         ) : (
@@ -500,12 +489,16 @@ export function ProductReviewsSection({
             const isLiked = Boolean(likedReviews[review.id])
             const isMyReview = Boolean(
               (currentUser && review.buyerUserId && String(review.buyerUserId) === String(currentUser.id)) ||
-              (currentUser && review.buyerName && review.buyerName.trim().toLowerCase() === currentUser.name?.trim().toLowerCase()) ||
-              (currentUser && eligiblePurchases.length > 0 && (!review.buyerName || review.buyerName === 'Khách hàng'))
+                (currentUser &&
+                  review.buyerName &&
+                  review.buyerName.trim().toLowerCase() === currentUser.name?.trim().toLowerCase()) ||
+                (currentUser &&
+                  eligiblePurchases.length > 0 &&
+                  (!review.buyerName || review.buyerName === 'Khách hàng')),
             )
             const rawName = isMyReview
-              ? (currentUser?.name || review.buyerName || 'Nhiên thái')
-              : (review.buyerName || 'Khách hàng')
+              ? currentUser?.name || review.buyerName || 'Nhiên thái'
+              : review.buyerName || 'Khách hàng'
             const initial = (rawName.trim()[0] || 'N').toUpperCase()
 
             return (
@@ -520,9 +513,7 @@ export function ProductReviewsSection({
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="font-label text-xs font-bold text-ink">
-                          {rawName}
-                        </span>
+                        <span className="font-label text-xs font-bold text-ink">{rawName}</span>
                         {isMyReview && (
                           <span className="rounded-full bg-violet-soft px-2 py-0.5 font-label text-[10px] font-semibold text-violet">
                             Bạn
@@ -557,9 +548,7 @@ export function ProductReviewsSection({
 
                     {/* Nội dung nhận xét */}
                     {review.comment ? (
-                      <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink">
-                        {review.comment}
-                      </p>
+                      <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink">{review.comment}</p>
                     ) : (
                       <p className="mt-2 text-xs italic text-ink-soft">Người mua không để lại nhận xét bằng lời.</p>
                     )}
@@ -784,7 +773,7 @@ function ReviewModal({
   const initialItemId =
     defaultOrderItemId && eligiblePurchases.some((p) => p.orderItemId === defaultOrderItemId)
       ? defaultOrderItemId
-      : (eligiblePurchases[0]?.orderItemId || 0)
+      : eligiblePurchases[0]?.orderItemId || 0
 
   const [selectedOrderItemId, setSelectedOrderItemId] = useState<number>(initialItemId)
   const [rating, setRating] = useState(5)
@@ -897,9 +886,7 @@ function ReviewModal({
 
           {/* Chọn số sao (1-5 sao) */}
           <div className="rounded-2xl bg-[#fffbf8] p-4 text-center border border-orange/15">
-            <label className="block font-label text-xs font-semibold text-ink-soft">
-              Chất lượng sản phẩm
-            </label>
+            <label className="block font-label text-xs font-semibold text-ink-soft">Chất lượng sản phẩm</label>
             <div className="mt-2 flex items-center justify-center gap-2">
               {[1, 2, 3, 4, 5].map((s) => (
                 <button
@@ -913,24 +900,18 @@ function ReviewModal({
                   <Star
                     size={32}
                     className={`transition ${
-                      s <= currentHover
-                        ? 'fill-orange text-orange drop-shadow-xs'
-                        : 'text-line hover:text-orange/50'
+                      s <= currentHover ? 'fill-orange text-orange drop-shadow-xs' : 'text-line hover:text-orange/50'
                     }`}
                   />
                 </button>
               ))}
             </div>
-            <p className="mt-2 font-label text-xs font-bold text-orange">
-              {RATING_TEXTS[currentHover]}
-            </p>
+            <p className="mt-2 font-label text-xs font-bold text-orange">{RATING_TEXTS[currentHover]}</p>
           </div>
 
           {/* Ô nhập bình luận */}
           <div>
-            <label className="block font-label text-xs font-semibold text-ink">
-              Nhận xét chi tiết về sản phẩm:
-            </label>
+            <label className="block font-label text-xs font-semibold text-ink">Nhận xét chi tiết về sản phẩm:</label>
             <textarea
               rows={4}
               value={comment}
@@ -946,9 +927,7 @@ function ReviewModal({
 
           {/* Thêm link ảnh thực tế */}
           <div>
-            <label className="block font-label text-xs font-semibold text-ink">
-              Hình ảnh thực tế (tùy chọn):
-            </label>
+            <label className="block font-label text-xs font-semibold text-ink">Hình ảnh thực tế (tùy chọn):</label>
             <div className="mt-1.5 flex gap-2">
               <input
                 type="url"

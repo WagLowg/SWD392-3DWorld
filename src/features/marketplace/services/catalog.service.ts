@@ -1,5 +1,5 @@
-import { toQueryString } from '../../../shared/lib/query'
 import { http } from '../../../shared/api'
+import { toQueryString } from '../../../shared/lib/query'
 import type {
   ApiEnvelope,
   CatalogPage,
@@ -30,8 +30,9 @@ export const catalogService = {
 
   /** GET /api/catalog/featured — sản phẩm có huy hiệu. */
   async featured(page = 0, size = 12, signal?: AbortSignal) {
-    return (await http.get<ApiEnvelope<CatalogPage>>(`/api/catalog/featured${toQueryString({ page, size })}`, { signal }))
-      .data
+    return (
+      await http.get<ApiEnvelope<CatalogPage>>(`/api/catalog/featured${toQueryString({ page, size })}`, { signal })
+    ).data
   },
 
   /** GET /api/catalog/{productId} — media, variants, mô tả, xưởng. */
@@ -50,30 +51,14 @@ export const catalogService = {
   },
 
   /** POST /api/products/{productId}/reviews — khách hàng gửi đánh giá sản phẩm đã mua */
-  async createReview(
-    productId: number,
-    payload: { orderItemId: number; rating: number; comment?: string },
-  ) {
-    return (
-      await http.post<ApiEnvelope<{ reviewId: number }>>(
-        `/api/products/${productId}/reviews`,
-        payload,
-      )
-    ).data
+  async createReview(productId: number, payload: { orderItemId: number; rating: number; comment?: string }) {
+    return (await http.post<ApiEnvelope<{ reviewId: number }>>(`/api/products/${productId}/reviews`, payload)).data
   },
 
   /** PUT /api/seller/products/{productId}/reviews/{reviewId}/reply — người bán phản hồi đánh giá */
-  async replyReview(
-    productId: number,
-    reviewId: number,
-    payload: { reply: string },
-  ) {
-    return (
-      await http.put<ApiEnvelope<void>>(
-        `/api/seller/products/${productId}/reviews/${reviewId}/reply`,
-        payload,
-      )
-    ).data
+  async replyReview(productId: number, reviewId: number, payload: { reply: string }) {
+    return (await http.put<ApiEnvelope<void>>(`/api/seller/products/${productId}/reviews/${reviewId}/reply`, payload))
+      .data
   },
 }
 
