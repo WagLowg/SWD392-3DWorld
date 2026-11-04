@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronLeft, ChevronRight, CreditCard, PackageCheck, Printer, Sparkles, Truck } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, CreditCard, PackageCheck, Sparkles, Truck } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { badgeLabel, categoryLabel, formatVnd } from '../lib/format'
@@ -23,30 +23,6 @@ export function HeroSection({ featured }: { featured: ProductSummary[] }) {
           Đồ chơi vinyl cao cấp, mô hình để bàn thủ công độc lập — hoàn thiện thủ công, kiểm định theo từng lô và giao
           tận tay trong hộp đóng gói bảo an.
         </p>
-
-        <div className="mt-8 flex flex-wrap items-center gap-3">
-          <a
-            href="#catalog"
-            className="inline-flex items-center gap-2 rounded-full bg-ink py-2 pl-5 pr-2 font-label text-sm font-semibold text-white transition hover:bg-violet"
-          >
-            Khám Phá Chợ
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-orange">
-              <ArrowRight size={16} />
-            </span>
-          </a>
-          <a
-            href="/pod/"
-            className="inline-flex items-center gap-2 rounded-full px-4 py-3 font-label text-sm font-semibold hover:bg-white"
-          >
-            <Printer size={16} className="text-violet" /> Đặt In Theo Yêu Cầu
-          </a>
-          <a
-            href="/ai/studio"
-            className="inline-flex items-center gap-2 rounded-full px-4 py-3 font-label text-sm font-semibold hover:bg-white"
-          >
-            <Sparkles size={16} className="text-violet" /> Sáng Tạo Bằng AI <ArrowRight size={14} />
-          </a>
-        </div>
 
         <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 font-label text-xs font-semibold text-ink-soft">
           <li className="inline-flex items-center gap-1.5">
