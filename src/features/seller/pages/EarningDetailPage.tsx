@@ -2,9 +2,20 @@ import { Wallet } from 'lucide-react'
 import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { formatDateTime, formatVnd } from '../../../shared/lib/format'
-import { Btn, DataTable, DetailLayout, Hero, KeyValues, MoneyRows, Pill, Section, StatusPill } from '../../../shared/ui/kit'
+import {
+  Btn,
+  DataTable,
+  DetailLayout,
+  Hero,
+  KeyValues,
+  MoneyRows,
+  Pill,
+  Section,
+  StatusPill,
+} from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { useEarning, useEarnings } from '../hooks/useSeller'
+import { earningCommission } from '../lib/earnings'
 import { EARNING_STATUS } from '../lib/status'
 
 const BUCKET = { pending: 'Chờ (pending)', available: 'Khả dụng', held: 'Tạm giữ (held)' }
@@ -19,22 +30,24 @@ export function EarningDetailPage() {
   }, [id])
 
   return (
-    <>
-      <QueryState isLoading={q.isLoading} error={q.error}>
+    <QueryState isLoading={q.isLoading} error={q.error}>
         {q.data &&
           (() => {
             const e = q.data
             const isRefund = e.status === 'REFUNDED' || e.isRefunded
-            const fee = isRefund ? 0 : (e.commissionAmount && e.commissionAmount > 0 ? e.commissionAmount : e.gross * (e.feeRate > 0 ? e.feeRate : 0.05))
-            const net = isRefund ? -(e.returnShippingFee ?? 48400) : (e.netAmount && e.netAmount > 0 ? e.netAmount : e.gross - fee)
+            const fee = earningCommission(e)
+            const returnShippingFee = e.returnShippingFee ?? 0
+            const net = isRefund ? -returnShippingFee : e.netAmount && e.netAmount > 0 ? e.netAmount : e.gross - fee
             const isReceived = !!e.receivedAt || e.status === 'RELEASED' || isRefund
-            const isWindowPassed = e.status === 'RELEASED' || (!!e.receivedAt && new Date(e.receivedAt).getTime() + 72 * 3600 * 1000 <= Date.now())
+            const isWindowPassed =
+              e.status === 'RELEASED' ||
+              (!!e.receivedAt && new Date(e.receivedAt).getTime() + 72 * 3600 * 1000 <= Date.now())
             const steps = isRefund
               ? [
                   { label: 'Đơn thanh toán', done: true },
                   { label: 'Người mua nhận hàng', done: true },
                   { label: 'Khách khiếu nại hoàn tiền', done: true },
-                  { label: 'Cấn trừ phí ship 2 chiều (-48.400đ)', done: true },
+                  { label: `Cấn trừ phí ship 2 chiều (-${formatVnd(returnShippingFee)})`, done: true },
                 ]
               : [
                   { label: 'Đơn thanh toán', done: true },
@@ -44,16 +57,14 @@ export function EarningDetailPage() {
                 ]
             return (
               <>
-                <Hero
-                  code="MP 054"
-                  eyebrow="Chi tiết khoản thu nhập"
-                  title={`Khoản Thu #${e.id}`}
-                  accent={e.product}
-                />
+                <Hero code="MP 054" eyebrow="Chi tiết khoản thu nhập" title={`Khoản Thu #${e.id}`} accent={e.product} />
                 <DetailLayout
                   main={
                     <>
-                      <Section title="Tổng quan khoản thu" aside={<StatusPill status={e.status} map={EARNING_STATUS} />}>
+                      <Section
+                        title="Tổng quan khoản thu"
+                        aside={<StatusPill status={e.status} map={EARNING_STATUS} />}
+                      >
                         <KeyValues
                           cols={3}
                           items={[
@@ -64,17 +75,26 @@ export function EarningDetailPage() {
                               value: e.receivedAt
                                 ? formatDateTime(e.receivedAt)
                                 : e.status === 'RELEASED'
-                                  ? (e.releaseAt ? formatDateTime(new Date(new Date(e.releaseAt).getTime() - 72 * 3600 * 1000).toISOString()) : 'Đã nhận')
+                                  ? e.releaseAt
+                                    ? formatDateTime(
+                                        new Date(new Date(e.releaseAt).getTime() - 72 * 3600 * 1000).toISOString(),
+                                      )
+                                    : 'Đã nhận'
                                   : '—',
                             },
                           ]}
                         />
-                        {e.blocker && <p className="mt-4 rounded-2xl bg-peach/60 p-4 text-sm text-orange-deep">{e.blocker}</p>}
+                        {e.blocker && (
+                          <p className="mt-4 rounded-2xl bg-peach/60 p-4 text-sm text-orange-deep">{e.blocker}</p>
+                        )}
                       </Section>
                       <Section title="Vòng đời khoản thu ký quỹ">
                         <ol className="grid gap-3 sm:grid-cols-4">
                           {steps.map((s, i) => (
-                            <li key={s.label} className={`rounded-2xl p-3 text-sm ${s.done ? 'bg-mint text-[#0f5132]' : 'bg-surface-low text-ink-soft'}`}>
+                            <li
+                              key={s.label}
+                              className={`rounded-2xl p-3 text-sm ${s.done ? 'bg-mint text-[#0f5132]' : 'bg-surface-low text-ink-soft'}`}
+                            >
                               <span className="font-display font-bold">{i + 1}.</span> {s.label}
                             </li>
                           ))}
@@ -93,12 +113,24 @@ export function EarningDetailPage() {
                               key: 'a',
                               header: 'Số tiền',
                               render: (l) => (
-                                <strong className={l.amount > 0 ? 'text-teal font-bold' : l.amount < 0 ? 'text-danger font-bold' : 'text-ink'}>
+                                <strong
+                                  className={
+                                    l.amount > 0
+                                      ? 'text-teal font-bold'
+                                      : l.amount < 0
+                                        ? 'text-danger font-bold'
+                                        : 'text-ink'
+                                  }
+                                >
                                   {l.amount > 0 ? `+${formatVnd(l.amount)}` : formatVnd(l.amount)}
                                 </strong>
                               ),
                             },
-                            { key: 's', header: 'Trạng thái', render: (l) => <Pill tone={l.status === 'POSTED' ? 'green' : 'orange'}>{l.status}</Pill> },
+                            {
+                              key: 's',
+                              header: 'Trạng thái',
+                              render: (l) => <Pill tone={l.status === 'POSTED' ? 'green' : 'orange'}>{l.status}</Pill>,
+                            },
                           ]}
                         />
                       </Section>
@@ -112,15 +144,23 @@ export function EarningDetailPage() {
                             rows={[
                               { label: 'Doanh số gốc', value: formatVnd(e.gross) },
                               { label: 'Thu hồi tiền hoàn khách', value: `-${formatVnd(e.gross)}`, tone: 'minus' },
-                              { label: 'Phí ship 2 chiều (Xưởng chịu)', value: `-${formatVnd(e.returnShippingFee ?? 48400)}`, tone: 'minus' },
+                              {
+                                label: 'Phí ship 2 chiều (Xưởng chịu)',
+                                value: `-${formatVnd(returnShippingFee)}`,
+                                tone: 'minus',
+                              },
                             ]}
-                            total={{ label: 'Thực nhận (Sau cấn trừ)', value: `-${formatVnd(e.returnShippingFee ?? 48400)}` }}
+                            total={{ label: 'Thực nhận (Sau cấn trừ)', value: `-${formatVnd(returnShippingFee)}` }}
                           />
                         ) : (
                           <MoneyRows
                             rows={[
                               { label: 'Doanh số gốc', value: formatVnd(e.gross) },
-                              { label: `Phí sàn (${e.feeRate * 100}%)`, value: `-${formatVnd(fee)}`, tone: 'minus' },
+                              {
+                                label: `${e.status === 'RELEASED' ? 'Phí sàn' : 'Phí sàn tạm tính'} (${e.feeRate * 100}%)`,
+                                value: `-${formatVnd(fee)}`,
+                                tone: 'minus',
+                              },
                             ]}
                             total={{ label: 'Thực nhận', value: formatVnd(net) }}
                           />
@@ -148,7 +188,6 @@ export function EarningDetailPage() {
               </>
             )
           })()}
-      </QueryState>
-    </>
+    </QueryState>
   )
 }

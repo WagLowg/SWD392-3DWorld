@@ -1,10 +1,5 @@
 import { type ApiEnvelope, http } from '../../../shared/api'
-import {
-  getOrSeedLocalRefunds,
-  getRefundById,
-  type LocalRefundCase,
-  updateLocalRefundStatus,
-} from './refund.storage'
+import { getLocalRefunds, getRefundById, type LocalRefundCase, updateLocalRefundStatus } from './refund.storage'
 
 interface CustomerRefundReasonFields {
   customer_reason?: string | null
@@ -70,9 +65,7 @@ function extractCustomerRefundReason(
     nonEmpty(refund.requestReason)
   if (explicitCustomerReason) return explicitCustomerReason
 
-  const requestedReason = refund.history
-    ?.find((entry) => entry.status?.toUpperCase() === 'REFUND_REQUESTED')
-    ?.reason
+  const requestedReason = refund.history?.find((entry) => entry.status?.toUpperCase() === 'REFUND_REQUESTED')?.reason
 
   return nonEmpty(requestedReason) ?? localCustomerReason(local)
 }
@@ -89,15 +82,10 @@ function findLocalRefund(
   localCases: LocalRefundCase[],
   refund: Pick<ManualRefundRow, 'id' | 'physical_order_id'>,
 ): LocalRefundCase | undefined {
-  return localCases.find(
-    (item) => item.id === refund.id || item.orderId === refund.physical_order_id,
-  )
+  return localCases.find((item) => item.id === refund.id || item.orderId === refund.physical_order_id)
 }
 
-async function normalizeAdminRefundRow(
-  row: ManualRefundRow,
-  local?: LocalRefundCase,
-): Promise<ManualRefundRow> {
+async function normalizeAdminRefundRow(row: ManualRefundRow, local?: LocalRefundCase): Promise<ManualRefundRow> {
   let customerReason = extractCustomerRefundReason(row, local)
 
   // A reviewed list row can expose the Staff note as `reason`. Fetch its audit
@@ -157,10 +145,7 @@ export const refundApi = {
       formData.append('images', file)
     }
 
-    const res = await http.post<ApiEnvelope<ManualRefundDetail>>(
-      `/api/orders/${orderId}/refunds`,
-      formData,
-    )
+    const res = await http.post<ApiEnvelope<ManualRefundDetail>>(`/api/orders/${orderId}/refunds`, formData)
     return res.data
   },
 
@@ -180,7 +165,7 @@ export const refundApi = {
           id: found.id || found.orderId,
           physical_order_id: found.orderId,
           payer_user_id: 1,
-          amount: found.amount || 224200,
+          amount: found.amount,
           status: (found.status as any) || 'PENDING',
           reason: found.reason || 'Khiếu nại sản phẩm',
           transfer_reference: found.transferReference,
@@ -235,7 +220,7 @@ export const refundApi = {
       apiRows = []
     }
 
-    const localCases = getOrSeedLocalRefunds()
+    const localCases = getLocalRefunds()
     const merged = apiRows.map((row) => ({
       ...row,
       reason: resolveCustomerRefundReason(row, findLocalRefund(localCases, row)),
@@ -246,7 +231,7 @@ export const refundApi = {
           merged.push({
             id: loc.id || loc.orderId,
             physical_order_id: loc.orderId,
-            amount: loc.amount || 224200,
+            amount: loc.amount,
             status: (loc.status as any) || 'PENDING',
             reason: localCustomerReason(loc) || 'Khiếu nại sản phẩm',
             created_at: loc.createdAt || new Date().toISOString(),
@@ -295,7 +280,7 @@ export const refundApi = {
       apiRows = []
     }
 
-    const localCases = getOrSeedLocalRefunds()
+    const localCases = getLocalRefunds()
     const merged = await Promise.all(
       apiRows.map((row) => normalizeAdminRefundRow(row, findLocalRefund(localCases, row))),
     )
@@ -305,7 +290,7 @@ export const refundApi = {
           merged.push({
             id: loc.id || loc.orderId,
             physical_order_id: loc.orderId,
-            amount: loc.amount || 224200,
+            amount: loc.amount,
             status: (loc.status as any) || 'PENDING',
             reason: localCustomerReason(loc) || 'Khiếu nại sản phẩm',
             created_at: loc.createdAt || new Date().toISOString(),
@@ -318,20 +303,10 @@ export const refundApi = {
 
   /** POST /api/admin/refunds/{id}/transfer-details - Admin xem STK giải mã để chuyển tiền */
   async getAdminTransferDetails(id: number | string, reason: string): Promise<AdminTransferDetails> {
-    try {
-      const res = await http.post<ApiEnvelope<AdminTransferDetails>>(
-        `/api/admin/refunds/${id}/transfer-details?reason=${encodeURIComponent(reason)}`,
-      )
-      return res.data
-    } catch {
-      const found = getRefundById(id)
-      return {
-        bankCode: found?.bankCode || 'MOCK_BANK',
-        bankName: found?.bankName || 'Demo Sandbox Bank',
-        accountHolder: found?.accountHolder || 'DEMO USER 1',
-        accountNumber: found?.accountNumber || found?.accountNumberMasked?.replace(/\*/g, '0') || '0000000000000003',
-      }
-    }
+    const res = await http.post<ApiEnvelope<AdminTransferDetails>>(
+      `/api/admin/refunds/${id}/transfer-details?reason=${encodeURIComponent(reason)}`,
+    )
+    return res.data
   },
 
   /** POST /api/admin/refunds/{id}/confirm-transfer - Admin xác nhận đã chuyển khoản thành công */
@@ -352,4 +327,3 @@ export const refundApi = {
     }
   },
 }
-

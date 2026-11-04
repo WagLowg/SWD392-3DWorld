@@ -14,7 +14,6 @@ import {
   OrderStatusBadge,
   OrderTimeline,
   orderCode,
-  REFUNDABLE,
   ShipmentStatusBadge,
   StorefrontLabel,
 } from '../components/OrderParts'
@@ -22,6 +21,7 @@ import { PayOrderButton } from '../components/PayOrderButton'
 import { CodPaymentPanel } from '../components/CodPaymentPanel'
 import { ShippingAddressSnapshot } from '../components/ShippingAddressSnapshot'
 import { useBuyerShipments, useConfirmReceived, useOrder, useOrderHistory, useOrderPackages } from '../hooks/useOrders'
+import { canRequestRefund } from '../lib/refundEligibility'
 import { statusMeta } from '../lib/status'
 import { useOrderPaymentsStore } from '../stores/order-payments.store'
 
@@ -208,12 +208,13 @@ export function OrderDetailPage() {
                   </p>
                 )}
                 {order.reservationExpiresAt &&
-                  (order.status === 'PENDING_PAYMENT' || (order.paymentMethod === 'COD' && order.status === 'CREATED')) && (
-                  <p className="mt-3 rounded-xl bg-peach/50 px-3 py-2 text-xs text-orange-deep">
-                    {order.paymentMethod === 'COD' ? 'Người bán cần nhận đơn trước' : 'Giữ chỗ tồn kho đến'}{' '}
-                    {formatDateTime(order.reservationExpiresAt)}
-                  </p>
-                )}
+                  (order.status === 'PENDING_PAYMENT' ||
+                    (order.paymentMethod === 'COD' && order.status === 'CREATED')) && (
+                    <p className="mt-3 rounded-xl bg-peach/50 px-3 py-2 text-xs text-orange-deep">
+                      {order.paymentMethod === 'COD' ? 'Người bán cần nhận đơn trước' : 'Giữ chỗ tồn kho đến'}{' '}
+                      {formatDateTime(order.reservationExpiresAt)}
+                    </p>
+                  )}
                 {order.autoConfirmDueAt && order.status === 'DELIVERED' && (
                   <p className="mt-3 rounded-xl bg-surface-low px-3 py-2 text-xs text-ink-soft">
                     Hệ thống tự xác nhận nhận hàng lúc {formatDateTime(order.autoConfirmDueAt)}
@@ -234,8 +235,8 @@ export function OrderDetailPage() {
                   {order.status === 'PENDING_PAYMENT' &&
                     order.paymentMethod !== 'COD' &&
                     order.onlinePaymentRequired !== false && (
-                    <PayOrderButton orderId={order.id} amount={order.totalAmount} className="justify-center" />
-                  )}
+                      <PayOrderButton orderId={order.id} amount={order.totalAmount} className="justify-center" />
+                    )}
                   {order.status === 'DELIVERED' && (
                     <button
                       type="button"
@@ -269,7 +270,7 @@ export function OrderDetailPage() {
                       <XCircle size={15} /> Huỷ đơn
                     </Link>
                   )}
-                  {REFUNDABLE.includes(order.status) && (
+                  {canRequestRefund(order) && (
                     <Link
                       to={`/refunds?orderId=${order.id}`}
                       className="inline-flex items-center justify-center gap-2 rounded-full bg-surface-low px-5 py-2.5 font-label text-sm font-semibold hover:bg-surface-high"
