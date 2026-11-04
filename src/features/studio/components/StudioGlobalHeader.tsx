@@ -1,5 +1,6 @@
 import { Bell, Box, LogOut } from 'lucide-react';
 import { ModuleSwitcher } from '../../../shared/ui/ModuleSwitcher';
+import { CommandTrigger, openCommandPalette } from '../../../shared/ui/CommandPalette';
 import { logout } from '../../../shared/session/session';
 import { href } from '../router';
 import { sessionUser } from '../session';
@@ -12,14 +13,15 @@ export default function StudioGlobalHeader() {
     <header className="studio-global-header">
       <a className="studio-global-brand" href={href({ name: 'welcome' })} aria-label="Trang chủ 3D Studio">
         <span className="studio-global-logo"><Box size={20} /></span>
-        <span>3DWorld<small>3D STUDIO</small></span>
+        <span>3D<em>World</em><small>3D STUDIO</small></span>
       </a>
 
       <div className="studio-global-modules">
-        <ModuleSwitcher current="studio" theme="dark" />
+        <ModuleSwitcher current="studio" theme="light" />
       </div>
 
       <div className="studio-global-user">
+        <CommandTrigger onOpen={openCommandPalette} />
         <button type="button" className="studio-header-icon" aria-label="Thông báo" title="Thông báo">
           <Bell size={18} />
         </button>

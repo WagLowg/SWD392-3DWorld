@@ -29,7 +29,7 @@ export function StatusBar() {
       <span>{toolHint[tool]}</span>
       <span className="sep" />
       <span>Lịch sử <b>{past}/{CAPABILITIES.undoCommands}</b></span>
-      <span style={{ color: over ? 'var(--error)' : undefined }}>Tam giác <b>{tris.toLocaleString()}</b> / {CAPABILITIES.maxSceneTriangles.toLocaleString()}</span>
+      <span style={{ color: over ? 'var(--st-error)' : undefined }}>Tam giác <b>{tris.toLocaleString()}</b> / {CAPABILITIES.maxSceneTriangles.toLocaleString()}</span>
       <span>Node <b>{nodes.length}</b> / {CAPABILITIES.maxSceneNodes}</span>
     </footer>
   );

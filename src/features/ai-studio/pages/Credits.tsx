@@ -35,7 +35,7 @@ export default function Credits() {
     <div className="page">
       <div className="page-head"><div><h1>Tín dụng & sử dụng</h1><p>Tín dụng AI dùng cho tạo mô hình. Chi phí in 3D được thanh toán riêng.</p></div></div>
       <div className="stat-grid">
-        <div className="stat"><span>Số dư khả dụng</span><b style={{ color: 'var(--primary)' }}>{num(wallet?.balance)}</b></div>
+        <div className="stat"><span>Số dư khả dụng</span><b style={{ color: 'var(--ai-primary)' }}>{num(wallet?.balance)}</b></div>
         <div className="stat"><span>Tác vụ đã chạy</span><b>{num(wallet?.totalTasks)}</b></div>
         <div className="stat"><span>Tác vụ thành công</span><b>{num(wallet?.successfulTasks)}</b></div>
       </div>
@@ -52,7 +52,7 @@ export default function Credits() {
                       <td className="muted">{dateTime(l.createdAt)}</td>
                       <td>{TYPE_LABEL[l.type] || l.type}</td>
                       <td className="muted">{l.note}{l.projectTitle ? ` · ${l.projectTitle}` : ''}</td>
-                      <td className="num" style={{ color: l.amount > 0 ? 'var(--success)' : l.amount < 0 ? 'var(--text)' : 'var(--muted)' }}>{l.amount > 0 ? '+' : ''}{l.amount === 0 ? '—' : num(l.amount)}</td>
+                      <td className="num" style={{ color: l.amount > 0 ? 'var(--ai-success)' : l.amount < 0 ? 'var(--ai-text)' : 'var(--ai-muted)' }}>{l.amount > 0 ? '+' : ''}{l.amount === 0 ? '—' : num(l.amount)}</td>
                     </tr>
                   ))}
                 </tbody>

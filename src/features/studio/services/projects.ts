@@ -1,5 +1,5 @@
 import type { PodStage, PrintRequestReceipt, SceneNode, Snapshot } from '../types';
-import { TEMPLATES } from '../lib/scene';
+import { TEMPLATES, normalizeNodes } from '../lib/scene';
 import { CAPABILITIES, POD_CATALOG } from '../config';
 import { renderThumbnail } from '../lib/thumbnail';
 import { goLogin } from '../../../shared/session/session';
@@ -27,7 +27,11 @@ export interface ProjectMeta {
   revision?: number;
 }
 
-export interface StoredProject { revision: number; name: string; nodes: SceneNode[]; savedAt: string }
+export interface StoredProject {
+  revision: number; name: string; nodes: SceneNode[]; savedAt: string;
+  /** Số phần tử trong scene không phải node 3D Studio (vd. mô hình từ AI Studio) — không hiển thị nhưng được giữ khi lưu. */
+  foreignCount?: number;
+}
 
 export const draftKey = (id: string) => `3dw.draft.project.${id}`;
 
@@ -88,7 +92,7 @@ export function validateProjectName(name: string): string | null {
   return null;
 }
 
-const thumbOf = (nodes: SceneNode[]) => (nodes.length ? renderThumbnail(nodes, { width: 576, height: 240, background: '#10141d' }) : null);
+const thumbOf = (nodes: SceneNode[]) => (nodes.length ? renderThumbnail(nodes, { width: 576, height: 240, background: '#e6f7ef' }) : null);
 
 /* ---------------------------------------------------- dạng dữ liệu Backend */
 
@@ -134,13 +138,14 @@ type BSnapshot = {
 /** Scene lưu ở Backend dưới dạng JSON tự do: { nodes, templateId, preset, icon, thumbnail }. */
 type SceneDoc = { nodes: SceneNode[]; templateId?: string; preset?: string; icon?: string; thumbnail?: string | null };
 
-function readScene(scene: unknown): SceneDoc {
-  if (Array.isArray(scene)) return { nodes: scene as SceneNode[] };
-  if (scene && typeof scene === 'object') {
-    const s = scene as Partial<SceneDoc>;
-    return { ...s, nodes: Array.isArray(s.nodes) ? s.nodes : [] };
-  }
-  return { nodes: [] };
+/** Phần tử lạ trong scene của từng dự án (xem normalizeNodes) — gửi kèm khi lưu để không làm mất dữ liệu. */
+const foreignByProject = new Map<string, unknown[]>();
+
+function readScene(scene: unknown): SceneDoc & { foreign: unknown[] } {
+  const raw: unknown[] = Array.isArray(scene) ? scene : Array.isArray((scene as Partial<SceneDoc> | null)?.nodes) ? (scene as SceneDoc).nodes : [];
+  const { nodes, foreign } = normalizeNodes(raw);
+  const s = scene && typeof scene === 'object' && !Array.isArray(scene) ? (scene as Partial<SceneDoc>) : {};
+  return { ...s, nodes, foreign };
 }
 
 const iso = (v?: string | null) => v ?? new Date().toISOString();
@@ -201,20 +206,22 @@ export async function listProjects(): Promise<ProjectMeta[]> {
 export async function fetchProject(id: string): Promise<(StoredProject & { meta: ProjectMeta }) | null> {
   try {
     const d = await call<BDetail>(`/projects/${encodeURIComponent(id)}`);
-    const scene = readScene(d.scene);
+    const { foreign, ...scene } = readScene(d.scene);
+    foreignByProject.set(String(d.modelId), foreign);
     rememberThumb(String(d.modelId), scene);
-    return { revision: revisionOf(d) ?? 1, name: d.name, nodes: scene.nodes, savedAt: iso(d.updatedAt), meta: toMeta(d, scene) };
+    return { revision: revisionOf(d) ?? 1, name: d.name, nodes: scene.nodes, foreignCount: foreign.length, savedAt: iso(d.updatedAt), meta: toMeta(d, scene) };
   } catch (e) {
     if (e instanceof StudioApiError && (e.status === 404 || e.status === 400)) return null;
     throw e;
   }
 }
 
-export async function createProject(input: { name: string; templateId?: string; preset?: string }): Promise<ProjectMeta> {
+export async function createProject(input: { name: string; templateId?: string; preset?: string; nodes?: SceneNode[] }): Promise<ProjectMeta> {
   const err = validateProjectName(input.name);
   if (err) throw new Error(err);
   const tpl = TEMPLATES.find((t) => t.id === input.templateId);
-  const nodes = tpl ? tpl.build() : [];
+  // `nodes` cho phép tạo từ một thiết kế đã tùy biến (vd. hero "gõ tên" ở trang chủ Studio)
+  const nodes = input.nodes ?? (tpl ? tpl.build() : []);
   const scene: SceneDoc = { nodes, templateId: tpl?.id, preset: input.preset, icon: tpl?.icon ?? 'box', thumbnail: thumbOf(nodes) };
   const d = await call<BDetail>('/projects', {
     body: {
@@ -255,12 +262,13 @@ export async function deleteProject(id: string): Promise<void> {
 export async function saveProjectContent(id: string, input: { baseRevision: number; name: string; nodes: SceneNode[] }) {
   const prev = recallThumb(id);
   const thumbnail = thumbOf(input.nodes);
-  const scene: SceneDoc = { nodes: input.nodes, icon: prev.icon, thumbnail };
+  const foreign = (foreignByProject.get(id) ?? []) as SceneNode[];
+  const scene: SceneDoc = { nodes: [...input.nodes, ...foreign], icon: prev.icon, thumbnail };
   const name = input.name.trim();
   // SaveStudioContentRequest nhận cả name / nodes / thumbnail → một lần gọi, không cần PATCH đổi tên riêng.
   const d = await call<BDetail>(`/projects/${encodeURIComponent(id)}/content`, {
     method: 'PUT',
-    body: { baseRevision: input.baseRevision, scene, nodes: input.nodes, name: name || undefined, thumbnail: thumbnail ?? undefined, note: 'Lưu từ 3D Studio' },
+    body: { baseRevision: input.baseRevision, scene, nodes: scene.nodes, name: name || undefined, thumbnail: thumbnail ?? undefined, note: 'Lưu từ 3D Studio' },
   });
   // Backend cũ bỏ qua `name` trong body → đổi tên bằng PATCH như trước.
   if (name && name !== d.name) await renameProject(id, name).catch(() => undefined);
