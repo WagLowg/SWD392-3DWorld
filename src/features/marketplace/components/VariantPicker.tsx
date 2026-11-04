@@ -6,6 +6,7 @@ import {
   formatAttributes,
   formatVnd,
   isColorKey,
+  isDarkColor,
   parseAttributes,
 } from '../lib/format'
 import type { ProductVariant } from '../types/catalog.types'
@@ -107,7 +108,7 @@ export function VariantPicker({ variants, selected, onSelect }: Props) {
                         style={{ background: swatch?.hex ?? '#efecf6' }}
                       >
                         {active && (
-                          <Check size={15} className={swatch?.hex === '#1b1b22' ? 'text-white' : 'text-ink'} />
+                          <Check size={15} className={swatch && isDarkColor(swatch.hex) ? 'text-white' : 'text-ink'} />
                         )}
                         {!swatch && !active && <span className="font-label text-[9px]">{value.slice(0, 3)}</span>}
                       </span>

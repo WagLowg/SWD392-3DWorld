@@ -150,7 +150,7 @@ export function ProductReviewsSection({
     }[] = []
 
     for (const order of myOrders.data) {
-      if (!['DELIVERED', 'RECEIVED'].includes(order.status)) continue
+      if (order.status !== 'RECEIVED') continue
       for (const item of order.items) {
         const matchesVariant = variantIdSet.has(item.variantId)
         const matchesTitle = item.productTitle && item.productTitle.trim() === productTitle.trim()

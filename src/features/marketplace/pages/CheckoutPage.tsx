@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   ArrowRight,
@@ -15,34 +16,33 @@ import {
   Truck,
   Wallet,
 } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
+import { goLogin } from '../../../shared/session/session'
+import { useSession } from '../../../shared/session/useSession'
 import { LoginRequired } from '../../../shared/ui/LoginRequired'
-import { ProductMedia } from '../components/ProductMedia'
-import { StatusBlock } from '../../../shared/ui/StatusBlock'
-import { StorefrontBadge } from '../components/StorefrontBadge'
 import { ApiNote, PageHeading, QuantityStepper } from '../../../shared/ui/primitives'
+import { StatusBlock } from '../../../shared/ui/StatusBlock'
+import { useOrderPaymentsStore } from '../../orders/stores/order-payments.store'
+import { AddressForm } from '../components/AddressForm'
+import { ProductMedia } from '../components/ProductMedia'
+import { StorefrontBadge } from '../components/StorefrontBadge'
 import { cartKey, useCart, useUpdateCartItem } from '../hooks/useCart'
 import { addressKey, useAddresses, useCheckout, useShippingQuote, useZaloPayPayment } from '../hooks/useCheckout'
-import { useSession } from '../../../shared/session/useSession'
 import { groupByStorefront, storefrontName } from '../lib/cart'
-import { formatAttributes, formatVnd } from '../lib/format'
-import { paymentResultUrl } from '../lib/payment'
-import { ordersRequiringGatewayPayment } from '../lib/checkoutPayment'
-import { isShippingQuoteUsable, SHIPPING_QUOTE_EXPIRY_BUFFER_MS } from '../lib/shipping'
-import { useVariantIndexStore } from '../stores/variant-index.store'
-import { useOrderPaymentsStore } from '../../orders/stores/order-payments.store'
-import { goLogin } from '../../../shared/session/session'
 import {
   clearPendingCheckout,
   loadPendingCheckout,
-  savePendingCheckout,
   type PendingCheckoutAttempt,
+  savePendingCheckout,
 } from '../lib/checkoutAttempt'
+import { ordersRequiringGatewayPayment } from '../lib/checkoutPayment'
+import { formatAttributes, formatVnd } from '../lib/format'
+import { paymentResultUrl } from '../lib/payment'
+import { isShippingQuoteUsable, SHIPPING_QUOTE_EXPIRY_BUFFER_MS } from '../lib/shipping'
+import { useVariantIndexStore } from '../stores/variant-index.store'
 import type { Address, CheckoutInput, Order, Payment, PaymentMethod, ShippingQuoteInput } from '../types/catalog.types'
-import { AddressForm } from '../components/AddressForm'
 
 type PaymentState = { orderId: number; payment?: Payment; error?: string }
 
@@ -200,7 +200,6 @@ function CheckoutForm({
   const updateCartItem = useUpdateCartItem()
   const [addressId, setAddressId] = useState<number>()
   const [adding, setAdding] = useState(false)
-  const [agree, setAgree] = useState(false)
   const [error, setError] = useState('')
   const [quoteRefreshKey, setQuoteRefreshKey] = useState(0)
   const [expiryTick, setExpiryTick] = useState(() => Date.now())
@@ -227,9 +226,7 @@ function CheckoutForm({
   )
   const quoteInput = useMemo<ShippingQuoteInput | null>(
     () =>
-      addressId && cartItemIds.length && !invalidCartSelection
-        ? { cartItemIds, shippingAddressId: addressId }
-        : null,
+      addressId && cartItemIds.length && !invalidCartSelection ? { cartItemIds, shippingAddressId: addressId } : null,
     [addressId, cartItemIds, invalidCartSelection],
   )
   const shippingQuote = useShippingQuote(quoteInput, cartFingerprint, quoteRefreshKey)
@@ -353,7 +350,7 @@ function CheckoutForm({
             <Clock size={20} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="font-display text-lg font-bold">Giữ chỗ tồn kho vật lý (reserved_quantity)</p>
+            <p className="font-display text-lg font-bold">Giữ chỗ tồn kho vật lý</p>
             <p className="text-sm text-ink-soft">
               Khi bạn xác nhận, hệ thống giữ chỗ tồn kho cho từng món và tách đơn theo xưởng trong một giao dịch.
             </p>
@@ -538,7 +535,9 @@ function CheckoutForm({
               badge="Sắp có"
               body="Thanh toán bằng số dư ví, tiền được giữ an toàn đến khi bạn nhận hàng."
             />
-            <ApiNote>COD không tạo giao dịch ZaloPay. Báo giá vận chuyển GHTK vẫn bắt buộc cho cả hai phương thức.</ApiNote>
+            <ApiNote>
+              COD không tạo giao dịch ZaloPay. Báo giá vận chuyển GHTK vẫn bắt buộc cho cả hai phương thức.
+            </ApiNote>
           </div>
         </Section>
       </div>
@@ -582,18 +581,12 @@ function CheckoutForm({
             {quoteUsable ? 'Đã gồm phí vận chuyển GHTK' : 'Cần phí vận chuyển hợp lệ trước khi đặt hàng'}
           </p>
 
-          <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl bg-peach/40 p-4 text-sm">
-            <input
-              type="checkbox"
-              checked={agree}
-              onChange={(e) => setAgree(e.target.checked)}
-              className="mt-0.5 h-4 w-4 accent-orange"
-            />
-            <span>
-              Tôi hiểu và xác nhận: đơn hàng gồm <strong>{groups.length} gói hàng</strong> gửi từ {groups.length} xưởng
-              chế tác khác nhau. Mỗi đơn con được vận chuyển và giao nhận độc lập.
-            </span>
-          </label>
+          {groups.length > 1 && (
+            <p className="mt-5 rounded-2xl bg-peach/40 p-4 text-sm">
+              Đơn hàng gồm <strong>{groups.length} gói hàng</strong> gửi từ {groups.length} xưởng chế tác khác nhau. Mỗi
+              đơn con được vận chuyển và giao nhận độc lập.
+            </p>
+          )}
 
           {priceChanged.length > 0 && (
             <p className="mt-3 rounded-xl bg-peach/60 px-4 py-3 text-sm text-orange-deep">
@@ -631,7 +624,6 @@ function CheckoutForm({
             type="button"
             onClick={submit}
             disabled={
-              !agree ||
               busy ||
               (!pendingAttempt &&
                 (!address ||

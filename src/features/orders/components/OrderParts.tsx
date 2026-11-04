@@ -1,9 +1,21 @@
-import { Check, Package, Store, X } from 'lucide-react'
+import {
+  Check,
+  ClipboardList,
+  Copy,
+  CreditCard,
+  MapPin,
+  Package,
+  PartyPopper,
+  Store,
+  Truck,
+  Wallet,
+  X,
+} from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { formatDateTime, formatVnd } from '../../../shared/lib/format'
 import { ProductMedia } from '../../marketplace/components/ProductMedia'
-import { useMemo } from 'react'
-import { formatAttributes, resolveMediaUrl } from '../../marketplace/lib/format'
 import { useCatalog } from '../../marketplace/hooks/useCatalog'
+import { formatAttributes, resolveMediaUrl } from '../../marketplace/lib/format'
 import { useVariantIndexStore } from '../../marketplace/stores/variant-index.store'
 import { ORDER_FLOW, shipmentMeta, statusMeta, TONE_CLASS } from '../lib/status'
 import type { Order, OrderHistoryEntry, OrderItem, OrderStatus } from '../types/order.types'
@@ -15,6 +27,44 @@ export function orderCode(id: number) {
 /** Mã đơn Backend sinh (orderCode) nếu có, không thì mã suy từ id. */
 export function displayOrderCode(order: Pick<Order, 'id' | 'orderCode'>) {
   return order.orderCode || orderCode(order.id)
+}
+
+/** Rút gọn mã dạng "ORD-<uuid>" thành "ORD-C88BA313" để hiển thị. */
+export function shortOrderCode(order: Pick<Order, 'id' | 'orderCode'>) {
+  const full = displayOrderCode(order)
+  const m = /^([A-Z]+)-([0-9a-f]{8})-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.exec(full)
+  return m ? `${m[1]}-${m[2].toUpperCase()}` : full
+}
+
+/** Mã đơn gọn một dòng + nút sao chép mã đầy đủ. */
+export function OrderCode({ order, className = '' }: { order: Pick<Order, 'id' | 'orderCode'>; className?: string }) {
+  const full = displayOrderCode(order)
+  const short = shortOrderCode(order)
+  const [copied, setCopied] = useState(false)
+  const copy = () =>
+    navigator.clipboard
+      ?.writeText(full)
+      .then(() => {
+        setCopied(true)
+        window.setTimeout(() => setCopied(false), 1500)
+      })
+      .catch(() => {})
+  return (
+    <span className={`inline-flex max-w-full items-center gap-2 ${className}`}>
+      <span title={full} className="truncate whitespace-nowrap">
+        {short}
+      </span>
+      <button
+        type="button"
+        onClick={copy}
+        aria-label="Sao chép mã đơn"
+        title={copied ? 'Đã sao chép' : 'Sao chép mã đầy đủ'}
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-low text-ink-soft transition hover:bg-surface-high hover:text-ink"
+      >
+        {copied ? <Check size={13} className="text-teal" /> : <Copy size={13} />}
+      </button>
+    </span>
+  )
 }
 
 export function OrderStatusBadge({ status }: { status: string }) {
@@ -141,54 +191,152 @@ export function OrderTimeline({
     return { value: undefined, label: 'Chưa cập nhật' }
   }
 
+  const n = flow.length
+  const progress = closed || current < 0 ? 0 : current / (n - 1)
+  const currentMeta = statusMeta(order.status)
+
   return (
     <div>
-      <ol className={`grid grid-cols-3 gap-y-6 ${isCod ? 'sm:grid-cols-5' : 'sm:grid-cols-6'}`}>
-        {flow.map((s, i) => {
-          const done = !closed && current >= i
-          const active = !closed && current === i
-          const m = statusMeta(s)
-          const time = stepTime(s)
-          return (
-            <li key={s} className="relative flex flex-col items-center text-center">
-              {i > 0 && (
-                <span
-                  className={`absolute right-1/2 top-5 hidden h-1 w-full -translate-y-1/2 sm:block ${done ? 'bg-orange' : 'bg-surface-high'}`}
-                />
-              )}
-              <span
-                className={`relative grid h-10 w-10 place-items-center rounded-full font-display text-sm font-bold ${
-                  active
-                    ? 'bg-orange text-white ring-4 ring-peach'
-                    : done
-                      ? 'bg-ink text-white'
-                      : 'bg-surface-high text-ink-soft'
-                }`}
-              >
-                {done && !active ? <Check size={16} /> : i + 1}
-              </span>
-              <span className={`mt-2 font-label text-xs font-semibold ${done ? '' : 'text-ink-soft'}`}>{m.label}</span>
-              <time
-                dateTime={time.value}
-                className={`mt-1 max-w-24 font-label text-[10px] leading-tight ${time.value ? 'text-ink-soft' : 'text-ink-soft/60'}`}
-              >
-                {time.label}
-              </time>
-            </li>
-          )
-        })}
+      {/* Desktop: ngang */}
+      <div className="relative hidden sm:block">
+        <div
+          aria-hidden="true"
+          className="absolute top-6 h-1.5 -translate-y-1/2 rounded-full bg-surface-high"
+          style={{ left: `calc(100% / ${2 * n})`, right: `calc(100% / ${2 * n})` }}
+        >
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-violet via-orange to-orange transition-[width] duration-700"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
+        <ol className="relative grid" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
+          {flow.map((s, i) => (
+            <TimelineStep key={s} status={s} index={i} current={closed ? -1 : current} time={stepTime(s)} />
+          ))}
+        </ol>
+      </div>
+
+      {/* Mobile: dọc */}
+      <ol className="relative space-y-5 sm:hidden">
+        <span
+          aria-hidden="true"
+          className="absolute bottom-6 left-6 top-6 w-1 -translate-x-1/2 rounded-full bg-surface-high"
+        >
+          <span
+            className="block w-full rounded-full bg-gradient-to-b from-violet to-orange transition-[height] duration-700"
+            style={{ height: `${progress * 100}%` }}
+          />
+        </span>
+        {flow.map((s, i) => (
+          <TimelineStep key={s} status={s} index={i} current={closed ? -1 : current} time={stepTime(s)} vertical />
+        ))}
       </ol>
+
       {closed && (
-        <p className="mt-5 flex items-center gap-2 rounded-2xl bg-[#ffdad6] px-4 py-3 text-sm text-danger">
-          <X size={16} /> {statusMeta(order.status).hint}
+        <p className="mt-6 flex items-center gap-3 rounded-2xl bg-[#ffdad6] px-4 py-3 text-sm text-danger">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/70">
+            <X size={16} />
+          </span>
+          {currentMeta.hint}
         </p>
       )}
-      {!closed && statusMeta(order.status).hint && (
-        <p className="mt-5 rounded-2xl bg-surface-low px-4 py-3 text-sm text-ink-soft">
-          {statusMeta(order.status).hint}
-        </p>
+      {!closed && currentMeta.hint && (
+        <div className="mt-6 flex items-center gap-3 rounded-2xl border border-violet-soft bg-gradient-to-r from-violet-soft/60 to-peach/50 px-4 py-3">
+          <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-orange shadow-soft">
+            <StepIcon status={normalizedStatus} size={16} />
+          </span>
+          <div className="min-w-0">
+            <p className="font-label text-[11px] font-semibold uppercase tracking-widest text-violet">
+              Hiện tại · {currentMeta.label}
+            </p>
+            <p className="text-sm text-ink">{currentMeta.hint}</p>
+          </div>
+        </div>
       )}
     </div>
+  )
+}
+
+const STEP_ICONS: Record<string, typeof Package> = {
+  CREATED: ClipboardList,
+  PENDING_PAYMENT: Wallet,
+  PAID: CreditCard,
+  PROCESSING: Package,
+  SHIPPED: Truck,
+  IN_TRANSIT: Truck,
+  DELIVERED: MapPin,
+  RECEIVED: PartyPopper,
+}
+
+function StepIcon({ status, size = 18 }: { status: string; size?: number }) {
+  const Icon = STEP_ICONS[status] ?? Package
+  return <Icon size={size} />
+}
+
+function TimelineStep({
+  status,
+  index,
+  current,
+  time,
+  vertical = false,
+}: {
+  status: OrderStatus
+  index: number
+  current: number
+  time: { value?: string; label: string }
+  vertical?: boolean
+}) {
+  const done = current > index
+  const active = current === index
+  const m = statusMeta(status)
+
+  const dot = (
+    <span className="relative z-10 grid h-12 w-12 shrink-0 place-items-center">
+      {active && <span className="absolute inset-0 rounded-full bg-orange/30 motion-safe:animate-ping" />}
+      <span
+        className={`relative grid h-12 w-12 place-items-center rounded-full border-4 border-white transition ${
+          active
+            ? 'bg-orange text-white shadow-lift'
+            : done
+              ? 'bg-gradient-to-br from-violet to-[#8b6cff] text-white shadow-soft'
+              : 'bg-surface-low text-ink-soft/70'
+        }`}
+      >
+        {done ? <Check size={18} strokeWidth={3} /> : <StepIcon status={status} />}
+      </span>
+    </span>
+  )
+
+  const text = (
+    <>
+      <span
+        className={`font-label text-[13px] font-semibold ${active ? 'text-orange' : done ? 'text-ink' : 'text-ink-soft'}`}
+      >
+        {m.label}
+      </span>
+      <time
+        dateTime={time.value}
+        className={`mt-0.5 font-label text-[11px] leading-tight ${time.value ? 'text-ink-soft' : 'text-ink-soft/55'}`}
+      >
+        {time.label}
+      </time>
+    </>
+  )
+
+  if (vertical) {
+    return (
+      <li className="relative flex items-center gap-4" aria-current={active ? 'step' : undefined}>
+        {dot}
+        <span className="flex min-w-0 flex-col">{text}</span>
+      </li>
+    )
+  }
+
+  return (
+    <li className="flex flex-col items-center px-1 text-center" aria-current={active ? 'step' : undefined}>
+      {dot}
+      <span className="mt-3 flex flex-col items-center">{text}</span>
+    </li>
   )
 }
 
