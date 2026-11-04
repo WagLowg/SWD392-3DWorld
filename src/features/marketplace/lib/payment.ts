@@ -39,7 +39,7 @@ export function parsePaymentParams(params: URLSearchParams): PaymentResultParams
   const status = params.get('status')
   return {
     kind,
-    ids: [...new Set([...toIds(params.get('ids')), ...toIds(params.get('id')), ...toIds(params.get('sourceId'))])],
+    ids: [...new Set([...toIds(params.get('ids')), ...toIds(params.get('id')), ...toIds(params.get('sourceId')), ...toIds(params.get('transactionId'))])],
     gatewaySuccess: status === null ? null : status === '1',
     gatewayCode: status,
     appTransId: params.get('apptransid') ?? params.get('appTransId'),

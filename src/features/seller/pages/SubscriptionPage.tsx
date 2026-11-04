@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   CalendarDays,
@@ -6,7 +7,9 @@ import {
   CreditCard,
   Crown,
   Eye,
+  Loader2,
   Receipt,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Store,
@@ -17,14 +20,40 @@ import { useEffect, useState } from 'react'
 import { formatDate, formatDateTime, formatVnd } from '../../../shared/lib/format'
 import { Btn, DataTable, Hero, RuleBox, Section } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
+import { useToast } from '../../../shared/ui/toast'
 import { type SubscriptionHistoryItem } from '../data/seller.fixtures'
-import { useRenew, useSubscription } from '../hooks/useSeller'
+import { sellerKeys, useRenew, useSubscription } from '../hooks/useSeller'
 import { PAYMENT_STATUS } from '../lib/status'
+import { sellerService } from '../services/seller.service'
 
 export function SubscriptionPage() {
   const q = useSubscription()
   const renew = useRenew()
+  const qc = useQueryClient()
+  const toast = useToast()
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<SubscriptionHistoryItem | null>(null)
+  const [checkingPayment, setCheckingPayment] = useState(false)
+
+  const handleCheckPendingPayment = async () => {
+    setCheckingPayment(true)
+    try {
+      const res = await sellerService.checkPendingSubscriptionPayment()
+      if (res.success) {
+        toast('Đã xác nhận thanh toán thành công từ ZaloPay! Gian hàng đã được kích hoạt.', 'success')
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: sellerKeys.subscription }),
+          qc.invalidateQueries({ queryKey: sellerKeys.storefront }),
+          qc.invalidateQueries({ queryKey: ['auth', 'session'] }),
+        ])
+      } else {
+        toast(res.message, 'error')
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Không thể kiểm tra giao dịch với ZaloPay.', 'error')
+    } finally {
+      setCheckingPayment(false)
+    }
+  }
 
   useEffect(() => {
     document.title = 'Gói đăng ký gian hàng · 3DWorld'
@@ -222,9 +251,24 @@ export function SubscriptionPage() {
 
                     <div className="flex flex-wrap items-center gap-2.5">
                       {hasPendingPayment && (
-                        <Btn href="/marketplace/payment/result?type=subscription" variant="white">
-                          Kiểm tra giao dịch đang chờ
-                        </Btn>
+                        <button
+                          type="button"
+                          disabled={checkingPayment}
+                          onClick={handleCheckPendingPayment}
+                          className="inline-flex items-center gap-2 rounded-2xl border border-violet/30 bg-violet/10 px-4 py-2.5 font-label text-sm font-semibold text-violet shadow-xs transition hover:bg-violet/20 disabled:opacity-50"
+                        >
+                          {checkingPayment ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin text-violet" />
+                              <span>Đang kiểm tra với ZaloPay…</span>
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw size={15} className="text-violet" />
+                              <span>Kiểm tra giao dịch đang chờ</span>
+                            </>
+                          )}
+                        </button>
                       )}
                       <Btn
                         variant="primary"
@@ -338,7 +382,9 @@ export function SubscriptionPage() {
                       setSelectedHistoryItem(null)
                       renew.mutate()
                     }}
+                    onCheckPayment={handleCheckPendingPayment}
                     isPaying={renew.isPending}
+                    isChecking={checkingPayment}
                   />
                 )}
               </>
@@ -355,13 +401,17 @@ function SubscriptionDetailModal({
   monthlyFee,
   onClose,
   onPayNow,
+  onCheckPayment,
   isPaying,
+  isChecking,
 }: {
   item: SubscriptionHistoryItem
   monthlyFee: number
   onClose: () => void
   onPayNow: () => void
+  onCheckPayment?: () => void
   isPaying: boolean
+  isChecking?: boolean
 }) {
   const isPending = item.status === 'PENDING'
   const isSucceeded = item.status === 'SUCCEEDED'
@@ -476,15 +526,37 @@ function SubscriptionDetailModal({
           </button>
 
           {isPending && (
-            <button
-              type="button"
-              disabled={isPaying}
-              onClick={onPayNow}
-              className="inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r from-violet to-[#8069f3] px-4 py-2 font-label text-xs font-bold text-white shadow-lift hover:opacity-95 transition disabled:opacity-50"
-            >
-              <CreditCard size={14} />
-              {isPaying ? 'Đang chuyển sang ZaloPay…' : `Thanh toán lại ngay (${formatVnd(monthlyFee)})`}
-            </button>
+            <>
+              {onCheckPayment && (
+                <button
+                  type="button"
+                  disabled={isChecking}
+                  onClick={onCheckPayment}
+                  className="inline-flex items-center gap-1.5 rounded-2xl border border-violet/30 bg-violet/10 px-4 py-2 font-label text-xs font-bold text-violet hover:bg-violet/20 transition disabled:opacity-50"
+                >
+                  {isChecking ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Đang kiểm tra…</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw size={14} />
+                      <span>Kiểm tra kết quả ZaloPay</span>
+                    </>
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={isPaying}
+                onClick={onPayNow}
+                className="inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r from-violet to-[#8069f3] px-4 py-2 font-label text-xs font-bold text-white shadow-lift hover:opacity-95 transition disabled:opacity-50"
+              >
+                <CreditCard size={14} />
+                {isPaying ? 'Đang chuyển sang ZaloPay…' : `Thanh toán lại ngay (${formatVnd(monthlyFee)})`}
+              </button>
+            </>
           )}
         </div>
       </div>
