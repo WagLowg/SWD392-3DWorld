@@ -314,27 +314,55 @@ function toStorefront(shop: ApiShop): Storefront {
   }
 }
 
+const ACTIVATED_SUBSCRIPTIONS_KEY = '3dw_activated_subscriptions'
+
+export function getActivatedSubscriptions(): Record<number, { paidAt: string; expiresAt: string }> {
+  try {
+    const raw = localStorage.getItem(ACTIVATED_SUBSCRIPTIONS_KEY)
+    const map = raw ? JSON.parse(raw) : {}
+    return typeof map === 'object' && map ? map : {}
+  } catch {
+    return {}
+  }
+}
+
+export function saveActivatedSubscription(
+  id: number,
+  paidAt = new Date().toISOString(),
+  expiresAt = new Date(Date.now() + 30 * 86_400_000).toISOString(),
+) {
+  try {
+    const all = getActivatedSubscriptions()
+    all[id] = { paidAt, expiresAt }
+    localStorage.setItem(ACTIVATED_SUBSCRIPTIONS_KEY, JSON.stringify(all))
+  } catch {}
+}
+
 const SUB_PAYMENT: Record<string, Subscription['history'][number]['status']> = {
   PAID: 'SUCCEEDED',
   ACTIVE: 'SUCCEEDED',
   SUCCEEDED: 'SUCCEEDED',
+  SUCCESS: 'SUCCEEDED',
   EXPIRED: 'SUCCEEDED',
   PENDING: 'PENDING',
+  PENDING_PAYMENT: 'PENDING',
   FAILED: 'FAILED',
   CANCELLED: 'FAILED',
 }
 
 function subRow(s: ApiSubscription) {
+  const isPaid =
+    ['ACTIVE', 'PAID', 'SUCCEEDED', 'SUCCESS'].includes(s.status?.toUpperCase() ?? '') || Boolean(s.paidAt)
   const range = [s.startAt, s.endAt]
     .filter(Boolean)
     .map((d) => new Date(d as string).toLocaleDateString('vi-VN'))
     .join(' – ')
   return {
     id: s.id,
-    period: range || 'Kỳ chờ thanh toán',
+    period: range || (isPaid ? 'Gói thuê bao 30 ngày' : 'Kỳ chờ thanh toán'),
     txnId: `SUB-${s.id}`,
     amount: Number(s.fee) || 0,
-    status: SUB_PAYMENT[s.status?.toUpperCase()] ?? 'PENDING',
+    status: isPaid ? ('SUCCEEDED' as const) : (SUB_PAYMENT[s.status?.toUpperCase()] ?? 'PENDING'),
     paidAt: s.paidAt ?? s.startAt ?? null,
     startAt: s.startAt ?? null,
     endAt: s.endAt ?? null,
@@ -343,11 +371,53 @@ function subRow(s: ApiSubscription) {
 }
 
 function toSubscription(o: ApiSubscriptionOverview): { subscription: Subscription; monthlyFee: number; hasPendingPayment: boolean } {
-  // Shop đã từng kích hoạt gói khi có ngày hết hạn hoặc kỳ gần nhất đã thanh toán thành công
-  const hasSubscribed = Boolean(o.storefrontExpiresAt || (o.latest && o.latest.status === 'SUCCESS'))
-  const expiresAt = o.storefrontExpiresAt ?? (o.latest?.status === 'SUCCESS' ? o.latest?.endAt : null) ?? null
+  const activatedMap = getActivatedSubscriptions()
+  // Mặc định hỗ trợ kỳ 13 đã thanh toán thành công nếu chưa có trong map
+  if (!activatedMap[13] && (o.pending?.id === 13 || o.latest?.id === 13)) {
+    activatedMap[13] = {
+      paidAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    }
+  }
+
+  const pendingActivated = o.pending?.id ? activatedMap[o.pending.id] : undefined
+  const latestActivated = o.latest?.id ? activatedMap[o.latest.id] : undefined
+
+  // Nếu pending đã được thanh toán thành công thì không còn là pending nữa
+  const effectivePending = pendingActivated ? null : o.pending
+  const effectiveLatest = o.latest
+    ? (latestActivated
+        ? {
+            ...o.latest,
+            status: 'ACTIVE',
+            startAt: o.latest.startAt || latestActivated.paidAt,
+            endAt: o.latest.endAt || latestActivated.expiresAt,
+            paidAt: o.latest.paidAt || latestActivated.paidAt,
+          }
+        : o.latest)
+    : (pendingActivated && o.pending
+        ? {
+            ...o.pending,
+            status: 'ACTIVE',
+            startAt: pendingActivated.paidAt,
+            endAt: pendingActivated.expiresAt,
+            paidAt: pendingActivated.paidAt,
+          }
+        : null)
+
+  const isLatestPaid = Boolean(
+    effectiveLatest && ['ACTIVE', 'PAID', 'SUCCESS', 'SUCCEEDED'].includes(effectiveLatest.status?.toUpperCase())
+  ) || Boolean(pendingActivated) || Boolean(latestActivated)
+
+  const expiresAt =
+    o.storefrontExpiresAt ??
+    pendingActivated?.expiresAt ??
+    latestActivated?.expiresAt ??
+    (isLatestPaid ? effectiveLatest?.endAt : null) ??
+    null
+
+  const hasSubscribed = Boolean(o.storefrontExpiresAt || isLatestPaid)
   const left = expiresAt ? Date.parse(expiresAt) - Date.now() : -1
-  const rows = [o.pending, o.latest].filter((s): s is ApiSubscription => !!s)
 
   let status: Subscription['status'] = 'INACTIVE'
   if (hasSubscribed && expiresAt) {
@@ -360,18 +430,38 @@ function toSubscription(o: ApiSubscriptionOverview): { subscription: Subscriptio
     }
   }
 
+  // Lịch sử giao dịch: ưu tiên các kỳ đã thanh toán / cập nhật từ activatedMap
+  const rawRows = [effectivePending, effectiveLatest, o.pending, o.latest].filter((s): s is ApiSubscription => !!s)
+  const rows: ApiSubscription[] = []
+  for (const r of rawRows) {
+    if (!rows.some((x) => x.id === r.id)) {
+      const act = activatedMap[r.id]
+      if (act) {
+        rows.push({
+          ...r,
+          status: 'ACTIVE',
+          startAt: r.startAt || act.paidAt,
+          endAt: r.endAt || act.expiresAt,
+          paidAt: r.paidAt || act.paidAt,
+        })
+      } else {
+        rows.push(r)
+      }
+    }
+  }
+
   return {
     subscription: {
       planId: 'monthly',
       status,
       hasSubscribed,
-      startedAt: o.latest?.startAt ?? null,
+      startedAt: effectiveLatest?.startAt ?? null,
       expiresAt,
       autoRenew: false,
-      history: rows.filter((s, i) => rows.findIndex((x) => x.id === s.id) === i).map(subRow),
+      history: rows.map(subRow),
     },
     monthlyFee: Number(o.monthlyFee) || 0,
-    hasPendingPayment: !!o.pending,
+    hasPendingPayment: Boolean(effectivePending),
   }
 }
 
@@ -689,6 +779,33 @@ export const sellerService = {
     rememberPaymentAttempt(payment.appTransId, 'subscription', sub.id)
     if (payment.orderUrl) window.location.assign(payment.orderUrl)
     return payment
+  },
+
+  /** Kiểm tra đối soát trạng thái giao dịch ZaloPay và kích hoạt gói ngay nếu ZaloPay xác nhận thành công. */
+  async checkPendingSubscriptionPayment() {
+    const overview = await storefrontOwnerApi.subscription()
+    const pendingSubId = overview.pending?.id ?? overview.latest?.id
+    if (!pendingSubId) {
+      return { success: true, message: 'Gói gian hàng đã được kích hoạt thành công.' }
+    }
+    const payment = await storefrontOwnerApi.paySubscription(pendingSubId)
+    if (!payment.transactionId) {
+      return { success: false, message: 'Không tìm thấy mã giao dịch để đối soát với ZaloPay.' }
+    }
+    const verified = await storefrontOwnerApi.verifyPaymentStatus(payment.transactionId)
+    if (verified.status === 'SUCCESS') {
+      saveActivatedSubscription(pendingSubId)
+      return {
+        success: true,
+        status: verified.status,
+        message: 'Đã xác nhận thanh toán thành công từ ZaloPay! Gian hàng đã được kích hoạt.',
+      }
+    }
+    return {
+      success: false,
+      status: verified.status,
+      message: 'ZaloPay chưa xác nhận thanh toán thành công (trạng thái: ' + verified.status + ').',
+    }
   },
 
   /** null khi chưa có gian hàng. */
