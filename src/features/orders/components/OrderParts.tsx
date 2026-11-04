@@ -1,7 +1,9 @@
 import { Check, Package, Store, X } from 'lucide-react'
 import { formatDateTime, formatVnd } from '../../../shared/lib/format'
 import { ProductMedia } from '../../marketplace/components/ProductMedia'
-import { formatAttributes } from '../../marketplace/lib/format'
+import { useMemo } from 'react'
+import { formatAttributes, resolveMediaUrl } from '../../marketplace/lib/format'
+import { useCatalog } from '../../marketplace/hooks/useCatalog'
 import { useVariantIndexStore } from '../../marketplace/stores/variant-index.store'
 import { ORDER_FLOW, shipmentMeta, statusMeta, TONE_CLASS } from '../lib/status'
 import type { Order, OrderHistoryEntry, OrderItem, OrderStatus } from '../types/order.types'
@@ -41,28 +43,50 @@ export function ShipmentStatusBadge({ status }: { status: string }) {
 /** Món trong đơn: tên & thuộc tính từ bản chụp OrderItemResponse; ảnh lấy từ chỉ mục variant nếu có. */
 export function OrderItemRow({ item }: { item: OrderItem }) {
   const info = useVariantIndexStore((s) => s.variants[item.variantId])
-  const title = item.productTitle || info?.title
+  const catalog = useCatalog({ page: 0, size: 50 }, !info)
+
+  const matchedProduct = useMemo(() => {
+    if (info) return null
+    const cleanTitle = (item.productTitle || '').trim().toLowerCase()
+    return catalog.data?.items.find((p) => p.title.trim().toLowerCase() === cleanTitle)
+  }, [info, catalog.data?.items, item.productTitle])
+
+  const productId = info?.productId || matchedProduct?.id || item.variantId || 12
+  const title = item.productTitle || info?.title || matchedProduct?.title
   const attributes = item.attributes ?? info?.attributes
+  const displayImage = info?.image || matchedProduct?.thumbnailUrl
+  const productHref = `/marketplace/${productId}`
+
   return (
-    <li className="flex items-center gap-4 rounded-2xl bg-surface-low/70 p-3">
-      {info ? (
-        <ProductMedia src={info.image} alt="" seed={info.productId} className="h-16 w-16 shrink-0 rounded-xl" />
-      ) : (
-        <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-soft to-peach text-ink-soft">
-          <Package size={22} />
-        </span>
-      )}
-      <div className="min-w-0 flex-1">
-        {info ? (
-          <a
-            href={`/marketplace/${info.productId}`}
-            className="block truncate font-display text-base font-bold hover:text-violet"
-          >
-            {title}
-          </a>
+    <li className="flex items-center gap-4 rounded-2xl bg-surface-low/70 p-3 transition hover:bg-surface-low">
+      <a href={productHref} className="group shrink-0 block" title="Xem chi tiết sản phẩm">
+        {displayImage ? (
+          <img
+            src={resolveMediaUrl(displayImage)}
+            alt={title || ''}
+            className="h-16 w-16 shrink-0 rounded-xl object-cover transition duration-200 group-hover:scale-105"
+          />
+        ) : info ? (
+          <ProductMedia
+            src={info.image}
+            alt=""
+            seed={info.productId}
+            className="h-16 w-16 shrink-0 rounded-xl transition duration-200 group-hover:scale-105"
+          />
         ) : (
-          <p className="truncate font-display text-base font-bold">{title || `Vật phẩm ${item.sku}`}</p>
+          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-soft to-peach text-ink-soft transition duration-200 group-hover:scale-105">
+            <Package size={22} />
+          </span>
         )}
+      </a>
+      <div className="min-w-0 flex-1">
+        <a
+          href={productHref}
+          className="block truncate font-display text-base font-bold text-ink transition hover:text-orange"
+          title="Bấm để xem sản phẩm trong Chợ Đồ Chơi"
+        >
+          {title || `Vật phẩm ${item.sku}`}
+        </a>
         <p className="font-mono text-[11px] text-ink-soft">
           SKU: {item.sku} · SL: x{item.quantity}
         </p>
@@ -190,3 +214,6 @@ export function OrderMoney({ order }: { order: Order }) {
     </dl>
   )
 }
+
+/** Trạng thái cho phép yêu cầu hoàn tiền (đã thanh toán). */
+export const REFUNDABLE = ['PAID', 'PROCESSING', 'SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'RECEIVED', 'RETURNED']

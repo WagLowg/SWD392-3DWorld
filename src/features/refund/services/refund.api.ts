@@ -16,6 +16,7 @@ export interface ManualRefundRow extends CustomerRefundReasonFields {
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAID'
   reason: string
   created_at: string
+  transfer_reference?: string | null
   history?: ManualRefundAudit[]
 }
 
@@ -127,6 +128,23 @@ export interface AdminTransferDetails {
 }
 
 export const refundApi = {
+  /** GET /api/refunds - Lấy danh sách yêu cầu hoàn tiền của khách hàng hiện tại */
+  async listCustomerRefunds(params?: { status?: string; page?: number; size?: number }): Promise<ManualRefundRow[]> {
+    try {
+      const query = new URLSearchParams()
+      if (params?.status) query.set('status', params.status)
+      if (params?.page !== undefined) query.set('page', String(params.page))
+      if (params?.size !== undefined) query.set('size', String(params.size))
+
+      const qs = query.toString() ? `?${query.toString()}` : ''
+      const res = await http.get<ApiEnvelope<ManualRefundRow[]>>(`/api/refunds${qs}`)
+      return res.data ?? []
+    } catch {
+      return []
+    }
+  },
+
+
   /** POST /api/orders/{orderId}/refunds - Khách hàng nộp yêu cầu hoàn tiền thủ công */
   async submitCustomerRefund(
     orderId: number,

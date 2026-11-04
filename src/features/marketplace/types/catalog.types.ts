@@ -84,6 +84,12 @@ export type PagedItems<T> = {
   totalPages: number
 }
 
+export type ReviewSellerReply = {
+  actorUserId?: number
+  reply: string
+  repliedAt: string
+}
+
 export type ProductReview = {
   id: number
   rating: number
@@ -91,6 +97,13 @@ export type ProductReview = {
   /** Chuỗi ảnh (JSON array hoặc danh sách cách nhau bởi dấu phẩy). */
   images?: string | null
   createdAt: string
+  sellerReply?: ReviewSellerReply | null
+  buyerName?: string | null
+  buyerAvatar?: string | null
+  buyerUserId?: number | null
+  userAvatar?: string | null
+  variantAttributes?: string | null
+  orderItemId?: number | null
 }
 
 /** ShopResponse — gian hàng công khai. */

@@ -169,6 +169,49 @@ export function RefundRequestPage() {
   useEffect(() => {
     let active = true
     async function syncBackendRefunds() {
+      // 1. Lấy danh sách từ API thật của Backend: GET /api/refunds
+      try {
+        const remoteRefunds = await refundApi.listCustomerRefunds()
+        if (active && remoteRefunds && remoteRefunds.length > 0) {
+          setRefundCases((prev) => {
+            const merged = [...prev]
+            for (const r of remoteRefunds) {
+              const idx = merged.findIndex((m) => m.id === r.id || m.orderId === r.physical_order_id)
+              const normStatus = normalizeStatus(r.status)
+              if (idx >= 0) {
+                merged[idx] = {
+                  ...merged[idx],
+                  status: normStatus,
+                  amount: Number(r.amount) || merged[idx].amount,
+                  transferReference: r.transfer_reference || merged[idx].transferReference,
+                }
+              } else {
+                merged.unshift({
+                  id: r.id,
+                  orderId: r.physical_order_id,
+                  orderCode: `#ORD-${String(r.physical_order_id).padStart(5, '0')}`,
+                  productTitle: 'Vật phẩm chế tác 3D',
+                  storefrontId: 12,
+                  amount: Number(r.amount),
+                  status: normStatus,
+                  reason: r.reason || 'Yêu cầu hoàn tiền',
+                  detail: r.reason,
+                  bankName: 'Ngân hàng nhận',
+                  accountNumberMasked: '***************',
+                  accountHolder: 'Khách hàng',
+                  createdAt: r.created_at || new Date().toISOString(),
+                  transferReference: r.transfer_reference,
+                })
+              }
+            }
+            saveStoredRefunds(merged)
+            return merged
+          })
+        }
+      } catch {
+        // ignore
+      }
+
       const stored = getStoredRefunds()
       const targetIds = Array.from(new Set(stored.map((c) => c.id)))
 

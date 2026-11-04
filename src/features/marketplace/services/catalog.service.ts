@@ -48,6 +48,33 @@ export const catalogService = {
       )
     ).data
   },
+
+  /** POST /api/products/{productId}/reviews — khách hàng gửi đánh giá sản phẩm đã mua */
+  async createReview(
+    productId: number,
+    payload: { orderItemId: number; rating: number; comment?: string },
+  ) {
+    return (
+      await http.post<ApiEnvelope<{ reviewId: number }>>(
+        `/api/products/${productId}/reviews`,
+        payload,
+      )
+    ).data
+  },
+
+  /** PUT /api/seller/products/{productId}/reviews/{reviewId}/reply — người bán phản hồi đánh giá */
+  async replyReview(
+    productId: number,
+    reviewId: number,
+    payload: { reply: string },
+  ) {
+    return (
+      await http.put<ApiEnvelope<void>>(
+        `/api/seller/products/${productId}/reviews/${reviewId}/reply`,
+        payload,
+      )
+    ).data
+  },
 }
 
 export const storefrontService = {
