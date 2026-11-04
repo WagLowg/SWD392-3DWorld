@@ -1,4 +1,3 @@
-
 export type SellerPayoutRecord = {
   id: string
   transactionId: number
@@ -90,7 +89,7 @@ export function saveLocalPayout(record: SellerPayoutRecord) {
 }
 
 import { orderService } from '../../orders/services/order.service'
-﻿import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
+import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
 import type { AuditEntry } from '../../../shared/ui/kit'
 import { addressService, bankAccountService, profileService } from '../../account/services/account.service'
 import { clearPendingSubmission, getPendingSubmission, savePendingSubmission } from './sellerSubmissionStorage'
@@ -107,7 +106,6 @@ import {
   type Subscription,
 } from '../data/seller.fixtures'
 import {
-  type ApiPayoutHistory,
   type ApiProduct,
   type ApiShop,
   type ApiSubscription,
@@ -190,12 +188,7 @@ function parseSpecsObject(specs: string | null | undefined): Record<string, unkn
   return {}
 }
 
-function buildSpecs(
-  polygonCount: number,
-  manifold: boolean,
-  variants: SellerVariant[],
-  previous?: string,
-) {
+function buildSpecs(polygonCount: number, manifold: boolean, variants: SellerVariant[], previous?: string) {
   const first = variants.find((variant) => variant.active) ?? variants[0]
   const dimensionsMm = first
     ? [first.lengthCm, first.widthCm, first.heightCm].map((value) => Math.round(Number(value) * 10))
@@ -215,12 +208,9 @@ function readSpecs(specs: string | null | undefined) {
   const manifold = specs?.match(MANIFOLD_RE)?.[1]
   return {
     polygonCount:
-      typeof object.polygonCount === 'number'
-        ? object.polygonCount
-        : poly
-          ? Number(poly.replace(/[.,]/g, '')) || 0
-          : 0,
-    manifold: typeof object.manifold === 'boolean' ? object.manifold : manifold ? manifold.toLowerCase() === 'có' : true,
+      typeof object.polygonCount === 'number' ? object.polygonCount : poly ? Number(poly.replace(/[.,]/g, '')) || 0 : 0,
+    manifold:
+      typeof object.manifold === 'boolean' ? object.manifold : manifold ? manifold.toLowerCase() === 'có' : true,
   }
 }
 
@@ -264,9 +254,24 @@ function toProduct(p: ApiProduct): SellerProduct {
   }
 }
 
-function toVariantWrite(v: Pick<SellerVariant,
-  'sku' | 'material' | 'color' | 'size' | 'price' | 'active' | 'fragile' | 'lowStockThreshold' |
-  'packingGroup' | 'weightGrams' | 'lengthCm' | 'widthCm' | 'heightCm'>): VariantWrite {
+function toVariantWrite(
+  v: Pick<
+    SellerVariant,
+    | 'sku'
+    | 'material'
+    | 'color'
+    | 'size'
+    | 'price'
+    | 'active'
+    | 'fragile'
+    | 'lowStockThreshold'
+    | 'packingGroup'
+    | 'weightGrams'
+    | 'lengthCm'
+    | 'widthCm'
+    | 'heightCm'
+  >,
+): VariantWrite {
   return {
     sku: v.sku,
     price: v.price,
@@ -338,7 +343,11 @@ function subRow(s: ApiSubscription): Subscription['history'][number] {
   }
 }
 
-function toSubscription(o: ApiSubscriptionOverview): { subscription: Subscription; monthlyFee: number; hasPendingPayment: boolean } {
+function toSubscription(o: ApiSubscriptionOverview): {
+  subscription: Subscription
+  monthlyFee: number
+  hasPendingPayment: boolean
+} {
   const expiresAt = o.storefrontExpiresAt ?? o.latest?.endAt ?? null
   const left = expiresAt ? Date.parse(expiresAt) - Date.now() : -1
   const rows = [o.pending, o.latest].filter((s): s is ApiSubscription => !!s)
@@ -476,10 +485,15 @@ export const sellerService = {
     const evidenceLink = draft.evidence || pending?.evidence
     const storefrontName = shop?.name ?? (draft.storefrontName || pending?.storefrontName || '')
     const technologies = draft.technologies.length ? draft.technologies : (pending?.technologies ?? [])
-    const address = pickup ? formatStructuredAddress(pickup) : (draft.address || pending?.address || '')
+    const address = pickup ? formatStructuredAddress(pickup) : draft.address || pending?.address || ''
 
     if (submittedTimestamp)
-      audit.push({ at: new Date(submittedTimestamp).toISOString(), actor: 'Bạn', action: 'Nộp hồ sơ xác thực người bán', tone: 'violet' })
+      audit.push({
+        at: new Date(submittedTimestamp).toISOString(),
+        actor: 'Bạn',
+        action: 'Nộp hồ sơ xác thực người bán',
+        tone: 'violet',
+      })
     if (ver?.reviewedAt)
       audit.push({
         at: new Date(ver.reviewedAt).toISOString(),
@@ -537,7 +551,9 @@ export const sellerService = {
     if (!bank) throw new Error('Bạn cần thêm ít nhất một tài khoản ngân hàng đang hoạt động vào hồ sơ trước khi nộp.')
     const pickup = addresses.find((address) => address.isDefault)
     if (!isGhtkReadyAddress(pickup)) {
-      throw new Error('Cần một địa chỉ mặc định có đủ người liên hệ, số điện thoại, địa chỉ chi tiết, tỉnh/thành và phường/xã để GHTK lấy hàng.')
+      throw new Error(
+        'Cần một địa chỉ mặc định có đủ người liên hệ, số điện thoại, địa chỉ chi tiết, tỉnh/thành và phường/xã để GHTK lấy hàng.',
+      )
     }
     const phone = patch.phone || pickup.phone || profile?.phone || ''
     const evidenceRef = buildEvidence({ ...patch, phone })
@@ -651,16 +667,26 @@ export const sellerService = {
         keep.add(old.id)
         const before = toVariant(old)
         if (
-          before.sku !== v.sku || before.material !== v.material || before.color !== v.color || before.size !== v.size ||
-          before.price !== v.price || before.active !== v.active || before.fragile !== v.fragile ||
-          before.lowStockThreshold !== v.lowStockThreshold || before.packingGroup !== v.packingGroup ||
-          before.weightGrams !== v.weightGrams || before.lengthCm !== v.lengthCm ||
-          before.widthCm !== v.widthCm || before.heightCm !== v.heightCm
+          before.sku !== v.sku ||
+          before.material !== v.material ||
+          before.color !== v.color ||
+          before.size !== v.size ||
+          before.price !== v.price ||
+          before.active !== v.active ||
+          before.fragile !== v.fragile ||
+          before.lowStockThreshold !== v.lowStockThreshold ||
+          before.packingGroup !== v.packingGroup ||
+          before.weightGrams !== v.weightGrams ||
+          before.lengthCm !== v.lengthCm ||
+          before.widthCm !== v.widthCm ||
+          before.heightCm !== v.heightCm
         )
           await sellerProductApi.updateVariant(id, old.id, toVariantWrite(v))
-        if (before.stock !== v.stock) await sellerProductApi.setStock(id, old.id, v.stock, 'Cập nhật từ trình sửa sản phẩm')
+        if (before.stock !== v.stock)
+          await sellerProductApi.setStock(id, old.id, v.stock, 'Cập nhật từ trình sửa sản phẩm')
       }
-      for (const old of existing.variants) if (old.active && !keep.has(old.id)) await sellerProductApi.removeVariant(id, old.id)
+      for (const old of existing.variants)
+        if (old.active && !keep.has(old.id)) await sellerProductApi.removeVariant(id, old.id)
     }
     let saved = await sellerProductApi.get(id)
     const startingMediaCount = saved.media.length
@@ -736,13 +762,14 @@ export const sellerService = {
     const data = await sellerWalletApi.mine()
     const earnings: Earning[] = (data.earnings ?? []).map((e) => {
       const orderIdNum = Number(e.orderId)
-      const isVoid = orderIdNum === 46 || ['VOID', 'REFUNDED', 'RETURNED'].includes(e.status?.toUpperCase() ?? '')
+      const isVoid = ['VOID', 'REFUNDED', 'RETURNED'].includes(e.status?.toUpperCase() ?? '')
       const released = e.status?.toUpperCase() === 'RELEASED'
       const pending = ['PENDING', 'AWAITING_FUNDS'].includes(e.status?.toUpperCase() ?? '')
       const status: Earning['status'] = isVoid ? 'REFUNDED' : released ? 'RELEASED' : pending ? 'PENDING' : 'HELD'
       const gross = Number(e.grossAmount) || 0
       const commissionAmount = Number(e.commissionAmount) || 0
       const netAmount = Number(e.netAmount) || 0
+      const returnShippingFee = Number(e.returnShippingFee) || 0
       const feeRate = Number(e.commissionRate) || (gross > 0 && commissionAmount > 0 ? commissionAmount / gross : 0.05)
       const receivedAt = e.eligibleAt
         ? new Date(new Date(e.eligibleAt).getTime() - 72 * 3600 * 1000).toISOString()
@@ -756,16 +783,16 @@ export const sellerService = {
           orderId: orderIdNum,
           product: `Đơn hàng #${e.orderId} (Hoàn tiền)`,
           sku: 'Hoàn hàng & Cấn trừ phí ship 2 chiều',
-          gross: gross > 0 ? gross : 150000,
+          gross,
           feeRate: 0,
           commissionAmount: 0,
-          returnShippingFee: 48400,
-          netAmount: -48400,
+          returnShippingFee,
+          netAmount: netAmount || -returnShippingFee,
           isRefunded: true,
           status: 'REFUNDED' as const,
           receivedAt,
           releaseAt: e.releasedAt ?? undefined,
-          blocker: 'Khách khiếu nại hoàn tiền (#REF-114). Đã hoàn tiền cho người mua và cấn trừ 48.400đ cước vận chuyển 2 chiều.',
+          blocker: 'Đơn hàng đã được hoàn tiền. Phí vận chuyển hoàn trả được lấy theo dữ liệu đối soát.',
           ledger: [
             {
               id: `earning-void-${e.orderId}`,
@@ -779,7 +806,7 @@ export const sellerService = {
               id: `shipping-assessment-${e.orderId}`,
               at: e.releasedAt ?? e.eligibleAt ?? nowIso(),
               type: 'Cấn trừ phí vận chuyển hoàn trả 2 chiều (GHTK)',
-              amount: -48400,
+              amount: -returnShippingFee,
               bucket: 'available',
               status: 'POSTED',
             },
@@ -799,11 +826,14 @@ export const sellerService = {
         status,
         receivedAt,
         releaseAt: e.releasedAt ?? e.eligibleAt ?? undefined,
-        blocker: status === 'PENDING'
-          ? (e.eligibleAt ? `Dự kiến giải ngân: ${new Date(e.eligibleAt).toLocaleString('vi-VN')}` : 'Tự động giải ngân sau 72h nhận hàng.')
-          : status === 'HELD'
-            ? 'Đang tạm hoãn giải ngân để kiểm tra tranh chấp/khiếu nại.'
-            : 'Đã giải ngân vào ví khả dụng.',
+        blocker:
+          status === 'PENDING'
+            ? e.eligibleAt
+              ? `Dự kiến giải ngân: ${new Date(e.eligibleAt).toLocaleString('vi-VN')}`
+              : 'Tự động giải ngân sau 72h nhận hàng.'
+            : status === 'HELD'
+              ? 'Đang tạm hoãn giải ngân để kiểm tra tranh chấp/khiếu nại.'
+              : 'Đã giải ngân vào ví khả dụng.',
         ledger: [
           {
             id: `earning-${e.orderId}`,
@@ -817,51 +847,26 @@ export const sellerService = {
       }
     })
 
-    // Bổ sung đơn hoàn tiền #46 nếu BE chưa trả về trong data.earnings
-    if (!earnings.some((x) => Number(x.orderId) === 46)) {
-      earnings.unshift({
-        id: 'ERN-46',
-        orderId: 46,
-        product: 'Đèn ngủ cú mèo đáng yêu (Hoàn tiền #REF-114)',
-        sku: 'ONE_SIZE - Trắng · FDM PETG',
-        gross: 150000,
-        feeRate: 0,
-        commissionAmount: 0,
-        returnShippingFee: 48400,
-        netAmount: -48400,
-        isRefunded: true,
-        status: 'REFUNDED',
-        receivedAt: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-        blocker: 'Khách khiếu nại hoàn tiền (#REF-114) đã được Admin duyệt chi trả. Xưởng chịu phí ship 2 chiều (-48.400đ) theo quy định.',
-        ledger: [
-          {
-            id: 'rev-void-46',
-            at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-            type: 'Thu hồi doanh thu đơn hoàn tiền #46',
-            amount: 0,
-            bucket: 'pending',
-            status: 'POSTED',
-          },
-          {
-            id: 'shipping-assessment-46',
-            at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-            type: 'Cấn trừ phí vận chuyển hoàn trả 2 chiều (SHIPPING_ASSESSMENT:46)',
-            amount: -48400,
-            bucket: 'available',
-            status: 'POSTED',
-          },
-        ],
-      })
-    }
-
     return {
       earnings,
       wallet: (() => {
         const available = Number(data.availableBalance) || 0
         const minimumReserve = Number(data.minimumReserve) || 100000
         const returnShippingDebt = Number(data.returnShippingDebt) || 0
-        const withdrawable = returnShippingDebt > 0 ? 0 : (data.withdrawableBalance !== undefined ? Number(data.withdrawableBalance) : Math.max(0, available - minimumReserve))
-        return { available, pending: Number(data.pendingBalance) || 0, held: Number(data.payoutHold) || 0, returnShippingDebt, minimumReserve, withdrawable }
+        const withdrawable =
+          returnShippingDebt > 0
+            ? 0
+            : data.withdrawableBalance !== undefined
+              ? Number(data.withdrawableBalance)
+              : Math.max(0, available - minimumReserve)
+        return {
+          available,
+          pending: Number(data.pendingBalance) || 0,
+          held: Number(data.payoutHold) || 0,
+          returnShippingDebt,
+          minimumReserve,
+          withdrawable,
+        }
       })(),
     }
   },
@@ -878,7 +883,10 @@ export const sellerService = {
       if (order?.items && order.items.length > 0) {
         earning.product = order.items.map((it) => it.productTitle || `Mẫu #${it.id}`).join(', ')
         if (order.items[0]?.sku) {
-          earning.sku = order.items.map((it) => it.sku).filter(Boolean).join(', ')
+          earning.sku = order.items
+            .map((it) => it.sku)
+            .filter(Boolean)
+            .join(', ')
         }
       }
     } catch {
@@ -943,7 +951,9 @@ export const sellerService = {
           amount: Number(p.amount) || 0,
           status: p.status,
           bankAccountId: p.bankAccountId ?? 0,
-          bankInfo: [p.bankName, p.accountNumberMasked, p.accountHolder].filter(Boolean).join(' · ') || 'Tài khoản ngân hàng đã liên kết',
+          bankInfo:
+            [p.bankName, p.accountNumberMasked, p.accountHolder].filter(Boolean).join(' · ') ||
+            'Tài khoản ngân hàng đã liên kết',
           transferReference: p.transferReference,
           createdAt: p.createdAt,
           reason: p.reason ?? 'Rút doanh thu bán hàng về tài khoản ngân hàng',

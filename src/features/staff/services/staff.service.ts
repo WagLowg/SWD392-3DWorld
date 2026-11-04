@@ -4,7 +4,7 @@ import { ApiClientError, type ApiEnvelope, http } from '../../../shared/api'
 import { parseShippingAddressSnapshot } from '../../orders/lib/shippingAddress'
 import type { Order } from '../../orders/types/order.types'
 import {
-  getOrSeedLocalRefunds,
+  getLocalRefunds,
   getRefundById,
   type LocalRefundCase,
   updateLocalRefundStatus,
@@ -328,30 +328,31 @@ export function mapLocalToStaffRequest(loc: LocalRefundCase): StaffRefundRequest
     reason: loc.reason || 'Sản phẩm lỗi/vỡ khi vận chuyển',
     reasonCategory: 'DAMAGED_IN_TRANSIT',
     description: loc.detail || loc.reason || 'Sản phẩm bị nứt vỡ khi mở hộp',
-    requestedAmount: loc.amount || 224200,
-    originalOrderTotal: loc.amount || 224200,
+    requestedAmount: loc.amount,
+    originalOrderTotal: loc.amount,
     status: normStatus,
     adminExecutionStatus: isPaid ? 'COMPLETED' : isApproved ? 'PENDING_ADMIN' : 'NOT_REQUESTED',
     submittedAt: loc.createdAt || new Date().toISOString(),
     receivedAt: loc.createdAt || new Date().toISOString(),
     refundDeadlineAt: new Date(Date.now() + 72 * 3600 * 1000).toISOString(),
-    evidence: (loc.images && loc.images.length > 0)
-      ? loc.images.map((img, idx) => ({
-          id: `ev-${idx + 1}`,
-          type: 'image' as const,
-          url: img,
-          caption: `Ảnh minh chứng sản phẩm #${idx + 1}`,
-          uploadedAt: loc.createdAt || new Date().toISOString(),
-        }))
-      : [
-          {
-            id: 'ev-1',
+    evidence:
+      loc.images && loc.images.length > 0
+        ? loc.images.map((img, idx) => ({
+            id: `ev-${idx + 1}`,
             type: 'image' as const,
-            url: 'https://res.cloudinary.com/dbuzojydp/image/upload/v1793179053/Products/3DDE-RESIN-WHITE-S.png',
-            caption: 'Ảnh minh chứng sản phẩm lỗi vỡ',
+            url: img,
+            caption: `Ảnh minh chứng sản phẩm #${idx + 1}`,
             uploadedAt: loc.createdAt || new Date().toISOString(),
-          },
-        ],
+          }))
+        : [
+            {
+              id: 'ev-1',
+              type: 'image' as const,
+              url: 'https://res.cloudinary.com/dbuzojydp/image/upload/v1793179053/Products/3DDE-RESIN-WHITE-S.png',
+              caption: 'Ảnh minh chứng sản phẩm lỗi vỡ',
+              uploadedAt: loc.createdAt || new Date().toISOString(),
+            },
+          ],
     items: [
       {
         id: 1,
@@ -362,7 +363,7 @@ export function mapLocalToStaffRequest(loc: LocalRefundCase): StaffRefundRequest
         quantityPurchased: 1,
         defectiveQuantity: 1,
         unitPrice: 200000,
-        refundAmount: loc.amount || 224200,
+        refundAmount: loc.amount,
       },
     ],
     shipmentSummary: {
@@ -408,7 +409,11 @@ export function mapLocalToStaffRequest(loc: LocalRefundCase): StaffRefundRequest
     financialStatus: {
       sellerEarningsStatus: 'HELD',
       payoutProviderStatus: isPaid ? 'PROCESSED' : isApproved ? 'QUEUED_FOR_GATEWAY' : 'PENDING_STAFF_APPROVAL',
-      note: isPaid ? 'Đã hoàn tất chuyển tiền cho khách hàng' : isApproved ? 'Staff đã duyệt · Chờ Admin chuyển khoản' : 'Chờ Staff thẩm định',
+      note: isPaid
+        ? 'Đã hoàn tất chuyển tiền cho khách hàng'
+        : isApproved
+          ? 'Staff đã duyệt · Chờ Admin chuyển khoản'
+          : 'Chờ Staff thẩm định',
     },
   }
 }
@@ -438,8 +443,8 @@ export const staffService = {
       rows = []
     }
 
-    // Luôn lấy dữ liệu local đã seed sẵn để đảm bảo hiển thị đúng hồ sơ cần duyệt
-    const localCases = getOrSeedLocalRefunds()
+    // Merge locally submitted refunds while the customer list API is unavailable.
+    const localCases = getLocalRefunds()
 
     // Bổ sung thông tin chi tiết đơn hàng cho các dòng API từ backend
     let apiRefunds: StaffRefundRequest[] = []
@@ -510,10 +515,7 @@ export const staffService = {
     },
   ): Promise<StaffRefundRequest> {
     try {
-      const response = await http.patch<ApiEnvelope<StaffRefundApi>>(
-        `/api/staff/refunds/${id}/review`,
-        input,
-      )
+      const response = await http.patch<ApiEnvelope<StaffRefundApi>>(`/api/staff/refunds/${id}/review`, input)
       updateLocalRefundStatus(id, {
         status: input.approved ? 'APPROVED' : 'REJECTED',
         staffReviewReason: input.reason,
@@ -570,7 +572,6 @@ export function useStaffShipments() {
   }
 }
 
-
 export function normalizeRefundDetail(raw: any, order?: Order | null): StaffRefundRequest {
   const base = normalizeRefundApi(raw)
   let evidence: StaffEvidenceItem[] = []
@@ -604,7 +605,7 @@ export function normalizeRefundDetail(raw: any, order?: Order | null): StaffRefu
   let imageUrls: string[] = []
   if (Array.isArray(raw?.history)) {
     const requested = raw.history.find(
-      (h: any) => h.status === 'REFUND_REQUESTED' || h.action_type === 'REFUND_REQUESTED'
+      (h: any) => h.status === 'REFUND_REQUESTED' || h.action_type === 'REFUND_REQUESTED',
     )
     if (requested?.metadata) {
       imageUrls = extractImages(requested.metadata)
@@ -642,28 +643,40 @@ export function normalizeRefundDetail(raw: any, order?: Order | null): StaffRefu
         id: `h-${idx}`,
         timestamp: h.created_at || new Date().toISOString(),
         actor: h.actor_id ? `Người dùng #${h.actor_id}` : 'Hệ thống',
-        action: h.status === 'REFUND_REQUESTED' ? 'Nộp yêu cầu hoàn tiền' :
-                h.status === 'REFUND_APPROVED' ? 'Staff duyệt chấp thuận' :
-                h.status === 'REFUND_REJECTED' ? 'Staff từ chối yêu cầu' :
-                h.status === 'REFUND_PAID' ? 'Admin chuyển khoản hoàn tiền' :
-                h.status === 'REFUND_BANK_DETAILS_ACCESSED' ? 'Admin truy cập STK ngân hàng' : h.status,
+        action:
+          h.status === 'REFUND_REQUESTED'
+            ? 'Nộp yêu cầu hoàn tiền'
+            : h.status === 'REFUND_APPROVED'
+              ? 'Staff duyệt chấp thuận'
+              : h.status === 'REFUND_REJECTED'
+                ? 'Staff từ chối yêu cầu'
+                : h.status === 'REFUND_PAID'
+                  ? 'Admin chuyển khoản hoàn tiền'
+                  : h.status === 'REFUND_BANK_DETAILS_ACCESSED'
+                    ? 'Admin truy cập STK ngân hàng'
+                    : h.status,
         note: h.reason || undefined,
-        tone: h.status === 'REFUND_APPROVED' || h.status === 'REFUND_PAID' ? 'green' :
-              h.status === 'REFUND_REJECTED' ? 'danger' : 'violet',
+        tone:
+          h.status === 'REFUND_APPROVED' || h.status === 'REFUND_PAID'
+            ? 'green'
+            : h.status === 'REFUND_REJECTED'
+              ? 'danger'
+              : 'violet',
       }))
     : []
 
-  const items: StaffRefundItem[] = order?.items?.map((item: any) => ({
-    id: item.id,
-    orderItemId: item.id,
-    productTitle: item.productTitle || `Sản phẩm ${item.sku}`,
-    variantName: item.attributes || item.sku,
-    sku: item.sku,
-    quantityPurchased: item.quantity,
-    defectiveQuantity: item.quantity,
-    unitPrice: Number(item.unitPrice),
-    refundAmount: Number(item.subtotal || item.unitPrice * item.quantity),
-  })) ?? []
+  const items: StaffRefundItem[] =
+    order?.items?.map((item: any) => ({
+      id: item.id,
+      orderItemId: item.id,
+      productTitle: item.productTitle || `Sản phẩm ${item.sku}`,
+      variantName: item.attributes || item.sku,
+      sku: item.sku,
+      quantityPurchased: item.quantity,
+      defectiveQuantity: item.quantity,
+      unitPrice: Number(item.unitPrice),
+      refundAmount: Number(item.subtotal || item.unitPrice * item.quantity),
+    })) ?? []
 
   const address = parseShippingAddressSnapshot(order?.shippingAddressSnapshot)
 
@@ -673,30 +686,40 @@ export function normalizeRefundDetail(raw: any, order?: Order | null): StaffRefu
   const rejectedEntry = Array.isArray(raw?.history)
     ? raw.history.find((h: any) => h.status === 'REFUND_REJECTED')
     : null
-  const paidEntry = Array.isArray(raw?.history)
-    ? raw.history.find((h: any) => h.status === 'REFUND_PAID')
-    : null
+  const paidEntry = Array.isArray(raw?.history) ? raw.history.find((h: any) => h.status === 'REFUND_PAID') : null
 
   const isFinal = base.status === 'APPROVED' || base.status === 'PAID' || base.status === 'REJECTED'
   const reviewedAt = approvedEntry?.created_at || rejectedEntry?.created_at || (isFinal ? base.submittedAt : null)
-  const reviewedBy = approvedEntry?.actor_id ? `Nhân viên Staff #${approvedEntry.actor_id}` : (isFinal ? 'Demo Print Staff' : null)
-  const decisionReason = approvedEntry?.reason || rejectedEntry?.reason || raw?.reason || raw?.refund_reason || 'Đã đối soát chứng từ và xác nhận hợp lệ.'
+  const reviewedBy = approvedEntry?.actor_id
+    ? `Nhân viên Staff #${approvedEntry.actor_id}`
+    : isFinal
+      ? 'Demo Print Staff'
+      : null
+  const decisionReason =
+    approvedEntry?.reason ||
+    rejectedEntry?.reason ||
+    raw?.reason ||
+    raw?.refund_reason ||
+    'Đã đối soát chứng từ và xác nhận hợp lệ.'
 
-  const adminHandoff = (base.status === 'APPROVED' || base.status === 'PAID') ? {
-    refundRequestId: base.id,
-    refundCode: base.code,
-    sourceOrderId: base.orderId,
-    orderCode: order?.orderCode || base.orderCode,
-    staffDecision: 'APPROVED' as const,
-    staffDecisionReason: decisionReason,
-    staffReviewedAt: reviewedAt || base.submittedAt,
-    reviewedBy: reviewedBy || 'Demo Print Staff',
-    approvedRefundAmount: base.requestedAmount,
-    adminExecutionStatus: base.adminExecutionStatus || (base.status === 'PAID' ? 'COMPLETED' : 'PENDING_ADMIN'),
-    customerName: address?.recipientName || base.customerName,
-    sellerName: base.sellerName,
-    evidenceCount: evidence.length,
-  } : null
+  const adminHandoff =
+    base.status === 'APPROVED' || base.status === 'PAID'
+      ? {
+          refundRequestId: base.id,
+          refundCode: base.code,
+          sourceOrderId: base.orderId,
+          orderCode: order?.orderCode || base.orderCode,
+          staffDecision: 'APPROVED' as const,
+          staffDecisionReason: decisionReason,
+          staffReviewedAt: reviewedAt || base.submittedAt,
+          reviewedBy: reviewedBy || 'Demo Print Staff',
+          approvedRefundAmount: base.requestedAmount,
+          adminExecutionStatus: base.adminExecutionStatus || (base.status === 'PAID' ? 'COMPLETED' : 'PENDING_ADMIN'),
+          customerName: address?.recipientName || base.customerName,
+          sellerName: base.sellerName,
+          evidenceCount: evidence.length,
+        }
+      : null
 
   return {
     ...base,

@@ -190,6 +190,3 @@ export function OrderMoney({ order }: { order: Order }) {
     </dl>
   )
 }
-
-/** Trạng thái cho phép yêu cầu hoàn tiền (đã thanh toán). */
-export const REFUNDABLE = ['PAID', 'PROCESSING', 'SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'RECEIVED', 'RETURNED']

@@ -8,9 +8,10 @@ import { ApiNote, Breadcrumbs } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { useToast } from '../../../shared/ui/toast'
-import { OrderStatusBadge, orderCode, REFUNDABLE, ShipmentStatusBadge } from '../components/OrderParts'
+import { OrderStatusBadge, orderCode, ShipmentStatusBadge } from '../components/OrderParts'
 import { ShipmentLog, ShipmentProgress } from '../components/ShipmentTimeline'
 import { useBuyerShipments, useConfirmReceived, useMyOrders } from '../hooks/useOrders'
+import { canRequestRefund } from '../lib/refundEligibility'
 import type { Shipment } from '../types/order.types'
 
 /** MP 027 · Theo Dõi Vận Chuyển Đơn Hàng */
@@ -106,7 +107,7 @@ export function OrderTrackingPage() {
                   <CheckCircle2 size={15} /> Xác nhận đã nhận hàng
                 </button>
               )}
-              {REFUNDABLE.includes(order.status) && (
+              {canRequestRefund(order) && (
                 <Link
                   to={`/refunds?orderId=${order.id}`}
                   className="inline-flex items-center gap-2 rounded-full bg-surface-low px-5 py-3 font-label text-sm font-semibold hover:bg-surface-high"

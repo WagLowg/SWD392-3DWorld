@@ -5,9 +5,10 @@ import { formatDateTime, formatVnd } from '../../../shared/lib/format'
 import { PageHeading } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
-import { OrderItemRow, OrderStatusBadge, orderCode, REFUNDABLE, StorefrontLabel } from '../components/OrderParts'
+import { OrderItemRow, OrderStatusBadge, orderCode, StorefrontLabel } from '../components/OrderParts'
 import { PayOrderButton } from '../components/PayOrderButton'
 import { useMyOrders } from '../hooks/useOrders'
+import { canRequestRefund } from '../lib/refundEligibility'
 import { STATUS_FILTERS } from '../lib/status'
 import type { Order } from '../types/order.types'
 
@@ -171,7 +172,7 @@ function OrderCard({ order: o }: { order: Order }) {
         </div>
       )}
       <footer className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
-        {REFUNDABLE.includes(o.status) && (
+        {canRequestRefund(o) && (
           <Link
             to={`/refunds?orderId=${o.id}`}
             className="inline-flex items-center gap-1.5 rounded-full bg-surface-low px-4 py-2.5 font-label text-xs font-semibold hover:bg-surface-high"

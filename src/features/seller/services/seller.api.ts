@@ -119,6 +119,7 @@ export type ApiEarning = {
   commissionRate: number
   commissionAmount: number
   netAmount: number
+  returnShippingFee?: number | null
   status: string
   eligibleAt?: string | null
   releasedAt?: string | null
@@ -281,9 +282,12 @@ export const sellerWalletApi = {
     return (await http.post<ApiEnvelope<ApiPayout>>('/api/users/me/payouts', input)).data
   },
   async payouts(page = 0, size = 50) {
-    return (await http.get<ApiEnvelope<ApiPayoutHistory[]>>(`/api/users/me/payouts${toQueryString({ page, size })}`)).data
+    return (await http.get<ApiEnvelope<ApiPayoutHistory[]>>(`/api/users/me/payouts${toQueryString({ page, size })}`))
+      .data
   },
   async ledgers(page = 0, size = 50) {
-    return (await http.get<ApiEnvelope<ApiWalletLedger[]>>(`/api/users/me/wallet/ledgers${toQueryString({ page, size })}`)).data
+    return (
+      await http.get<ApiEnvelope<ApiWalletLedger[]>>(`/api/users/me/wallet/ledgers${toQueryString({ page, size })}`)
+    ).data
   },
 }
