@@ -1,3 +1,9 @@
+/**
+ * [Giải thích] Trạng thái chung toàn app qua React Context:
+ * - ToastProvider/useToast: thông báo nhỏ ở góc.
+ * - AuthProvider/useAuth: người dùng đăng nhập và ví tín dụng.
+ * - useOnline: biết đang có mạng hay không.
+ */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-react';
 import { authEvents, type ConfigOptions, type User, type Wallet } from './api';
@@ -51,6 +57,7 @@ type AuthState = {
 const AuthCtx = createContext<AuthState>(null as unknown as AuthState);
 export const useAuth = () => useContext(AuthCtx);
 
+// [GT] Nạp người dùng + ví tín dụng một lần, chia sẻ cho mọi trang qua Context (đọc bằng useAuth).
 export function AuthProvider({ children }: { children: ReactNode }) {
   const cachedUser = getCachedSessionUser();
   const [user, setUser] = useState<User | null>(cachedUser);

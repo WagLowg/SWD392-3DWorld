@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Thanh điều hướng trên cùng (bấm để cuộn tới từng world) và thanh tiến độ WorldProgress bên cạnh.
+ */
 import { LogOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { logout } from '../../../shared/session/session'

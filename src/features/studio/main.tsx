@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Điểm khởi động 3D Studio: kiểm tra đăng nhập (chưa đăng nhập → trang login), tải font rồi render <App/>.
+ */
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';

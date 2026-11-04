@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Link sang module khác bằng <a> thường (tải trang mới), vì mỗi module là một trang riêng.
+ */
 import type { AnchorHTMLAttributes, Ref } from 'react'
 
 /**

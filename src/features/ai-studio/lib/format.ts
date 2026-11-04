@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Hàm định dạng hiển thị: số, dung lượng (KB/MB), ngày giờ, thời gian đã trôi qua,
+ * nhãn và màu cho trạng thái tác vụ/dự án, tên model AI, chữ cái đầu của tên.
+ */
 import type { ProjectStatus, TaskStatus } from './api';
 
 const nf = new Intl.NumberFormat('vi-VN');

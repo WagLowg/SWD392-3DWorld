@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Trạng thái dùng MỖI FRAME (biến JS thường, KHÔNG phải React state).
+ * Sửa trực tiếp S.t, S.drag... không làm React render lại → animation 60fps không lag.
+ */
 import * as THREE from 'three'
 
 /**

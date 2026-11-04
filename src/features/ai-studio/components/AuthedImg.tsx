@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Thẻ <img> cho ảnh cần đăng nhập: tải bằng fetch có Bearer token rồi hiển thị bằng blob: URL.
+ */
 import { type ImgHTMLAttributes, useEffect } from 'react';
 import { useAuthedUrl } from '../lib/authed';
 

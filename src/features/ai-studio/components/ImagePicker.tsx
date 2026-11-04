@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Chọn và tải ảnh đầu vào: kéo thả hoặc chọn file, kiểm tra loại/dung lượng,
+ * upload bằng XHR để có thanh tiến độ. Chế độ Multi-View có 4 ô (Trước/Sau/Trái/Phải).
+ */
 import { useEffect, useRef, useState } from 'react';
 import { UploadCloud, Plus, X, ImageIcon } from 'lucide-react';
 import type { SourceImage } from '../lib/api';
@@ -19,6 +23,7 @@ function uploadFile(file: File, onProgress: (p: number) => void): Promise<Source
     xhr.open('POST', '/api/ai-studio/uploads');
     const token = tokenStore.get();
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    // [GT] Cập nhật % tải lên cho thanh tiến độ.
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
     xhr.onload = () => {
       let data: { data?: unknown; message?: string; error?: { message: string } } = {};

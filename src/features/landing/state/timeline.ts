@@ -1,4 +1,8 @@
 /**
+ * [Giải thích] KỊCH BẢN thời gian của cả trang. Mỗi mục [bắt đầu, kết thúc] tính theo "unit"
+ * (1 unit ≈ 65vh cuộn). WORLD_Y: độ cao của từng world trong cảnh 3D (xếp chồng theo trục Y).
+ */
+/**
  * The whole landing page is one scroll-scrubbed timeline measured in "units".
  * 1 unit ≈ 65vh of scroll on desktop (55vh on mobile).
  * Every 3D value is derived from the current time `t`, so scrolling up
@@ -33,6 +37,7 @@ export const WORLD_STARTS = [0, 3.35, 7.0, 10.15, 14.65]
 /** Time the nav jumps to for each world — its interactive hold point. */
 export const WORLD_ANCHORS = [2.2, 5.75, 9.0, 13.5, 15.6]
 
+// [GT] Đoạn "dừng" của mỗi world: camera đứng yên, người dùng được kéo/tương tác.
 export const HOLDS: [number, number][] = [
   [T.aiHold[0] - 0.05, T.aiHold[1] + 0.05],
   [T.stHold[0] - 0.05, T.stHold[1] + 0.05],

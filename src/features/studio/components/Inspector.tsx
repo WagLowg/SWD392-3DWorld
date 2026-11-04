@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Bảng thuộc tính bên phải: nhập số vị trí/góc/tỷ lệ/kích thước, màu, căn chỉnh, mirror,
+ * kết quả kiểm tra in và theo dõi đơn in (PodTracking).
+ */
 import { useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import {

@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Bảng cấu hình tạo mô hình: preset (nhanh/cân bằng/chất lượng cao/tuỳ chỉnh), model AI, texture, PBR,
+ * số polygon, topology, tư thế nhân vật, số biến thể, đồng ý điều khoản, hiển thị chi phí ước tính.
+ */
 import { useState } from 'react';
 import { ChevronDown, SlidersHorizontal, Sparkles } from 'lucide-react';
 import type { ConfigOptions, Estimate, GenConfig, SourceMode } from '../lib/api';

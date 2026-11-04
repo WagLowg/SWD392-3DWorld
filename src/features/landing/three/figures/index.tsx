@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Các MODEL 3D (robot, gấu, rồng...) – không dùng file .glb, mà GHÉP bằng code
+ * từ hình cơ bản (sphere, cylinder, torus, RoundedBox). <group> gom các mảnh để di chuyển cùng nhau.
+ */
 import { forwardRef, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'

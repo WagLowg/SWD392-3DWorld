@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Menu bên trái của dashboard: Dự án / Mẫu.
+ */
 import { BookOpen, CircleHelp, FolderKanban, LayoutTemplate } from 'lucide-react';
 import { href } from '../router';
 

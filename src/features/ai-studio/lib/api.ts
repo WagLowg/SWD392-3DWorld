@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Kiểu dữ liệu phía frontend (User, Task, Version, Project, Estimate, Wallet...) và hàm api() gọi HTTP chung:
+ * tự gắn Bearer token, đổi lỗi mạng và lỗi HTTP thành ApiError có mã (code) để giao diện xử lý.
+ */
 import { tokenStore } from '../../../shared/session/token';
 import { resetSessionCheck, sessionStillValid } from '../../../shared/session/verify';
 
@@ -92,6 +96,7 @@ export const authEvents = new EventTarget();
 
 export const AI_UNAUTHORIZED = 'AI_SERVICE_UNAUTHORIZED';
 
+// [GT] Mọi request HTTP đều qua đây: gắn token, parse JSON, ném ApiError (code NETWORK, HTTP_xxx...) khi lỗi.
 export async function api<T>(path: string, opts: Opts = {}): Promise<T> {
   const isForm = opts.body instanceof FormData;
   const token = tokenStore.get();

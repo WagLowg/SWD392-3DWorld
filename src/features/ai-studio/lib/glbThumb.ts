@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Ảnh xem trước cho thẻ dự án, chụp từ chính file GLB (nhiều góc xoay ghép thành dải ảnh), có cache.
+ */
 import { useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';

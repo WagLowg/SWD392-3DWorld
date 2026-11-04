@@ -1,3 +1,9 @@
+/**
+ * [Giải thích] Tương tác dùng chung:
+ * - CanvasDrag: kéo ngang vùng trống → S.drag[world] (xoay model/camera/băng chuyền), có quán tính khi thả.
+ * - SharedShadow: một bóng đổ di chuyển theo world đang xem.
+ * - useWorldVisibility: ẩn world ở xa camera để GPU đỡ vẽ.
+ */
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { ContactShadows } from '@react-three/drei'
@@ -20,6 +26,7 @@ export function CanvasDrag() {
     const el = gl.domElement
     const onDown = (e: PointerEvent) => {
       if (e.target !== el) return
+      // [GT] Một vật 3D (vd. khối trong Studio) đã nhận cú nhấn này → không xoay cảnh nữa.
       if (S.consumed) {
         S.consumed = false
         return
@@ -35,6 +42,7 @@ export function CanvasDrag() {
       S.pointer.y = -((e.clientY / window.innerHeight) * 2 - 1)
       if (!S.dragging || e.pointerId !== st.current.id) return
       const now = performance.now()
+      // [GT] Đổi quãng kéo (px) thành góc xoay cộng dồn vào S.drag[world]; ghi cả vận tốc để có quán tính khi thả.
       const dx = (e.clientX - st.current.x) / Math.max(400, window.innerWidth * 0.6)
       const w = st.current.world
       S.drag[w] += dx * Math.PI
@@ -70,6 +78,7 @@ export function CanvasDrag() {
       const v = S.dragVel[w]
       if (Math.abs(v) > 0.001) {
         S.drag[w] += v * dt
+        // [GT] Quán tính: vận tốc giảm dần theo thời gian → quay chậm dần rồi dừng.
         S.dragVel[w] *= Math.exp(-5 * dt)
         if (w === 1 || w === 3) S.drag[w] = THREE.MathUtils.clamp(S.drag[w], -1.1, 1.1)
       }

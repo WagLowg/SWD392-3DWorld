@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Thanh dưới: số tam giác, gợi ý công cụ, lưới. Toasts: thông báo nhỏ ở góc màn hình.
+ */
 import { useMemo } from 'react';
 import { AlertCircle, CheckCircle2, Info, TriangleAlert, X } from 'lucide-react';
 import { useStudio } from '../store';

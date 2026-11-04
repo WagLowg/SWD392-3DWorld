@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Gốc của trang Landing: bọc LandingPage trong BrowserRouter.
+ */
 import { BrowserRouter } from 'react-router-dom'
 import LandingPage from './pages/LandingPage'
 

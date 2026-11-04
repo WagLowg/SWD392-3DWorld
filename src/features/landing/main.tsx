@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Điểm khởi động trang Landing: render <App/> vào #root.
+ * Ngoại lệ: URL /payment-result (ZaloPay trả về) được chuyển sang trang kết quả thanh toán.
+ */
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AppProviders } from '../../app/providers/AppProviders'

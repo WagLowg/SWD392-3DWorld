@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Chọn dự án đã có mô hình (dùng ở trang Xuất/In khi chưa chọn phiên bản). useVersion: tải một phiên bản theo id.
+ */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Cuboid } from 'lucide-react';

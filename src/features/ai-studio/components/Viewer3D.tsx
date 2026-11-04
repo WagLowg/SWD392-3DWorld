@@ -1,3 +1,10 @@
+/**
+ * [Giải thích] TRÌNH XEM 3D cho file GLB do AI tạo ra.
+ * - useGLTF tải file, rồi chuẩn hoá: scale về cùng kích thước, đặt tâm giữa và đáy chạm bệ.
+ * - 3 chế độ hiển thị: textured (gốc), clay (đất sét), wireframe (khung lưới).
+ * - Hiệu ứng hiện hình: wireframe mọc từ dưới lên (clipping plane) → clay → texture.
+ * - OrbitControls để xoay/zoom; chụp ảnh (screenshot) và quay video xoay 360° (MediaRecorder).
+ */
 import { Component, Suspense, forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, useGLTF, Grid, ContactShadows } from '@react-three/drei';
@@ -77,10 +84,12 @@ const wireMat = new THREE.MeshBasicMaterial({ color: VIOLET, wireframe: true, tr
 type Phase = 'build' | 'clay' | 'done';
 const BUILD_MS = 1400;
 const CLAY_MS = 900;
+// [GT] Mặt phẳng cắt dùng cho hiệu ứng hiện hình (chỉ giữ phần nằm dưới độ cao constant).
 const clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
 const ease = (x: number) => 1 - (1 - x) ** 3;
 
 function Model({ url, mode, bbox, onStats, onReady }: { url: string; mode: RenderMode; bbox: boolean; onStats?: Props['onStats']; onReady: (h: number) => void }) {
+  // [GT] useGLTF tải và đọc file GLB (trong lúc tải, Suspense hiện <Loading/>). Clone để không sửa vào bản đã cache.
   const { scene } = useGLTF(url);
   const root = useMemo(() => scene.clone(true), [scene]);
 
@@ -89,6 +98,7 @@ function Model({ url, mode, bbox, onStats, onReady }: { url: string; mode: Rende
     const box = new THREE.Box3().setFromObject(root);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
+    // [GT] Mô hình AI có kích thước bất kỳ → tính hệ số scale để cạnh dài nhất bằng TARGET_SIZE.
     const s = TARGET_SIZE / Math.max(size.x, size.y, size.z, 1e-6);
     let vertices = 0;
     let triangles = 0;
@@ -131,6 +141,7 @@ function Model({ url, mode, bbox, onStats, onReady }: { url: string; mode: Rende
     root.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
+      // [GT] Đổi vật liệu cho từng mesh: clay, wireframe hoặc vật liệu gốc (đã lưu sẵn trong userData.original).
       m.material = show === 'clay' ? clayMat : show === 'wireframe' ? wireMat : m.userData.original;
     });
   }, [root, mode, phase, gl]);
@@ -146,6 +157,7 @@ function Model({ url, mode, bbox, onStats, onReady }: { url: string; mode: Rende
     if (phase === 'build' && ms >= BUILD_MS) setPhase('clay');
     else if (phase === 'clay' && ms >= BUILD_MS + CLAY_MS) setPhase('done');
     const el = ms / 1000;
+    // [GT] Hiệu ứng hiện hình: nâng dần mặt phẳng cắt → wireframe "mọc" từ đáy lên; xong thì chuyển sang clay rồi texture.
     if (phase === 'build') clipPlane.constant = ease(Math.min(1, el / (BUILD_MS / 1000))) * height * 1.02;
     if (!scan.current) return;
     scan.current.visible = true;
@@ -220,6 +232,8 @@ const CameraRig = forwardRef<ViewerHandle, { height: number; scene: StageScene }
     const r = recording.current;
     if (!r || r.done) return;
     const t = Math.min(1, (performance.now() - r.start) / r.ms);
+    // [GT] Quay video: xoay camera quanh trục Y đúng một vòng theo thời gian;
+    // mỗi frame chép canvas 3D (kèm nền) sang canvas mà MediaRecorder đang ghi.
     camera.position.copy(r.offset).applyAxisAngle(Y_AXIS, t * Math.PI * 2).add(r.tgt);
     camera.lookAt(r.tgt);
     composite(gl.domElement, sceneRef.current, r.out);

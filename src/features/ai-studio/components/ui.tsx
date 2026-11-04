@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Component giao diện dùng chung: Segmented, SelectField, TextField, Switch, Badge, Progress, Modal, Empty.
+ */
 import { useEffect, type ReactNode, type SelectHTMLAttributes, type InputHTMLAttributes } from 'react';
 import { X } from 'lucide-react';
 

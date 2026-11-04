@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Hộp thoại tạo dự án (trống / từ mẫu, chọn cỡ bàn in), đổi tên và xoá dự án.
+ */
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Alert, Modal } from '../components/ui';

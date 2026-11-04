@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Vẽ "ảnh 2D đầu vào" cho demo AI Studio bằng Canvas 2D (không cần file ảnh).
+ * Mỗi ảnh khớp với một model 3D; được cache và dùng làm texture.
+ */
 import * as THREE from 'three'
 import type { FigureKind } from '../config/content'
 

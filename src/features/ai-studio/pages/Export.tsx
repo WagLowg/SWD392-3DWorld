@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Trang Xuất mô hình: chọn định dạng (GLB, STL, OBJ, FBX), Backend chuyển đổi rồi trả link tải.
+ */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CheckCircle2, Circle, Lock, Download, AlertTriangle, Cuboid } from 'lucide-react';

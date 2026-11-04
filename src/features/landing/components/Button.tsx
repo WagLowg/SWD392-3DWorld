@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Nút CTA có hiệu ứng "nam châm" hút nhẹ theo con trỏ; Eyebrow là nhãn số nhỏ trên tiêu đề.
+ */
 import { useRef } from 'react'
 import { Link } from '../lib/PageLink'
 

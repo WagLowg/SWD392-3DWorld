@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Tất cả popup: nhập STL, xuất STL, kiểm tra in, gửi yêu cầu in, phím tắt, hướng dẫn, boolean.
+ */
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { CheckCircle2, FileUp, Loader2, Printer } from 'lucide-react';

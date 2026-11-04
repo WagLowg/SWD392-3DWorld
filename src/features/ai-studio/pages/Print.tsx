@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Trang In 3D theo yêu cầu: nhập kích thước thật (mm/cm), chọn công nghệ, vật liệu, chất lượng, màu, số lượng
+ * rồi gửi yêu cầu sang module POD. Hiện các yêu cầu in gần đây.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Lock, Unlock, Send, AlertTriangle, CheckCircle2, Cuboid, ShieldAlert } from 'lucide-react';

@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Biến DỮ LIỆU node thành HÌNH 3D: buildGeometry() dựng hộp/cầu/trụ/chữ 3D/hình đùn.
+ * Kiểm tra tham số hợp lệ, cache hình theo tham số, mã hoá mesh base64, tính hộp bao, tách ma trận.
+ */
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { NodeParams, SceneNode, Vec3 } from '../types';
@@ -185,6 +189,7 @@ export function buildGeometry(n: SceneNode): { geometry: THREE.BufferGeometry; m
   if (n.kind === 'group') return null;
   if (validateParams(n.kind, n.params)) return null;
   const key = nodeGeometryKey(n);
+  // [GT] Đã dựng hình với đúng tham số này rồi → dùng lại, không dựng lại.
   const hit = cache.get(key);
   if (hit) return hit;
   const p = n.params;

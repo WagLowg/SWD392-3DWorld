@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Nền gradient và ánh sáng, chuyển màu mượt theo world camera đang ở (THEMES trong content.ts).
+ */
 import { useFrame, useThree } from '@react-three/fiber'
 import { Environment, Lightformer } from '@react-three/drei'
 import { useMemo, useRef } from 'react'

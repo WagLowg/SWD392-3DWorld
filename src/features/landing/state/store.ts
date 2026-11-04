@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Trạng thái UI (Zustand) – chỉ cho thay đổi thưa: world đang xem, preset AI,
+ * danh sách khối trong demo 3D Studio, sản phẩm đang chọn, tuỳ chọn in. Component nào đọc thì tự render lại.
+ */
 import { create } from 'zustand'
 import type { FigureKind } from '../config/content'
 import { EDITOR_COLORS } from '../config/content'

@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Lớp chữ HTML của world 1 (AI Studio): tiêu đề, 3 bước, panel chọn preset/phát lại.
+ */
 import { useEffect, useState } from 'react'
 import { AI_PRESETS } from '../config/content'
 import { ROUTES } from '../config/routes'

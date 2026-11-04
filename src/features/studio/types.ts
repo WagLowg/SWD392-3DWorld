@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Kiểu dữ liệu chung. Quan trọng nhất: SceneNode – một vật thể trong scene,
+ * chỉ lưu "công thức" (loại, kích thước, vị trí, màu), hình 3D được dựng lại từ đó.
+ */
 export type Vec3 = [number, number, number];
 
 export type PrimitiveKind = 'box' | 'sphere' | 'cylinder' | 'cone' | 'torus' | 'plane';

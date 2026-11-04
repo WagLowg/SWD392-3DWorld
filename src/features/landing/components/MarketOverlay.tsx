@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Lớp chữ HTML của world 3 (Marketplace): thông tin sản phẩm, nút trước/sau, phím mũi tên.
+ */
 import { useEffect, useRef } from 'react'
 import { PRODUCTS } from '../config/content'
 import { ROUTES } from '../config/routes'

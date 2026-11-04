@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Thanh trên: tên dự án, trạng thái lưu (đang lưu/chưa lưu/xung đột), Undo/Redo, Import/Export, kiểm tra và gửi in.
+ */
 import { useEffect, useState } from 'react';
 import {
   AlertCircle, CheckCircle2, CircleHelp, Cloud, CloudOff, Download, Loader2, Lock, Printer, Redo2, Save, ShieldCheck, Undo2, Upload,

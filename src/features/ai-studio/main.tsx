@@ -1,3 +1,10 @@
+/**
+ * [Giải thích] Điểm khởi động AI Studio (đường dẫn gốc /ai).
+ * - Bọc app trong ToastProvider (thông báo) và AuthProvider (người dùng + ví tín dụng).
+ * - Khai báo các trang: /studio (tạo mô hình), /models (thư viện), /export, /print, /credits.
+ * - RequireAuth: chưa đăng nhập thì chuyển sang trang /login/ dùng chung.
+ * - Các trang được lazy load: chỉ tải code của trang khi mở trang đó.
+ */
 import { StrictMode, lazy, Suspense, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useEffect } from 'react';

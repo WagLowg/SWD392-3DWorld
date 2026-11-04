@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Cây đối tượng (giống Layers): đóng/mở group, ẩn/hiện, khoá, nhân bản, xoá, bật "đưa vào bản in".
+ */
 import { useMemo, useState } from 'react';
 import {
   Box, ChevronDown, ChevronRight, Copy, Eye, EyeOff, Folder, Lock, LockOpen, Printer, Trash2, Type, Hexagon, Shapes, Plus,

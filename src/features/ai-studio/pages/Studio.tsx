@@ -1,3 +1,9 @@
+/**
+ * [Giải thích] TRANG CHÍNH: tạo mô hình 3D bằng AI.
+ * Luồng: chọn chế độ (1 ảnh / nhiều góc / văn bản) → tải ảnh hoặc nhập mô tả → chỉnh cấu hình
+ * → server ước tính chi phí → xác nhận → gửi tác vụ → theo dõi tiến trình (polling) → xem mô hình 3D.
+ * Còn có: danh sách biến thể và tác vụ, huỷ tác vụ, so sánh ảnh gốc với mô hình, chụp ảnh và quay video.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -154,6 +160,7 @@ export default function Studio() {
 
   // --- tải dự án ---
   const prevStatuses = useRef<Record<string, string>>({});
+  // [GT] Tải lại chi tiết dự án (phiên bản, tác vụ, ảnh) từ server; polling bên dưới gọi hàm này định kỳ.
   const load = useCallback(async (initial = false) => {
     if (!projectId) return;
     try {
@@ -252,6 +259,7 @@ export default function Studio() {
   useEffect(() => {
     const ctl = new AbortController();
     const t = setTimeout(() => {
+      // [GT] Đợi 250ms sau lần đổi cấu hình cuối mới gọi API (debounce); AbortController huỷ request cũ còn dang dở.
       aiStudio.estimate({ mode, config: cfg, variants }, ctl.signal)
         .then((e) => { setEstimate(e); setEstimateError(null); })
         .catch((e) => { if (e.name !== 'AbortError') { setEstimate(null); setEstimateError(e.message); } });
@@ -279,6 +287,7 @@ export default function Studio() {
     setSubmitting(true);
     try {
       const name = title.trim() || project?.title || (mode === 'text' ? prompt.trim().slice(0, 60) : images[0]!.name.replace(/\.\w+$/, ''));
+      // [GT] Gửi tác vụ kèm khoá chống trùng (confirm.key): mạng lỗi mà bấm lại cũng không tạo job thứ hai, không trừ tiền hai lần.
       const r = await aiStudio.createTask({
         mode,
         name,
@@ -300,6 +309,7 @@ export default function Studio() {
       setDockTab('tasks');
     } catch (e) {
       const err = e as ApiError;
+      // [GT] Giá đổi giữa lúc ước tính và lúc gửi → server từ chối; hiện giá mới để người dùng xác nhận lại.
       if (err.code === 'PRICE_CHANGED' && err.data?.estimate) {
         setEstimate({ ...estimate, ...(err.data.estimate as Estimate) });
         toast('warning', 'Chi phí đã thay đổi', 'Vui lòng xem lại và xác nhận.');
@@ -382,6 +392,7 @@ export default function Studio() {
   }, [detail, selectedId]);
   useEffect(() => { if (!sourceImg) setCompare(false); }, [sourceImg]);
 
+  // [GT] Thanh so sánh: kéo tay cầm ngang để đổi tỉ lệ hiển thị giữa ảnh gốc (bên trái) và mô hình 3D (bên phải).
   const dragCompare = (e: RPointerEvent<HTMLDivElement>) => {
     const r = vpRef.current?.getBoundingClientRect();
     if (!r || !(e.buttons & 1)) return;

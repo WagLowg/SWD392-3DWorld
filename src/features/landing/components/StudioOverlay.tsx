@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Lớp chữ HTML của world 2 (3D Studio): tiêu đề và thanh công cụ (thêm khối, đổi move/rotate, reset).
+ */
 import { useState } from 'react'
 import { EDITOR_COLORS } from '../config/content'
 import { ROUTES } from '../config/routes'

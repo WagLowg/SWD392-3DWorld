@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Tải file cần đăng nhập (model GLB, ảnh) bằng fetch kèm token, đổi thành blob: URL để <img> và GLTFLoader dùng được.
+ */
 import { useEffect, useState } from 'react';
 import { tokenStore } from '../../../shared/session/token';
 

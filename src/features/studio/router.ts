@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Router tự viết dựa trên phần # của URL: #/projects, #/templates, #/templates/<id>, #/studio/<id>.
+ */
 import { useEffect, useState } from 'react';
 
 export type Route =

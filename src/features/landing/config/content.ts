@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Nội dung tĩnh của Landing: danh sách 4 world, bảng màu từng world (THEMES),
+ * preset của AI Studio, sản phẩm Marketplace, mẫu/màu in của Order Print.
+ */
 import { ROUTES } from './routes'
 
 export type FigureKind = 'robot' | 'bear' | 'dragon' | 'creature' | 'knight' | 'mushroom'

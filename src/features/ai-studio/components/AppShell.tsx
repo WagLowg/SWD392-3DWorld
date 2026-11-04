@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Khung chung của mọi trang: thanh điều hướng bên trái (icon), header có breadcrumb, khu vực nội dung (Outlet).
+ * useCrumb: mỗi trang tự đặt breadcrumb của mình.
+ */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Box, Sparkles, LayoutGrid, Download, Printer, Wallet, LogOut, Type, Image as ImageIcon, Home, Cuboid, Store, Star } from 'lucide-react';

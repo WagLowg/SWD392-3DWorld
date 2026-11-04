@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Tạo node mới (makeNode) với kích thước mặc định, tạo id, làm sạch dữ liệu từ server,
+ * và danh sách MẪU có sẵn (móc khoá, khay, biển tên...).
+ */
 import type { NodeKind, NodeParams, SceneNode, Vec3 } from '../types';
 
 let seq = 0;

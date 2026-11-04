@@ -1,3 +1,9 @@
+/**
+ * [Giải thích] ĐẠO DIỄN của cả trang: GSAP ScrollTrigger biến vị trí cuộn thành thời gian t (0 → T.TOTAL).
+ * - t được ghi vào S.t; mọi model 3D đọc S.t trong useFrame để tự tính vị trí.
+ * - Cùng timeline đó điều khiển việc hiện/ẩn chữ HTML (show/hide), nên chữ và 3D luôn khớp nhịp.
+ * - scrollToTime(): cuộn mượt tới một thời điểm (dùng cho menu điều hướng).
+ */
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { ScrollToPlugin } from 'gsap/ScrollToPlugin'
@@ -26,6 +32,7 @@ export function scrollToTime(t: number) {
  */
 export function buildDirector(root: HTMLElement, spacer: HTMLElement) {
   const ctx = gsap.context(() => {
+    // [GT] proxy.t là "đồng hồ" của cả trang: GSAP tween nó từ 0 → T.TOTAL theo tiến độ cuộn của spacer.
     const proxy = { t: 0 }
     const tl = gsap.timeline({
       defaults: { ease: 'none' },
@@ -33,9 +40,11 @@ export function buildDirector(root: HTMLElement, spacer: HTMLElement) {
         trigger: spacer,
         start: 'top top',
         end: 'bottom bottom',
+        // [GT] scrub 0.9: t đuổi theo thanh cuộn với độ trễ ~0.9s → chuyển động mượt, không giật theo từng nấc lăn chuột.
         scrub: S.reduced ? true : 0.9,
         invalidateOnRefresh: true,
       },
+      // [GT] Mỗi lần t đổi: ghi vào S.t (3D đọc trong useFrame) và báo store đang ở world/hold nào (để UI cập nhật).
       onUpdate: () => {
         S.t = proxy.t
         useUI.getState().setWorld(worldAt(S.t), holdAt(S.t))
@@ -45,6 +54,7 @@ export function buildDirector(root: HTMLElement, spacer: HTMLElement) {
     tl.to(proxy, { t: T.TOTAL, duration: T.TOTAL }, 0)
 
     const q = gsap.utils.selector(root)
+    // [GT] show/hide: thêm hiệu ứng hiện/ẩn chữ HTML vào CÙNG timeline tại thời điểm `at` → cuộn ngược thì chữ cũng ẩn ngược lại.
     const show = (sel: string, at: number, from: gsap.TweenVars = { y: 36 }, dur = 0.32) => {
       // staggered fromTo only pre-renders its first target, so set the hidden state explicitly
       gsap.set(q(sel), { autoAlpha: 0, ...from })

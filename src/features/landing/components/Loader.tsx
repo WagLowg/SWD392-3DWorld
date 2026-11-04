@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Màn hình chờ: ẩn đi khi canvas đã vẽ frame đầu + font đã tải + đủ thời gian tối thiểu.
+ */
 import { useEffect, useState } from 'react'
 import { useUI } from '../state/store'
 

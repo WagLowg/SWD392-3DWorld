@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] KIỂM TRA IN: mesh kín, cạnh non-manifold, hướng mặt, mặt suy biến, phần rời, số tam giác.
+ * Ý tưởng: đếm mỗi cạnh được bao nhiêu tam giác dùng (1 = hở, >2 = non-manifold).
+ */
 import * as THREE from 'three';
 import type { CheckItem, CheckLevel, PrintReport, SceneNode, Vec3 } from '../types';
 import { bakedGeometry, buildGeometry, hashFloats, validateParams, weldedForTopology } from './geometry';
@@ -22,8 +26,11 @@ export function analyzeTopology(g: THREE.BufferGeometry): Topology {
   const w = weldedForTopology(g);
   const idx = w.index!;
   const pos = w.getAttribute('position') as THREE.BufferAttribute;
+  // [GT] Đếm mỗi cạnh được bao nhiêu tam giác dùng: 1 = mesh hở, 2 = bình thường, >2 = non-manifold.
+  // dir cộng/trừ theo chiều cạnh: khác 0 nghĩa là hai mặt kề nhau quay ngược hướng.
   const edges = new Map<string, { count: number; dir: number }>();
   const parent = new Int32Array(pos.count).map((_, i) => i);
+  // [GT] Union-find: gom các đỉnh nối nhau thành nhóm → đếm số khối rời (shells).
   const find = (x: number): number => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
   const unite = (a: number, b: number) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
   let degenerate = 0;

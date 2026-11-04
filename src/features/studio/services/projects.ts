@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Gọi API backend (/api/studio): danh sách/tạo/mở/đổi tên/nhân bản/xoá dự án,
+ * lưu scene theo revision (409 khi xung đột), upload snapshot, yêu cầu in.
+ */
 import type { PodStage, PrintRequestReceipt, SceneNode, Snapshot } from '../types';
 import { TEMPLATES, normalizeNodes } from '../lib/scene';
 import { CAPABILITIES, POD_CATALOG } from '../config';
