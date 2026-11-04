@@ -1,4 +1,6 @@
-import { ArrowRight, Calendar, CheckCircle2, RotateCcw, Search, ShieldCheck, Truck, Undo2 } from 'lucide-react'
+import { ArrowRight, Calendar, CheckCircle2, RotateCcw, Search, ShieldCheck, Sparkles, Star, Truck, Undo2 } from 'lucide-react'
+import { useCatalog } from '../../marketplace/hooks/useCatalog'
+import { useVariantIndexStore } from '../../marketplace/stores/variant-index.store'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { formatDateTime, formatVnd } from '../../../shared/lib/format'
@@ -135,6 +137,21 @@ export function MyOrdersPage() {
 }
 
 function OrderCard({ order: o }: { order: Order }) {
+  const catalog = useCatalog({ page: 0, size: 50 })
+  const firstItem = o.items[0]
+  const firstProductId = useMemo(() => {
+    if (!firstItem) return o.storefrontId || 12
+    const info = useVariantIndexStore.getState().variants[firstItem.variantId]
+    if (info?.productId) return info.productId
+    const cleanTitle = (firstItem.productTitle || '').trim().toLowerCase()
+    const found = catalog.data?.items.find((p) => p.title.trim().toLowerCase() === cleanTitle)
+    return found?.id || firstItem.variantId || 12
+  }, [firstItem, catalog.data?.items, o.storefrontId])
+
+  const hasRefundDeadline = Boolean(o.refundDeadlineAt)
+  const isRefundExpired = hasRefundDeadline && new Date(o.refundDeadlineAt!).getTime() <= Date.now()
+  const canRefund = REFUNDABLE.includes(o.status) && !isRefundExpired
+  const isCompleted = ['DELIVERED', 'RECEIVED'].includes(o.status)
   const shipped = ['SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'RECEIVED', 'RETURNED'].includes(o.status)
   return (
     <article className="rounded-[2rem] bg-white/95 p-5 shadow-soft sm:p-6">
@@ -171,22 +188,31 @@ function OrderCard({ order: o }: { order: Order }) {
         </div>
       )}
       <footer className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
-        {REFUNDABLE.includes(o.status) && (
+        {canRefund ? (
           <Link
             to={`/refunds?orderId=${o.id}`}
             className="inline-flex items-center gap-1.5 rounded-full bg-surface-low px-4 py-2.5 font-label text-xs font-semibold hover:bg-surface-high"
           >
             <Undo2 size={14} /> Yêu cầu hoàn tiền
           </Link>
-        )}
-        {shipped && (
-          <Link
-            to={`/orders/${o.id}/tracking`}
+        ) : (isCompleted || ['CANCELLED', 'REFUNDED'].includes(o.status)) ? (
+          <a
+            href={`/marketplace/${firstProductId}`}
             className="inline-flex items-center gap-1.5 rounded-full bg-surface-low px-4 py-2.5 font-label text-xs font-semibold hover:bg-surface-high"
           >
-            <Truck size={14} /> Tra cứu kiện hàng
-          </Link>
+            <RotateCcw size={14} /> Mua lại
+          </a>
+        ) : null}
+
+        {isCompleted && (
+          <a
+            href={`/marketplace/${firstProductId}?tab=reviews&orderItemId=${firstItem?.id || ''}`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-orange/40 bg-peach/40 px-4 py-2.5 font-label text-xs font-semibold text-orange-deep hover:bg-peach"
+          >
+            <Star size={14} className="fill-orange text-orange" /> Đánh giá
+          </a>
         )}
+
         {o.status === 'PENDING_PAYMENT' && o.paymentMethod !== 'COD' && o.onlinePaymentRequired !== false && (
           <PayOrderButton orderId={o.id} amount={o.totalAmount} />
         )}

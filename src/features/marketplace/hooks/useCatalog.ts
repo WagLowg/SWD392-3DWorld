@@ -1,4 +1,4 @@
-import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { catalogService, storefrontService } from '../services/catalog.service'
 import { useVariantIndexStore } from '../stores/variant-index.store'
 import type { CatalogQuery } from '../types/catalog.types'
@@ -101,5 +101,47 @@ export function useStorefrontProducts(storefrontId: number, query: CatalogQuery)
     queryFn: ({ signal }) => storefrontService.products(storefrontId, query, signal),
     enabled: Number.isFinite(storefrontId) && storefrontId > 0,
     placeholderData: keepPreviousData,
+  })
+}
+
+export function useCreateReview() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      productId,
+      orderItemId,
+      rating,
+      comment,
+    }: {
+      productId: number
+      orderItemId: number
+      rating: number
+      comment?: string
+    }) => catalogService.createReview(productId, { orderItemId, rating, comment }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: catalogKeys.all })
+      qc.invalidateQueries({ queryKey: catalogKeys.detail(vars.productId) })
+      qc.invalidateQueries({ queryKey: ['catalog', 'reviews', vars.productId] })
+      qc.invalidateQueries({ queryKey: ['orders'] })
+    },
+  })
+}
+
+export function useReplyReview() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      productId,
+      reviewId,
+      reply,
+    }: {
+      productId: number
+      reviewId: number
+      reply: string
+    }) => catalogService.replyReview(productId, reviewId, { reply }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: catalogKeys.all })
+      qc.invalidateQueries({ queryKey: ['catalog', 'reviews', vars.productId] })
+    },
   })
 }
