@@ -54,13 +54,26 @@ export const application: SellerApplication = {
 
 /* --------------------------------------------------------- subscription */
 
+export type SubscriptionHistoryItem = {
+  id?: number
+  period: string
+  txnId: string
+  amount: number
+  status: 'SUCCEEDED' | 'FAILED' | 'PENDING'
+  paidAt?: string | null
+  startAt?: string | null
+  endAt?: string | null
+  rawStatus?: string
+}
+
 export type Subscription = {
   planId: string
-  status: 'ACTIVE' | 'EXPIRING' | 'EXPIRED' | 'SUSPENDED'
-  startedAt: string
-  expiresAt: string
+  status: 'ACTIVE' | 'EXPIRING' | 'EXPIRED' | 'SUSPENDED' | 'INACTIVE'
+  hasSubscribed?: boolean
+  startedAt?: string | null
+  expiresAt?: string | null
   autoRenew: boolean
-  history: { period: string; txnId: string; amount: number; status: 'SUCCEEDED' | 'FAILED' | 'PENDING'; paidAt: string }[]
+  history: SubscriptionHistoryItem[]
 }
 
 /* ----------------------------------------------------------- storefront */
