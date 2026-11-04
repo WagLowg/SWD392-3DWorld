@@ -2,10 +2,11 @@ import { BadgeCheck, CreditCard, RefreshCw, ShieldCheck, Store, Zap } from 'luci
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDateTime } from '../../../shared/lib/format'
-import { QueryState } from '../../../shared/ui/QueryState'
 import { StatusPill } from '../../../shared/ui/kit'
+import { QueryState } from '../../../shared/ui/QueryState'
 import { useOpsList } from '../../ops/hooks/useOps'
 import { OPS_STATUS } from '../../ops/lib/status'
+import { StorefrontPlansPanel } from '../components/StorefrontPlansPanel'
 
 type View = 'verification' | 'storefront'
 
@@ -246,7 +247,12 @@ export function AdminStorefrontPage() {
                           <td className="border-b border-line px-4 py-4">
                             <p className="font-bold text-ink">{item.title}</p>
                             <p className="mt-1 text-xs text-ink-soft">
-                              USR-{item.id} · {String(item.f.location && item.f.location !== '—' ? item.f.location : item.f.userEmail || item.subtitle || '—')}
+                              USR-{item.id} ·{' '}
+                              {String(
+                                item.f.location && item.f.location !== '—'
+                                  ? item.f.location
+                                  : item.f.userEmail || item.subtitle || '—',
+                              )}
                             </p>
                           </td>
                           <td className="border-b border-line px-4 py-4">
@@ -254,7 +260,13 @@ export function AdminStorefrontPage() {
                             <p className="mt-1 text-xs text-ink-soft">{String(item.f.phone ?? '—')}</p>
                           </td>
                           <td className="border-b border-line px-4 py-4">
-                            <p className={item.f.eligible === 'Đủ điều kiện' ? 'font-semibold text-[#15783e]' : 'font-semibold text-danger'}>
+                            <p
+                              className={
+                                item.f.eligible === 'Đủ điều kiện'
+                                  ? 'font-semibold text-[#15783e]'
+                                  : 'font-semibold text-danger'
+                              }
+                            >
                               {String(item.f.eligible ?? '—')}
                             </p>
                             <p className="mt-1 text-xs text-ink-soft">Ngân hàng: {String(item.f.bankStatus ?? '—')}</p>
@@ -349,69 +361,29 @@ export function AdminStorefrontPage() {
           </div>
         </section>
       ) : (
-        <section className="space-y-5" aria-label="Vòng đời gian hàng">
-          <div className="rounded-[1.75rem] border border-[#d9cffd] bg-gradient-to-br from-white to-[#f3efff] p-6 shadow-sm sm:p-8">
-            <div className="flex items-start gap-4">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-violet text-white">
-                <BadgeCheck size={23} />
+        <div className="space-y-6">
+          <StorefrontPlansPanel />
+          <details className="group rounded-[1.75rem] border border-line bg-white p-5 shadow-sm">
+            <summary className="flex cursor-pointer list-none items-center gap-3 font-display text-lg font-bold">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-violet text-white">
+                <BadgeCheck size={18} />
               </span>
-              <div>
-                <h2 className="font-display text-xl font-bold">Gian hàng không có bước duyệt thủ công riêng</h2>
-                <p className="mt-2 max-w-4xl text-sm leading-6 text-ink-soft">
-                  Sau khi hồ sơ người bán được Admin duyệt, chủ shop tự tạo storefront. Shop chỉ được kích hoạt khi
-                  Backend xác minh thanh toán subscription thành công; lúc đó Backend đồng thời cấp role SELLER. Admin
-                  không sửa trạng thái trực tiếp trong database.
-                </p>
-              </div>
+              Vòng đời gian hàng & gói thuê
+              <span className="ml-auto text-xs font-semibold text-ink-soft group-open:hidden">Xem</span>
+            </summary>
+            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {LIFECYCLE.map(({ icon: Icon, title, body, tone }) => (
+                <article key={title} className="rounded-[1.5rem] bg-[#faf9ff] p-5">
+                  <span className={`grid h-11 w-11 place-items-center rounded-2xl ${tone}`}>
+                    <Icon size={20} />
+                  </span>
+                  <h3 className="mt-4 font-display text-lg font-bold">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-ink-soft">{body}</p>
+                </article>
+              ))}
             </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {LIFECYCLE.map(({ icon: Icon, title, body, tone }) => (
-              <article key={title} className="rounded-[1.5rem] border border-line bg-white p-5 shadow-sm">
-                <span className={`grid h-11 w-11 place-items-center rounded-2xl ${tone}`}>
-                  <Icon size={20} />
-                </span>
-                <h3 className="mt-4 font-display text-lg font-bold">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-ink-soft">{body}</p>
-              </article>
-            ))}
-          </div>
-
-          <div className="rounded-[1.75rem] border border-line bg-white p-6 shadow-sm">
-            <h2 className="font-display text-xl font-bold">Phạm vi API quản trị hiện tại</h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <ApiRow
-                method="GET"
-                path="/api/admin/seller-verifications"
-                description="Danh sách hồ sơ người bán theo trạng thái"
-                ready
-              />
-              <ApiRow
-                method="PATCH"
-                path="/api/admin/users/{id}/seller-verification"
-                description="Phê duyệt hoặc từ chối hồ sơ"
-                ready
-              />
-              <ApiRow
-                method="GET"
-                path="/api/admin/storefronts"
-                description="Danh sách mọi gian hàng và tình trạng thuê gói"
-                ready={false}
-              />
-              <ApiRow
-                method="PATCH"
-                path="/api/admin/storefronts/{id}/status"
-                description="Tạm ngưng / mở lại gian hàng có audit log"
-                ready={false}
-              />
-            </div>
-            <p className="mt-4 rounded-2xl bg-[#fff7e8] px-4 py-3 text-sm text-[#85500d]">
-              Hai API storefront dành cho Admin chưa tồn tại trong BE, nên FE chưa dựng nút can thiệp giả. Khi BE bổ
-              sung, bảng quản lý có thể nối trực tiếp mà không đổi luồng thanh toán tự động.
-            </p>
-          </div>
-        </section>
+          </details>
+        </div>
       )}
     </>
   )
@@ -424,36 +396,5 @@ function Metric({ label, value, detail, color }: { label: string; value: number;
       <p className={`mt-2 font-display text-3xl font-bold ${color}`}>{value}</p>
       <p className="mt-1 text-xs text-ink-soft">{detail}</p>
     </article>
-  )
-}
-
-function ApiRow({
-  method,
-  path,
-  description,
-  ready,
-}: {
-  method: string
-  path: string
-  description: string
-  ready: boolean
-}) {
-  return (
-    <div className="rounded-2xl bg-[#f8f7fc] p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span
-          className={`rounded-lg px-2 py-1 font-mono text-[10px] font-bold ${method === 'GET' ? 'bg-[#dff4ff] text-[#087aa3]' : 'bg-[#eee8ff] text-violet'}`}
-        >
-          {method}
-        </span>
-        <code className="break-all text-xs font-semibold">{path}</code>
-        <span
-          className={`ml-auto rounded-full px-2 py-1 text-[10px] font-bold ${ready ? 'bg-mint text-[#15783e]' : 'bg-[#ffe8e5] text-[#b42318]'}`}
-        >
-          {ready ? 'ĐÃ CÓ' : 'CÒN THIẾU'}
-        </span>
-      </div>
-      <p className="mt-2 text-xs text-ink-soft">{description}</p>
-    </div>
   )
 }
