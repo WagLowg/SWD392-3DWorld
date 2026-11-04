@@ -234,6 +234,16 @@ function SubscriptionResult({ id, gatewaySuccess, gatewayCode }: { id?: number }
     },
   })
 
+  // Khi ZaloPay trả về kết quả, chủ động kích hoạt API đối soát để Backend kiểm tra ngay với ZaloPay
+  useEffect(() => {
+    if (gatewaySuccess !== false) {
+      sellerService
+        .checkPendingSubscriptionPayment()
+        .then(() => q.refetch())
+        .catch(() => {})
+    }
+  }, [id, gatewaySuccess, round])
+
   if (q.isError) {
     return (
       <StatusBlock
@@ -267,7 +277,10 @@ function SubscriptionResult({ id, gatewaySuccess, gatewayCode }: { id?: number }
       gatewayCode={gatewayCode}
       onRecheck={() => {
         setRound((r) => r + 1)
-        q.refetch()
+        sellerService
+          .checkPendingSubscriptionPayment()
+          .then(() => q.refetch())
+          .catch(() => q.refetch())
       }}
       primary={
         state === 'failed' ? (

@@ -14,10 +14,21 @@ import {
 import { useEffect, useState } from 'react'
 import { formatDateTime, formatVnd } from '../../../shared/lib/format'
 import { Pagination } from '../../../shared/ui/Pagination'
-import { Btn, CellTitle, DataTable, FilterTabs, Hero, RuleBox, StatCard, StatusPill, Toolbar } from '../../../shared/ui/kit'
+import {
+  Btn,
+  CellTitle,
+  DataTable,
+  FilterTabs,
+  Hero,
+  RuleBox,
+  StatCard,
+  StatusPill,
+  Toolbar,
+} from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import type { EarningStatus } from '../data/seller.fixtures'
 import { useEarnings, usePayoutHistory, useWalletLedgers } from '../hooks/useSeller'
+import { earningCommission, realizedCommissionTotal } from '../lib/earnings'
 import { EARNING_STATUS } from '../lib/status'
 import { LEDGER_BUCKET_MAP, type SellerPayoutRecord, type SellerWalletLedgerRecord } from '../services/seller.service'
 
@@ -46,10 +57,7 @@ export function RevenuePage() {
 
   const all = q.data?.earnings ?? []
   const w = q.data?.wallet
-  const commission = all.reduce((sum, e) => {
-    if (e.status === 'REFUNDED') return sum
-    return sum + (e.commissionAmount && e.commissionAmount > 0 ? e.commissionAmount : e.gross * (e.feeRate > 0 ? e.feeRate : 0.05))
-  }, 0)
+  const commission = realizedCommissionTotal(all)
 
   // Dữ liệu Payout từ BE API GET /api/users/me/payouts
   const payoutList: SellerPayoutRecord[] = qPayouts.data ?? []
@@ -101,7 +109,8 @@ export function RevenuePage() {
         <div className="mt-6 flex items-center gap-3 rounded-2xl bg-[#ffdad6] p-4 text-xs font-semibold text-danger">
           <AlertTriangle size={18} className="shrink-0" />
           <span>
-            Xưởng đang có công nợ phí vận chuyển hoàn trả: {formatVnd(w.returnShippingDebt)}. Hệ thống sẽ tự động ưu tiên cấn trừ khi có doanh thu giải ngân mới.
+            Xưởng đang có công nợ phí vận chuyển hoàn trả: {formatVnd(w.returnShippingDebt)}. Hệ thống sẽ tự động ưu
+            tiên cấn trừ khi có doanh thu giải ngân mới.
           </span>
         </div>
       )}
@@ -114,9 +123,7 @@ export function RevenuePage() {
             </span>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-bold text-ink">
-                  Đang xử lý yêu cầu rút {formatVnd(w.held)}
-                </p>
+                <p className="text-sm font-bold text-ink">Đang xử lý yêu cầu rút {formatVnd(w.held)}</p>
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-200/60 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900">
                   Dự kiến trong 24 giờ
                 </span>
@@ -171,11 +178,11 @@ export function RevenuePage() {
           hint={w && w.returnShippingDebt > 0 ? 'Cần cấn trừ trước khi rút' : 'Không có công nợ'}
         />
         <StatCard
-          label="Phí sàn đã khấu trừ"
+          label="Phí sàn đã ghi nhận"
           value={formatVnd(commission)}
           icon={Percent}
           tone="neutral"
-          hint="Tự động trừ 5% trên đơn thành công"
+          hint="Chỉ tính các khoản đã giải ngân"
         />
       </div>
 
@@ -197,7 +204,9 @@ export function RevenuePage() {
             >
               <FileText size={15} />
               <span>Khoản Thu Đơn Hàng</span>
-              <span className={`rounded-full px-2 py-0.5 text-[11px] ${viewTab === 'EARNINGS' ? 'bg-white/20 text-white' : 'bg-surface-low text-ink-soft'}`}>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] ${viewTab === 'EARNINGS' ? 'bg-white/20 text-white' : 'bg-surface-low text-ink-soft'}`}
+              >
                 {all.length}
               </span>
             </button>
@@ -216,7 +225,9 @@ export function RevenuePage() {
             >
               <BookOpen size={15} />
               <span>Sổ Cái Biến Động Số Dư</span>
-              <span className={`rounded-full px-2 py-0.5 text-[11px] ${viewTab === 'LEDGERS' ? 'bg-white/20 text-white' : 'bg-surface-low text-ink-soft'}`}>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] ${viewTab === 'LEDGERS' ? 'bg-white/20 text-white' : 'bg-surface-low text-ink-soft'}`}
+              >
                 {rawLedgers.length}
               </span>
             </button>
@@ -235,7 +246,9 @@ export function RevenuePage() {
             >
               <History size={15} />
               <span>Lịch Sử Rút Tiền</span>
-              <span className={`rounded-full px-2 py-0.5 text-[11px] ${viewTab === 'PAYOUTS' ? 'bg-white/20 text-white' : 'bg-surface-low text-ink-soft'}`}>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] ${viewTab === 'PAYOUTS' ? 'bg-white/20 text-white' : 'bg-surface-low text-ink-soft'}`}
+              >
                 {payoutList.length}
               </span>
             </button>
@@ -255,7 +268,9 @@ export function RevenuePage() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h2 className="font-display text-xl font-bold text-ink">Khoản Thu & Bút Toán Cấn Trừ Đơn Hàng</h2>
-              <p className="text-xs text-ink-soft">Doanh thu bán hàng thực nhận (sau phí sàn 5%) và các bút toán hoàn tiền/cấn trừ cước vận chuyển 2 chiều.</p>
+              <p className="text-xs text-ink-soft">
+                Doanh thu bán hàng thực nhận (sau phí sàn 5%) và các bút toán hoàn tiền/cấn trừ cước vận chuyển 2 chiều.
+              </p>
             </div>
           </div>
 
@@ -278,34 +293,82 @@ export function RevenuePage() {
               rows={pagedEarnings}
               rowKey={(e) => e.id}
               columns={[
-                { key: 'id', header: 'Mã thu nhập / đơn', render: (e) => <CellTitle title={e.id} sub={`#ORD-${e.orderId}`} to={`/seller/revenue/${e.id}`} /> },
+                {
+                  key: 'id',
+                  header: 'Mã thu nhập / đơn',
+                  render: (e) => <CellTitle title={e.id} sub={`#ORD-${e.orderId}`} to={`/seller/revenue/${e.id}`} />,
+                },
                 { key: 'p', header: 'Mẫu & SKU', render: (e) => <CellTitle title={e.product} sub={e.sku} /> },
                 { key: 'g', header: 'Doanh số gốc', render: (e) => formatVnd(e.gross) },
                 {
                   key: 'f',
                   header: 'Phí sàn (5%)',
-                  render: (e) => e.status === 'REFUNDED'
-                    ? <span className="text-ink-soft">0đ (Đã huỷ)</span>
-                    : <span className="text-danger">-{formatVnd(e.commissionAmount && e.commissionAmount > 0 ? e.commissionAmount : e.gross * (e.feeRate > 0 ? e.feeRate : 0.05))}</span>,
+                  render: (e) =>
+                    e.status === 'REFUNDED' ? (
+                      <span className="text-ink-soft">0đ (Đã huỷ)</span>
+                    ) : (
+                      <span className={e.status === 'RELEASED' ? 'text-danger' : 'text-ink-soft'}>
+                        -{formatVnd(earningCommission(e))} {e.status === 'RELEASED' ? '' : '(Tạm tính)'}
+                      </span>
+                    ),
                 },
                 {
                   key: 'n',
                   header: 'Thực nhận (Net)',
-                  render: (e) => e.status === 'REFUNDED'
-                    ? <strong className="text-danger">-{formatVnd(e.returnShippingFee ?? 48400)} (Cước hoàn)</strong>
-                    : <strong>{formatVnd(e.netAmount && e.netAmount > 0 ? e.netAmount : e.gross * (1 - (e.feeRate > 0 ? e.feeRate : 0.05)))}</strong>,
+                  render: (e) =>
+                    e.status === 'REFUNDED' ? (
+                      <strong className="text-danger">-{formatVnd(e.returnShippingFee ?? 0)} (Cước hoàn)</strong>
+                    ) : (
+                      <strong>
+                        {formatVnd(
+                          e.netAmount && e.netAmount > 0
+                            ? e.netAmount
+                            : e.gross * (1 - (e.feeRate > 0 ? e.feeRate : 0.05)),
+                        )}
+                      </strong>
+                    ),
                 },
-                { key: 's', header: 'Trạng thái', render: (e) => <StatusPill status={e.status} map={EARNING_STATUS} /> },
-                { key: 'b', header: 'Chi tiết & Ghi chú', render: (e) => <span className="block max-w-[15rem] text-xs text-ink-soft">{e.blocker ?? 'Đã giải ngân vào ví khả dụng.'}</span> },
-                { key: 'x', header: '', render: (e) => <Btn to={`/seller/revenue/${e.id}`} size="sm">Sổ cái</Btn> },
+                {
+                  key: 's',
+                  header: 'Trạng thái',
+                  render: (e) => <StatusPill status={e.status} map={EARNING_STATUS} />,
+                },
+                {
+                  key: 'b',
+                  header: 'Chi tiết & Ghi chú',
+                  render: (e) => (
+                    <span className="block max-w-[15rem] text-xs text-ink-soft">
+                      {e.blocker ?? 'Đã giải ngân vào ví khả dụng.'}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'x',
+                  header: '',
+                  render: (e) => (
+                    <Btn to={`/seller/revenue/${e.id}`} size="sm">
+                      Sổ cái
+                    </Btn>
+                  ),
+                },
               ]}
             />
             {earningsTotalPages > 1 && (
               <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row text-xs text-ink-soft">
                 <span>
-                  Hiển thị <strong>{filteredEarnings.length === 0 ? 0 : page * EARNINGS_PAGE_SIZE + 1} - {Math.min((page + 1) * EARNINGS_PAGE_SIZE, filteredEarnings.length)}</strong> trên tổng số <strong>{filteredEarnings.length}</strong> khoản thu
+                  Hiển thị{' '}
+                  <strong>
+                    {filteredEarnings.length === 0 ? 0 : page * EARNINGS_PAGE_SIZE + 1} -{' '}
+                    {Math.min((page + 1) * EARNINGS_PAGE_SIZE, filteredEarnings.length)}
+                  </strong>{' '}
+                  trên tổng số <strong>{filteredEarnings.length}</strong> khoản thu
                 </span>
-                <Pagination page={page} totalPages={earningsTotalPages} onChange={setPage} className="flex items-center justify-center gap-1.5" />
+                <Pagination
+                  page={page}
+                  totalPages={earningsTotalPages}
+                  onChange={setPage}
+                  className="flex items-center justify-center gap-1.5"
+                />
               </div>
             )}
           </QueryState>
@@ -318,7 +381,10 @@ export function RevenuePage() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h2 className="font-display text-xl font-bold text-ink">Sổ Cái Biến Động Số Dư Ví (Wallet Ledgers)</h2>
-              <p className="text-xs text-ink-soft">Ghi nhận toàn bộ dòng tiền cộng, trừ và luân chuyển giữa các ngăn số dư (Khả dụng, Chờ mở khoá 72h, Tạm giữ rút tiền).</p>
+              <p className="text-xs text-ink-soft">
+                Ghi nhận toàn bộ dòng tiền cộng, trừ và luân chuyển giữa các ngăn số dư (Khả dụng, Chờ mở khoá 72h, Tạm
+                giữ rút tiền).
+              </p>
             </div>
           </div>
 
@@ -328,9 +394,21 @@ export function RevenuePage() {
               onChange={handleLedgerBucketChange}
               options={[
                 { value: '', label: 'Tất cả ngăn số dư', count: rawLedgers.length },
-                { value: 'available', label: 'Khả dụng', count: rawLedgers.filter((l) => l.bucket === 'available').length },
-                { value: 'pending', label: 'Chờ mở khoá 72h', count: rawLedgers.filter((l) => l.bucket === 'pending').length },
-                { value: 'held', label: 'Tạm giữ rút tiền', count: rawLedgers.filter((l) => l.bucket === 'held').length },
+                {
+                  value: 'available',
+                  label: 'Khả dụng',
+                  count: rawLedgers.filter((l) => l.bucket === 'available').length,
+                },
+                {
+                  value: 'pending',
+                  label: 'Chờ mở khoá 72h',
+                  count: rawLedgers.filter((l) => l.bucket === 'pending').length,
+                },
+                {
+                  value: 'held',
+                  label: 'Tạm giữ rút tiền',
+                  count: rawLedgers.filter((l) => l.bucket === 'held').length,
+                },
               ]}
             />
           </Toolbar>
@@ -370,7 +448,10 @@ export function RevenuePage() {
                       key: 'b',
                       header: 'Ngăn số dư',
                       render: (l) => {
-                        const bInfo = LEDGER_BUCKET_MAP[l.bucket.toUpperCase()] ?? { label: l.bucketLabel, tone: 'neutral' }
+                        const bInfo = LEDGER_BUCKET_MAP[l.bucket.toUpperCase()] ?? {
+                          label: l.bucketLabel,
+                          tone: 'neutral',
+                        }
                         const badgeClass =
                           l.bucket === 'available'
                             ? 'bg-mint text-[#0f5132]'
@@ -378,7 +459,9 @@ export function RevenuePage() {
                               ? 'bg-amber-100 text-amber-800'
                               : 'bg-rose-100 text-danger'
                         return (
-                          <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${badgeClass}`}>
+                          <span
+                            className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${badgeClass}`}
+                          >
                             {bInfo.label}
                           </span>
                         )
@@ -404,7 +487,9 @@ export function RevenuePage() {
                     {
                       key: 'after',
                       header: 'Số dư sau GD',
-                      render: (l) => <span className="text-xs font-semibold text-ink">{formatVnd(l.balanceAfter)}</span>,
+                      render: (l) => (
+                        <span className="text-xs font-semibold text-ink">{formatVnd(l.balanceAfter)}</span>
+                      ),
                     },
                     {
                       key: 'ref',
@@ -428,9 +513,19 @@ export function RevenuePage() {
                 {ledgersTotalPages > 1 && (
                   <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row text-xs text-ink-soft">
                     <span>
-                      Hiển thị <strong>{ledgerPage * LEDGERS_PAGE_SIZE + 1} - {Math.min((ledgerPage + 1) * LEDGERS_PAGE_SIZE, filteredLedgers.length)}</strong> trên tổng số <strong>{filteredLedgers.length}</strong> bút toán
+                      Hiển thị{' '}
+                      <strong>
+                        {ledgerPage * LEDGERS_PAGE_SIZE + 1} -{' '}
+                        {Math.min((ledgerPage + 1) * LEDGERS_PAGE_SIZE, filteredLedgers.length)}
+                      </strong>{' '}
+                      trên tổng số <strong>{filteredLedgers.length}</strong> bút toán
                     </span>
-                    <Pagination page={ledgerPage} totalPages={ledgersTotalPages} onChange={setLedgerPage} className="flex items-center justify-center gap-1.5" />
+                    <Pagination
+                      page={ledgerPage}
+                      totalPages={ledgersTotalPages}
+                      onChange={setLedgerPage}
+                      className="flex items-center justify-center gap-1.5"
+                    />
                   </div>
                 )}
               </>
@@ -445,14 +540,17 @@ export function RevenuePage() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h2 className="font-display text-xl font-bold text-ink">Lịch Sử Yêu Cầu Rút Tiền</h2>
-              <p className="text-xs text-ink-soft">Theo dõi tiến độ đối soát và giải ngân tiền về tài khoản ngân hàng của bạn.</p>
+              <p className="text-xs text-ink-soft">
+                Theo dõi tiến độ đối soát và giải ngân tiền về tài khoản ngân hàng của bạn.
+              </p>
             </div>
           </div>
 
           <QueryState isLoading={qPayouts.isLoading} error={qPayouts.error}>
             {payoutList.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-surface-low/40 p-8 text-center text-xs text-ink-soft">
-                Chưa phát sinh yêu cầu rút tiền nào. Khi bạn gửi yêu cầu rút tiền, tiến độ chuyển khoản sẽ được hiển thị minh bạch tại đây.
+                Chưa phát sinh yêu cầu rút tiền nào. Khi bạn gửi yêu cầu rút tiền, tiến độ chuyển khoản sẽ được hiển thị
+                minh bạch tại đây.
               </div>
             ) : (
               <>
@@ -478,17 +576,28 @@ export function RevenuePage() {
                     {
                       key: 'b',
                       header: 'Tài khoản nhận',
-                      render: (p) => <span className="text-xs font-medium text-ink">{p.bankInfo ?? 'Tài khoản ngân hàng đã xác minh'}</span>,
+                      render: (p) => (
+                        <span className="text-xs font-medium text-ink">
+                          {p.bankInfo ?? 'Tài khoản ngân hàng đã xác minh'}
+                        </span>
+                      ),
                     },
                     {
                       key: 'r',
                       header: 'Lý do rút tiền',
-                      render: (p) => <span className="text-xs text-ink-soft">{p.reason ?? 'Rút doanh thu bán hàng'}</span>,
+                      render: (p) => (
+                        <span className="text-xs text-ink-soft">{p.reason ?? 'Rút doanh thu bán hàng'}</span>
+                      ),
                     },
                     {
                       key: 'ref',
                       header: 'Mã đối soát / NH',
-                      render: (p) => p.transferReference ? <code className="text-xs text-ink font-semibold">{p.transferReference}</code> : <span className="text-xs text-ink-soft">Đang xử lý</span>,
+                      render: (p) =>
+                        p.transferReference ? (
+                          <code className="text-xs text-ink font-semibold">{p.transferReference}</code>
+                        ) : (
+                          <span className="text-xs text-ink-soft">Đang xử lý</span>
+                        ),
                     },
                     {
                       key: 's',
@@ -521,9 +630,19 @@ export function RevenuePage() {
                 {payoutTotalPages > 1 && (
                   <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row text-xs text-ink-soft">
                     <span>
-                      Hiển thị <strong>{payoutPage * PAYOUTS_PAGE_SIZE + 1} - {Math.min((payoutPage + 1) * PAYOUTS_PAGE_SIZE, payoutList.length)}</strong> trên tổng số <strong>{payoutList.length}</strong> yêu cầu
+                      Hiển thị{' '}
+                      <strong>
+                        {payoutPage * PAYOUTS_PAGE_SIZE + 1} -{' '}
+                        {Math.min((payoutPage + 1) * PAYOUTS_PAGE_SIZE, payoutList.length)}
+                      </strong>{' '}
+                      trên tổng số <strong>{payoutList.length}</strong> yêu cầu
                     </span>
-                    <Pagination page={payoutPage} totalPages={payoutTotalPages} onChange={setPayoutPage} className="flex items-center justify-center gap-1.5" />
+                    <Pagination
+                      page={payoutPage}
+                      totalPages={payoutTotalPages}
+                      onChange={setPayoutPage}
+                      className="flex items-center justify-center gap-1.5"
+                    />
                   </div>
                 )}
               </>

@@ -14,7 +14,8 @@ import {
   Truck,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { ProductReviewsSection } from '../components/ProductReviewsSection'
 import { ApiClientError } from '../../../shared/api'
 import { Breadcrumbs, QuantityStepper, StockBar } from '../../../shared/ui/primitives'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
@@ -430,7 +431,9 @@ const TABS = [
 ] as const
 
 function DetailTabs({ detail, variants }: { detail: ProductDetail; variants: ProductVariant[] }) {
-  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('story')
+  const [searchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab') === 'reviews' ? 'reviews' : 'story'
+  const [tab, setTab] = useState<(typeof TABS)[number]['id']>(initialTab)
   const { product } = detail
 
   return (
@@ -541,7 +544,17 @@ function DetailTabs({ detail, variants }: { detail: ProductDetail; variants: Pro
           </div>
         )}
 
-        {tab === 'reviews' && <ReviewList productId={product.id} />}
+        {tab === 'reviews' && (
+          <ProductReviewsSection
+            productId={product.id}
+            productTitle={product.title}
+            averageRating={product.averageRating ?? undefined}
+            reviewCount={product.reviewCount ?? undefined}
+            storefrontId={product.storefrontId}
+            storefrontName={detail.storefront?.name}
+            variants={variants}
+          />
+        )}
 
         {tab === 'shipping' && (
           <div className="grid gap-5 md:grid-cols-3">

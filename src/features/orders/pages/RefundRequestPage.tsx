@@ -11,7 +11,6 @@ import {
   Landmark,
   Plus,
   RefreshCw,
-  RotateCcw,
   ShieldAlert,
   ShieldCheck,
   Trash2,
@@ -30,15 +29,16 @@ import { Field, FormError, inputClass, SubmitButton } from '../../../shared/ui/f
 import { PageHeading } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
-import { OrderItemRow, OrderStatusBadge, orderCode, REFUNDABLE } from '../components/OrderParts'
+import { OrderItemRow, OrderStatusBadge, orderCode } from '../components/OrderParts'
 import { useMyOrders } from '../hooks/useOrders'
-import { type ManualRefundDetail, refundApi } from '../../refund/services/refund.api'
 import {
-  getOrSeedLocalRefunds,
-  type LocalRefundCase,
-  REFUND_STORAGE_KEY,
-  saveLocalRefundCase,
-} from '../../refund/services/refund.storage'
+  canRequestRefund,
+  isBlockingRefundStatus,
+  refundEligibility,
+  refundEligibilityMessage,
+} from '../lib/refundEligibility'
+import { type ManualRefundDetail, refundApi } from '../../refund/services/refund.api'
+import { getLocalRefunds, REFUND_STORAGE_KEY } from '../../refund/services/refund.storage'
 import type { BankAccount } from '../../account/types/account.types'
 import type { Order } from '../types/order.types'
 
@@ -123,7 +123,7 @@ const STATUS_CONFIG: Record<
 }
 
 function getStoredRefunds(): CustomerRefundCase[] {
-  return getOrSeedLocalRefunds() as CustomerRefundCase[]
+  return getLocalRefunds() as CustomerRefundCase[]
 }
 
 function saveStoredRefunds(items: CustomerRefundCase[]) {
@@ -169,8 +169,51 @@ export function RefundRequestPage() {
   useEffect(() => {
     let active = true
     async function syncBackendRefunds() {
+      // 1. Lấy danh sách từ API thật của Backend: GET /api/refunds
+      try {
+        const remoteRefunds = await refundApi.listCustomerRefunds()
+        if (active && remoteRefunds && remoteRefunds.length > 0) {
+          setRefundCases((prev) => {
+            const merged = [...prev]
+            for (const r of remoteRefunds) {
+              const idx = merged.findIndex((m) => m.id === r.id || m.orderId === r.physical_order_id)
+              const normStatus = normalizeStatus(r.status)
+              if (idx >= 0) {
+                merged[idx] = {
+                  ...merged[idx],
+                  status: normStatus,
+                  amount: Number(r.amount) || merged[idx].amount,
+                  transferReference: r.transfer_reference || merged[idx].transferReference,
+                }
+              } else {
+                merged.unshift({
+                  id: r.id,
+                  orderId: r.physical_order_id,
+                  orderCode: `#ORD-${String(r.physical_order_id).padStart(5, '0')}`,
+                  productTitle: 'Vật phẩm chế tác 3D',
+                  storefrontId: 12,
+                  amount: Number(r.amount),
+                  status: normStatus,
+                  reason: r.reason || 'Yêu cầu hoàn tiền',
+                  detail: r.reason,
+                  bankName: 'Ngân hàng nhận',
+                  accountNumberMasked: '***************',
+                  accountHolder: 'Khách hàng',
+                  createdAt: r.created_at || new Date().toISOString(),
+                  transferReference: r.transfer_reference,
+                })
+              }
+            }
+            saveStoredRefunds(merged)
+            return merged
+          })
+        }
+      } catch {
+        // ignore
+      }
+
       const stored = getStoredRefunds()
-      const targetIds = Array.from(new Set([112, ...stored.map((c) => c.id)]))
+      const targetIds = Array.from(new Set(stored.map((c) => c.id)))
 
       for (const id of targetIds) {
         try {
@@ -193,28 +236,6 @@ export function RefundRequestPage() {
                 saveStoredRefunds(updated)
                 return updated
               }
-            } else if (detail.physical_order_id === 45 || detail.id === 112) {
-              const newCase: CustomerRefundCase = {
-                id: detail.id,
-                orderId: detail.physical_order_id,
-                orderCode: 'ORD-00045',
-                productTitle: 'Đèn ngủ cú mèo đáng yêu',
-                attributes: 'size: "ONE_SIZE", color: "Trắng", material: "FDMPETG" — Họa tiết: V1',
-                storefrontId: 12,
-                amount: Number(detail.amount),
-                status: normStatus,
-                reason: detail.reason,
-                detail: detail.reason,
-                bankName: 'Vietcombank',
-                accountNumberMasked: '0000000000000003',
-                accountNumber: '0000000000000003',
-                accountHolder: 'Nhiên thái',
-                createdAt: detail.created_at || new Date().toISOString(),
-                transferReference: transferRef,
-              }
-              const updated = [newCase, ...prev]
-              saveStoredRefunds(updated)
-              return updated
             }
             return prev
           })
@@ -252,7 +273,30 @@ export function RefundRequestPage() {
     })
   }
 
-  const eligible = useMemo(() => (orders.data ?? []).filter((o) => REFUNDABLE.includes(o.status)), [orders.data])
+  const blockingRefundOrderIds = useMemo(
+    () => new Set(refundCases.filter((item) => isBlockingRefundStatus(item.status)).map((item) => item.orderId)),
+    [refundCases],
+  )
+  const eligible = useMemo(
+    () =>
+      (orders.data ?? []).filter((order) =>
+        canRequestRefund(order, { hasBlockingRefund: blockingRefundOrderIds.has(order.id) }),
+      ),
+    [blockingRefundOrderIds, orders.data],
+  )
+  const requestedOrder = requestedOrderId
+    ? (orders.data ?? []).find((order) => order.id === requestedOrderId)
+    : undefined
+  const requestedOrderIssue = requestedOrderId
+    ? requestedOrder
+      ? (() => {
+          const result = refundEligibility(requestedOrder, {
+            hasBlockingRefund: blockingRefundOrderIds.has(requestedOrder.id),
+          })
+          return result.eligible ? null : refundEligibilityMessage(result.reason)
+        })()
+      : 'Không tìm thấy đơn hàng được yêu cầu trong tài khoản của bạn.'
+    : null
 
   const filteredCases = useMemo(() => {
     if (tab === 'ALL') return refundCases
@@ -280,7 +324,7 @@ export function RefundRequestPage() {
             accent={mode === 'create' ? 'Tạo Khiếu Nại Mới.' : 'Lịch Sử Khiếu Nại Của Bạn.'}
             description={
               mode === 'create'
-                ? 'Gửi yêu cầu hoàn tiền thủ công cho đơn hàng đã thanh toán. Kiểm duyệt viên sẽ xem xét minh chứng và hoàn tiền trực tiếp vào tài khoản ngân hàng.'
+                ? 'Gửi yêu cầu hoàn tiền cho đơn đã nhận hàng và còn trong thời hạn. Kiểm duyệt viên sẽ xem xét minh chứng trước khi hoàn tiền.'
                 : 'Theo dõi tiến độ xét duyệt khiếu nại, lịch sử thẩm định của Staff và đối soát thanh toán hoàn tiền của Admin.'
             }
           />
@@ -312,11 +356,25 @@ export function RefundRequestPage() {
       <div className="mt-8">
         {mode === 'create' ? (
           <QueryState isLoading={orders.isLoading} error={orders.error} onRetry={() => orders.refetch()}>
-            {!eligible.length ? (
+            {requestedOrderIssue ? (
+              <StatusBlock
+                tone="empty"
+                title="Không thể tạo yêu cầu hoàn tiền"
+                body={requestedOrderIssue}
+                action={
+                  <Link
+                    to="/orders"
+                    className="rounded-full bg-ink px-6 py-3 font-label text-sm font-semibold text-white"
+                  >
+                    Xem đơn hàng
+                  </Link>
+                }
+              />
+            ) : !eligible.length ? (
               <StatusBlock
                 tone="empty"
                 title="Chưa có đơn đủ điều kiện hoàn tiền"
-                body="Chỉ đơn đã thanh toán (từ trạng thái Đã thanh toán trở đi) mới gửi được yêu cầu hoàn tiền."
+                body="Chỉ đơn đã nhận hàng, còn thời hạn và chưa có yêu cầu đang xử lý mới gửi được yêu cầu hoàn tiền."
                 action={
                   <div className="flex gap-3">
                     <button
@@ -432,13 +490,9 @@ export function RefundRequestPage() {
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-xs font-bold text-violet">
-                              Mã khiếu nại #{item.id}
-                            </span>
+                            <span className="font-mono text-xs font-bold text-violet">Mã khiếu nại #{item.id}</span>
                             <span className="text-ink-soft">•</span>
-                            <span className="font-mono text-xs font-semibold text-ink">
-                              Đơn {item.orderCode}
-                            </span>
+                            <span className="font-mono text-xs font-semibold text-ink">Đơn {item.orderCode}</span>
                             {item.storefrontId && (
                               <>
                                 <span className="text-ink-soft">•</span>
@@ -446,9 +500,7 @@ export function RefundRequestPage() {
                               </>
                             )}
                           </div>
-                          <h3 className="font-display text-lg font-bold text-ink">
-                            {item.productTitle}
-                          </h3>
+                          <h3 className="font-display text-lg font-bold text-ink">{item.productTitle}</h3>
                         </div>
 
                         <div className="flex flex-col items-end gap-1.5">
@@ -474,7 +526,8 @@ export function RefundRequestPage() {
                           </p>
                         )}
                         <p className="mt-2 text-ink-soft">
-                          Nhận về: <strong className="text-ink">{item.bankName}</strong> ({item.accountNumber || item.accountNumberMasked?.replace(/\*/g, '0')}) —{' '}
+                          Nhận về: <strong className="text-ink">{item.bankName}</strong> (
+                          {item.accountNumber || item.accountNumberMasked?.replace(/\*/g, '0')}) —{' '}
                           <strong className="text-ink">{item.accountHolder}</strong>
                         </p>
                         {item.transferReference && (
@@ -518,7 +571,10 @@ export function RefundRequestPage() {
               <ul className="mt-2 list-inside list-disc space-y-1">
                 <li>Yêu cầu hoàn tiền được nộp trong vòng 72 giờ kể từ thời điểm nhận hàng.</li>
                 <li>Đội ngũ kiểm duyệt (Staff) sẽ xem xét ảnh chụp minh chứng sản phẩm lỗi, nứt vỡ hoặc sai mẫu.</li>
-                <li>Sau khi được Staff chấp thuận, Quản trị viên (Admin) sẽ đối soát và thực hiện lệnh chuyển khoản hoàn tiền trực tiếp vào tài khoản ngân hàng của bạn.</li>
+                <li>
+                  Sau khi được Staff chấp thuận, Quản trị viên (Admin) sẽ đối soát và thực hiện lệnh chuyển khoản hoàn
+                  tiền trực tiếp vào tài khoản ngân hàng của bạn.
+                </li>
               </ul>
             </div>
           </div>
@@ -526,9 +582,7 @@ export function RefundRequestPage() {
       </div>
 
       {/* Modal xem chi tiết hồ sơ khiếu nại hoàn tiền */}
-      {selectedCase && (
-        <RefundDetailModal item={selectedCase} onClose={() => setSelectedCase(null)} />
-      )}
+      {selectedCase && <RefundDetailModal item={selectedCase} onClose={() => setSelectedCase(null)} />}
     </>
   )
 }
@@ -552,24 +606,7 @@ function getAutoAccountNumber(bank?: BankAccount): string {
     return masked
   }
 
-  // Chuyển chuỗi bị che sao (vd: ***********7777) thành số tài khoản đầy đủ, không che
-  if (masked.includes('*')) {
-    const unmasked = masked.replace(/\*/g, '0')
-    if (/^[0-9]{6,34}$/.test(unmasked)) {
-      try {
-        localStorage.setItem(`bank_raw_${bank.id}`, unmasked)
-      } catch {}
-      return unmasked
-    }
-    const digitsOnly = masked.replace(/[^0-9]/g, '')
-    const fallback = `0000000000${digitsOnly || '7777'}`
-    try {
-      localStorage.setItem(`bank_raw_${bank.id}`, fallback)
-    } catch {}
-    return fallback
-  }
-
-  return '0000000000000003'
+  return ''
 }
 
 /** Form nộp yêu cầu hoàn tiền */
@@ -601,10 +638,7 @@ function RefundForm({
     [bankQuery.data],
   )
 
-  const allActiveBanks = useMemo(
-    () => (bankQuery.data ?? []).filter((b) => b.isActive !== false),
-    [bankQuery.data],
-  )
+  const allActiveBanks = useMemo(() => (bankQuery.data ?? []).filter((b) => b.isActive !== false), [bankQuery.data])
 
   const activeBankList = verifiedBanks.length > 0 ? verifiedBanks : allActiveBanks
   const start = orders.find((o) => o.id === initialOrderId) ?? orders[0]
@@ -641,7 +675,9 @@ function RefundForm({
   const reasonType = watch('reasonType')
 
   // Kiểm tra xem đơn đang chọn đã có yêu cầu hoàn tiền chưa
-  const hasExistingRefund = existingCases.some((c) => c.orderId === orderId)
+  const hasExistingRefund = existingCases.some(
+    (item) => item.orderId === orderId && isBlockingRefundStatus(item.status),
+  )
 
   useEffect(() => {
     if (selectedBank) {
@@ -679,6 +715,12 @@ function RefundForm({
   }
 
   const submit = handleSubmit(async (raw) => {
+    const currentEligibility = refundEligibility(order, { hasBlockingRefund: hasExistingRefund })
+    if (!currentEligibility.eligible) {
+      setError('root', { message: refundEligibilityMessage(currentEligibility.reason) })
+      return
+    }
+
     if (files.length === 0) {
       setFileError('Vui lòng đính kèm ít nhất 1 hình ảnh minh chứng sản phẩm lỗi/vỡ/không đúng mô tả.')
       return
@@ -724,9 +766,11 @@ function RefundForm({
       }
       onSuccess(newCase)
     } catch (e: unknown) {
-      let msg = e instanceof ApiClientError ? e.message : e instanceof Error ? e.message : 'Không gửi được yêu cầu hoàn tiền.'
+      let msg =
+        e instanceof ApiClientError ? e.message : e instanceof Error ? e.message : 'Không gửi được yêu cầu hoàn tiền.'
       if (msg.includes('Full platform receipt must be reconciled before refund')) {
-        msg = 'Đơn hàng này chưa hoàn tất đối soát thu tiền về nền tảng. Với đơn COD, Admin cần xác nhận tiền COD đã về nền tảng trước khi tạo yêu cầu hoàn tiền.'
+        msg =
+          'Đơn hàng này chưa hoàn tất đối soát thu tiền về nền tảng. Với đơn COD, Admin cần xác nhận tiền COD đã về nền tảng trước khi tạo yêu cầu hoàn tiền.'
       } else if (msg.includes('Bank number does not match the verified account')) {
         msg = 'Số tài khoản ngân hàng không khớp với tài khoản đã xác minh trong hồ sơ.'
       } else if (msg.includes('The refund window has expired')) {
@@ -734,7 +778,8 @@ function RefundForm({
       } else if (msg.includes('An active or completed refund already exists')) {
         msg = 'Đơn hàng này đã có một yêu cầu hoàn tiền đang xử lý hoặc đã hoàn tất trong hệ thống.'
       } else if (msg.includes('violates a database constraint') || msg.includes('unique constraint')) {
-        msg = 'Lỗi ràng buộc cơ sở dữ liệu (có thể do đơn hàng này đã từng phát sinh mã REFUND trong bảng transactions). Vui lòng kiểm tra lại DB.'
+        msg =
+          'Lỗi ràng buộc cơ sở dữ liệu (có thể do đơn hàng này đã từng phát sinh mã REFUND trong bảng transactions). Vui lòng kiểm tra lại DB.'
       } else if (msg.includes('references data still in use')) {
         msg = 'Dữ liệu đơn hàng đang được tham chiếu bởi các bản ghi khác trong hệ thống.'
       } else if (msg.includes('An owned active verified bank account is required')) {
@@ -763,7 +808,8 @@ function RefundForm({
           <span>Trạng thái: {result.status}</span>
         </div>
         <p className="mt-3 max-w-md text-xs text-ink-soft">
-          Đơn đã được lưu vào danh sách khiếu nại. Nhân viên Staff sẽ thẩm định minh chứng và Admin sẽ thực hiện lệnh chuyển khoản hoàn tiền.
+          Đơn đã được lưu vào danh sách khiếu nại. Nhân viên Staff sẽ thẩm định minh chứng và Admin sẽ thực hiện lệnh
+          chuyển khoản hoàn tiền.
         </p>
         <div className="mt-6 flex gap-3">
           <button
@@ -790,7 +836,12 @@ function RefundForm({
         {/* 1. Chọn đơn hàng */}
         <section className="rounded-[2rem] bg-white/95 p-6 shadow-soft">
           <h2 className="font-display text-xl font-bold">1. Chọn đơn hàng</h2>
-          <Field id={`${uid}-order`} label="Đơn hàng đã thanh toán *" error={errors.orderId?.message} className="mt-4">
+          <Field
+            id={`${uid}-order`}
+            label="Đơn hàng còn thời hạn hoàn tiền *"
+            error={errors.orderId?.message}
+            className="mt-4"
+          >
             <select id={`${uid}-order`} className={inputClass} {...register('orderId')}>
               {orders.map((o) => {
                 const isClaimed = existingCases.some((c) => c.orderId === o.id)
@@ -808,7 +859,8 @@ function RefundForm({
             <div className="mt-3 flex items-center gap-2 rounded-xl bg-peach/70 p-3 text-xs font-semibold text-orange-deep">
               <AlertCircle size={15} className="shrink-0" />
               <span>
-                Đơn này đã có trong danh sách yêu cầu hoàn tiền. Bạn có thể quay lại danh sách để kiểm tra tiến độ xử lý.
+                Đơn này đã có trong danh sách yêu cầu hoàn tiền. Bạn có thể quay lại danh sách để kiểm tra tiến độ xử
+                lý.
               </span>
             </div>
           )}
@@ -817,6 +869,9 @@ function RefundForm({
             <OrderStatusBadge status={order.status} />
             <span className="font-display text-lg font-bold text-violet">{formatVnd(order.totalAmount)}</span>
           </div>
+          <p className="mt-3 flex items-center gap-2 text-xs font-semibold text-teal">
+            <Clock size={14} /> Hạn yêu cầu: {formatDateTime(order.refundDeadlineAt)}
+          </p>
           <ul className="mt-3 space-y-2">
             {order.items.map((i) => (
               <OrderItemRow key={i.id} item={i} />
@@ -832,22 +887,17 @@ function RefundForm({
               <label
                 key={r}
                 className={`flex cursor-pointer items-center gap-3 rounded-2xl p-3 text-sm transition ${
-                  reasonType === r ? 'bg-peach/60 ring-2 ring-orange font-semibold' : 'bg-surface-low hover:bg-surface-high'
+                  reasonType === r
+                    ? 'bg-peach/60 ring-2 ring-orange font-semibold'
+                    : 'bg-surface-low hover:bg-surface-high'
                 }`}
               >
-                <input
-                  type="radio"
-                  value={r}
-                  {...register('reasonType')}
-                  className="accent-orange"
-                />
+                <input type="radio" value={r} {...register('reasonType')} className="accent-orange" />
                 <span>{r}</span>
               </label>
             ))}
           </div>
-          {errors.reasonType && (
-            <p className="mt-2 text-xs font-semibold text-danger">{errors.reasonType.message}</p>
-          )}
+          {errors.reasonType && <p className="mt-2 text-xs font-semibold text-danger">{errors.reasonType.message}</p>}
 
           <Field
             id={`${uid}-detail`}
@@ -898,7 +948,10 @@ function RefundForm({
                 {files.map((file, idx) => {
                   const url = URL.createObjectURL(file)
                   return (
-                    <div key={`${file.name}-${idx}`} className="group relative aspect-square overflow-hidden rounded-xl border border-line bg-surface-low">
+                    <div
+                      key={`${file.name}-${file.size}-${file.lastModified}`}
+                      className="group relative aspect-square overflow-hidden rounded-xl border border-line bg-surface-low"
+                    >
                       <img src={url} alt={file.name} className="h-full w-full object-cover" />
                       <button
                         type="button"
@@ -930,9 +983,7 @@ function RefundForm({
           {activeBankList.length === 0 ? (
             <div className="mt-4 rounded-2xl border border-orange/20 bg-peach/40 p-4 text-xs text-ink-soft">
               <p className="font-semibold text-orange-deep">Bạn chưa có tài khoản ngân hàng</p>
-              <p className="mt-1">
-                Vui lòng thêm tài khoản ngân hàng của bạn vào hồ sơ cá nhân để nhận tiền hoàn.
-              </p>
+              <p className="mt-1">Vui lòng thêm tài khoản ngân hàng của bạn vào hồ sơ cá nhân để nhận tiền hoàn.</p>
               <Link
                 to="/bank-accounts"
                 className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-orange px-3 py-1.5 text-xs font-semibold text-white"
@@ -942,11 +993,7 @@ function RefundForm({
             </div>
           ) : (
             <div className="mt-4 space-y-4">
-              <Field
-                id={`${uid}-bank`}
-                label="Chọn tài khoản ngân hàng *"
-                error={errors.bankAccountId?.message}
-              >
+              <Field id={`${uid}-bank`} label="Chọn tài khoản ngân hàng *" error={errors.bankAccountId?.message}>
                 <select id={`${uid}-bank`} className={inputClass} {...register('bankAccountId')}>
                   {activeBankList.map((b) => (
                     <option key={b.id} value={b.id}>
@@ -970,7 +1017,10 @@ function RefundForm({
                     Chủ tài khoản: <strong className="text-ink">{selectedBank.accountHolder}</strong>
                   </p>
                   <p className="font-mono text-ink-soft">
-                    Số tài khoản nhận tiền: <strong className="font-semibold text-ink">{watch('accountNumber') || getAutoAccountNumber(selectedBank)}</strong>
+                    Số tài khoản nhận tiền:{' '}
+                    <strong className="font-semibold text-ink">
+                      {watch('accountNumber') || getAutoAccountNumber(selectedBank)}
+                    </strong>
                   </p>
                 </div>
               )}
@@ -1022,10 +1072,7 @@ function RefundForm({
             <FormError message={errors.root?.message} />
           </div>
 
-          <SubmitButton
-            busy={isSubmitting || activeBankList.length === 0}
-            className="mt-4 w-full"
-          >
+          <SubmitButton busy={isSubmitting || activeBankList.length === 0 || hasExistingRefund} className="mt-4 w-full">
             {isSubmitting ? 'Đang gửi yêu cầu & tải ảnh...' : 'Gửi yêu cầu hoàn tiền'}
           </SubmitButton>
         </section>
@@ -1050,13 +1097,7 @@ function RefundForm({
 }
 
 /** Modal xem chi tiết hồ sơ khiếu nại hoàn tiền */
-function RefundDetailModal({
-  item,
-  onClose,
-}: {
-  item: CustomerRefundCase
-  onClose: () => void
-}) {
+function RefundDetailModal({ item, onClose }: { item: CustomerRefundCase; onClose: () => void }) {
   const [detail, setDetail] = useState<ManualRefundDetail | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -1103,7 +1144,9 @@ function RefundDetailModal({
 
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-display text-2xl font-bold text-ink">Chi Tiết Yêu Cầu Hoàn Tiền</h2>
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${cfg.badgeClass}`}>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${cfg.badgeClass}`}
+          >
             <Icon size={14} />
             {cfg.label}
           </span>
@@ -1126,7 +1169,10 @@ function RefundDetailModal({
             Ngân hàng: <strong className="text-ink">{item.bankName}</strong>
           </p>
           <p className="text-ink-soft">
-            Số tài khoản: <strong className="font-mono text-ink">{item.accountNumber || item.accountNumberMasked?.replace(/\*/g, '0')}</strong>
+            Số tài khoản:{' '}
+            <strong className="font-mono text-ink">
+              {item.accountNumber || item.accountNumberMasked?.replace(/\*/g, '0')}
+            </strong>
           </p>
           <p className="text-ink-soft">
             Chủ tài khoản: <strong className="text-ink">{item.accountHolder}</strong>
@@ -1156,8 +1202,11 @@ function RefundDetailModal({
 
           <div className="mt-3 space-y-3">
             {detail?.history && detail.history.length > 0 ? (
-              detail.history.map((h, i) => (
-                <div key={`${h.status}-${i}`} className="flex items-start gap-3 rounded-2xl border border-line/50 p-3 text-xs">
+              detail.history.map((h) => (
+                <div
+                  key={`${h.status}-${h.created_at}-${h.actor_id}`}
+                  className="flex items-start gap-3 rounded-2xl border border-line/50 p-3 text-xs"
+                >
                   <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-violet-soft text-violet">
                     <FileText size={13} />
                   </span>
@@ -1167,12 +1216,12 @@ function RefundDetailModal({
                         {h.status === 'REFUND_REQUESTED'
                           ? 'Khách hàng gửi yêu cầu'
                           : h.status === 'REFUND_APPROVED'
-                          ? 'Staff chấp thuận khiếu nại'
-                          : h.status === 'REFUND_REJECTED'
-                          ? 'Staff từ chối khiếu nại'
-                          : h.status === 'REFUND_PAID'
-                          ? 'Admin hoàn tiền thành công'
-                          : h.status}
+                            ? 'Staff chấp thuận khiếu nại'
+                            : h.status === 'REFUND_REJECTED'
+                              ? 'Staff từ chối khiếu nại'
+                              : h.status === 'REFUND_PAID'
+                                ? 'Admin hoàn tiền thành công'
+                                : h.status}
                       </span>
                       <span className="font-mono text-[11px] text-ink-soft">{formatDateTime(h.created_at)}</span>
                     </div>

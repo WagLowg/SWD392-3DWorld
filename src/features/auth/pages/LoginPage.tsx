@@ -23,7 +23,7 @@ function getReferrerPath() {
 
 /**
  * Điều hướng sau đăng nhập theo vai trò tài khoản:
- * 1. Admin: chuyển hướng đến trang quản lý gian hàng (/portal/admin/storefronts) hoặc route admin hợp lệ.
+ * 1. Admin: chuyển hướng đến dashboard quản trị (/portal/admin) hoặc route admin hợp lệ.
  * 2. Staff: chuyển hướng đến Staff Dashboard (/portal/staff) hoặc route staff hợp lệ.
  * 3. Khách hàng / Người bán / Khác: chuyển hướng theo URL next hoặc fallback /marketplace/.
  */
@@ -38,7 +38,7 @@ function destinationAfterLogin(
   const isPrintStaff = roles.includes('PRINT_STAFF')
   const isAdministrator = isAdmin(user as Parameters<typeof isAdmin>[0])
 
-  // 1. Phân quyền Admin: Ưu tiên trang quản trị Admin Storefronts (/portal/admin/storefronts)
+  // 1. Phân quyền Admin: ưu tiên dashboard tài chính (/portal/admin)
   if (isAdministrator) {
     if (explicitNextParam) {
       const validatedNext = safeNext(explicitNextParam, '')
@@ -51,7 +51,7 @@ function destinationAfterLogin(
         return validatedNext
       }
     }
-    return '/portal/admin/storefronts'
+    return '/portal/admin'
   }
 
   // 2. Phân quyền Staff: Ưu tiên trang Staff Dashboard (/portal/staff)

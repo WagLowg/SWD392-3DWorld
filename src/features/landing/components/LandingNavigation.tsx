@@ -91,12 +91,23 @@ export function LandingNavigation() {
         <div className="flex items-center gap-1.5">
           {sessionLoading ? (
             <span role="status" className="hidden h-9 w-24 animate-pulse rounded-full bg-white/70 sm:inline-block" aria-label="Đang khôi phục phiên đăng nhập" />
+          ) : user ? (
+            <Link
+              to={ROUTES.profile}
+              title={`Hồ sơ cá nhân: ${user.email || user.name}`}
+              className="hidden items-center gap-2 rounded-full py-1.5 pl-2 pr-3.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-white hover:text-ink sm:inline-flex"
+            >
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-violet to-[#8069f3] text-xs font-bold text-white shadow-xs">
+                {user.name.charAt(0).toUpperCase()}
+              </span>
+              <span className="max-w-[8rem] truncate">{user.name}</span>
+            </Link>
           ) : (
             <Link
-              to={user ? ROUTES.aiStudio : ROUTES.signIn}
+              to={ROUTES.signIn}
               className="hidden rounded-full px-4 py-2 text-sm font-semibold text-ink/80 hover:bg-white sm:inline-block"
             >
-              {user ? user.name : 'Sign In'}
+              Sign In
             </Link>
           )}
           {user && (
@@ -158,13 +169,26 @@ export function LandingNavigation() {
             {sessionLoading ? (
               <span role="status" className="h-11 animate-pulse rounded-2xl bg-white/70" aria-label="Đang khôi phục phiên đăng nhập" />
             ) : user ? (
-              <button
-                type="button"
-                onClick={() => void logout('/')}
-                className="flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold"
-              >
-                <LogOut size={16} /> Đăng xuất
-              </button>
+              <div className="flex gap-2">
+                <Link
+                  to={ROUTES.profile}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white px-3 py-3 text-sm font-semibold text-ink hover:text-violet"
+                >
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-violet to-[#8069f3] text-xs font-bold text-white">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="truncate">{user.name}</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void logout('/')}
+                  className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-ink-soft hover:text-danger"
+                  aria-label="Đăng xuất"
+                  title="Đăng xuất"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
             ) : (
               <Link to={ROUTES.signIn} className="rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold">
                 Sign In

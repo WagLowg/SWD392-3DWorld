@@ -246,15 +246,17 @@ export function AdminStorefrontPage() {
                           <td className="border-b border-line px-4 py-4">
                             <p className="font-bold text-ink">{item.title}</p>
                             <p className="mt-1 text-xs text-ink-soft">
-                              USR-{item.id} · {String(item.f.location ?? '—')}
+                              USR-{item.id} · {String(item.f.location && item.f.location !== '—' ? item.f.location : item.f.userEmail || item.subtitle || '—')}
                             </p>
                           </td>
                           <td className="border-b border-line px-4 py-4">
-                            <p className="font-semibold">{String(item.f.owner ?? '—')}</p>
+                            <p className="font-semibold text-ink">{String(item.f.owner ?? '—')}</p>
                             <p className="mt-1 text-xs text-ink-soft">{String(item.f.phone ?? '—')}</p>
                           </td>
                           <td className="border-b border-line px-4 py-4">
-                            <p>{String(item.f.eligible ?? '—')}</p>
+                            <p className={item.f.eligible === 'Đủ điều kiện' ? 'font-semibold text-[#15783e]' : 'font-semibold text-danger'}>
+                              {String(item.f.eligible ?? '—')}
+                            </p>
                             <p className="mt-1 text-xs text-ink-soft">Ngân hàng: {String(item.f.bankStatus ?? '—')}</p>
                           </td>
                           <td className="border-b border-line px-4 py-4">

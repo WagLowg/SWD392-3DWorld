@@ -12,4 +12,5 @@ export const ROUTES = {
   product: (slug: string) => `/marketplace/${slug}`,
   printOnDemand: '/pod/',
   signIn: '/login/',
+  profile: '/portal/profile',
 } as const

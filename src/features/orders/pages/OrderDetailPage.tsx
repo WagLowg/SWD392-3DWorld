@@ -1,5 +1,5 @@
-import { ArrowLeft, Boxes, CheckCircle2, History, MapPin, Truck, Undo2, XCircle } from 'lucide-react'
-import { type ReactNode, useEffect } from 'react'
+import { ArrowLeft, Boxes, CheckCircle2, History, MapPin, RotateCcw, Sparkles, Star, Truck, Undo2, XCircle } from 'lucide-react'
+import { type ReactNode, useEffect, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
 import { formatDateTime } from '../../../shared/lib/format'
@@ -22,8 +22,11 @@ import { PayOrderButton } from '../components/PayOrderButton'
 import { CodPaymentPanel } from '../components/CodPaymentPanel'
 import { ShippingAddressSnapshot } from '../components/ShippingAddressSnapshot'
 import { useBuyerShipments, useConfirmReceived, useOrder, useOrderHistory, useOrderPackages } from '../hooks/useOrders'
+import { canRequestRefund } from '../lib/refundEligibility'
 import { statusMeta } from '../lib/status'
 import { useOrderPaymentsStore } from '../stores/order-payments.store'
+import { useCatalog } from '../../marketplace/hooks/useCatalog'
+import { useVariantIndexStore } from '../../marketplace/stores/variant-index.store'
 
 /** MP 025 · Chi Tiết Đơn Hàng Người Mua — GET /api/orders/{id}, /history, /packages, /shipments. */
 export function OrderDetailPage() {
@@ -33,6 +36,20 @@ export function OrderDetailPage() {
   const shipments = useBuyerShipments(order ? orderId : undefined)
   const history = useOrderHistory(order ? orderId : undefined)
   const packages = useOrderPackages(order ? orderId : undefined)
+  const catalog = useCatalog({ page: 0, size: 50 })
+  const firstItem = order?.items[0]
+  const firstProductId = useMemo(() => {
+    if (!firstItem) return order?.storefrontId || 12
+    const info = useVariantIndexStore.getState().variants[firstItem.variantId]
+    if (info?.productId) return info.productId
+    const cleanTitle = (firstItem.productTitle || '').trim().toLowerCase()
+    const found = catalog.data?.items.find((p) => p.title.trim().toLowerCase() === cleanTitle)
+    return found?.id || firstItem.variantId || 12
+  }, [firstItem, catalog.data?.items, order?.storefrontId])
+
+  const hasRefundDeadline = Boolean(order?.refundDeadlineAt)
+  const isRefundExpired = hasRefundDeadline && new Date(order!.refundDeadlineAt!).getTime() <= Date.now()
+  const canRefund = Boolean(order && (canRequestRefund(order) || REFUNDABLE.includes(order.status)) && !isRefundExpired)
   const payment = useOrderPaymentsStore((s) => s.byOrder[orderId])
   const confirmReceived = useConfirmReceived()
   const toast = useToast()
@@ -95,6 +112,25 @@ export function OrderDetailPage() {
             <div className="space-y-6">
               <section className="rounded-[2rem] bg-white/95 p-6 shadow-soft">
                 <h2 className="font-display text-xl font-bold">Vật phẩm trong đơn ({order.items.length})</h2>
+                {['DELIVERED', 'RECEIVED'].includes(order.status) && (
+                  <div className="mt-3 mb-4 flex flex-col gap-2 rounded-2xl border border-orange/20 bg-[#fffbf8] p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-peach text-orange-deep">
+                        <Star size={18} className="fill-orange text-orange" />
+                      </div>
+                      <div>
+                        <p className="font-label text-xs font-bold text-ink">Bạn hài lòng với sản phẩm?</p>
+                        <p className="text-[11px] text-ink-soft">Hãy gửi đánh giá 1–5 sao để chia sẻ cảm nhận và giúp xưởng hoàn thiện nhé!</p>
+                      </div>
+                    </div>
+                    <a
+                      href={`/marketplace/${firstProductId}?tab=reviews&orderItemId=${firstItem?.id || ''}`}
+                      className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-orange px-4 py-2 font-label text-xs font-bold text-white shadow-xs hover:bg-orange-deep"
+                    >
+                      <Sparkles size={13} /> Đánh giá ngay
+                    </a>
+                  </div>
+                )}
                 <ul className="mt-4 space-y-2">
                   {order.items.map((i) => (
                     <OrderItemRow key={i.id} item={i} />
@@ -208,12 +244,13 @@ export function OrderDetailPage() {
                   </p>
                 )}
                 {order.reservationExpiresAt &&
-                  (order.status === 'PENDING_PAYMENT' || (order.paymentMethod === 'COD' && order.status === 'CREATED')) && (
-                  <p className="mt-3 rounded-xl bg-peach/50 px-3 py-2 text-xs text-orange-deep">
-                    {order.paymentMethod === 'COD' ? 'Người bán cần nhận đơn trước' : 'Giữ chỗ tồn kho đến'}{' '}
-                    {formatDateTime(order.reservationExpiresAt)}
-                  </p>
-                )}
+                  (order.status === 'PENDING_PAYMENT' ||
+                    (order.paymentMethod === 'COD' && order.status === 'CREATED')) && (
+                    <p className="mt-3 rounded-xl bg-peach/50 px-3 py-2 text-xs text-orange-deep">
+                      {order.paymentMethod === 'COD' ? 'Người bán cần nhận đơn trước' : 'Giữ chỗ tồn kho đến'}{' '}
+                      {formatDateTime(order.reservationExpiresAt)}
+                    </p>
+                  )}
                 {order.autoConfirmDueAt && order.status === 'DELIVERED' && (
                   <p className="mt-3 rounded-xl bg-surface-low px-3 py-2 text-xs text-ink-soft">
                     Hệ thống tự xác nhận nhận hàng lúc {formatDateTime(order.autoConfirmDueAt)}
@@ -234,8 +271,8 @@ export function OrderDetailPage() {
                   {order.status === 'PENDING_PAYMENT' &&
                     order.paymentMethod !== 'COD' &&
                     order.onlinePaymentRequired !== false && (
-                    <PayOrderButton orderId={order.id} amount={order.totalAmount} className="justify-center" />
-                  )}
+                      <PayOrderButton orderId={order.id} amount={order.totalAmount} className="justify-center" />
+                    )}
                   {order.status === 'DELIVERED' && (
                     <button
                       type="button"
@@ -269,13 +306,28 @@ export function OrderDetailPage() {
                       <XCircle size={15} /> Huỷ đơn
                     </Link>
                   )}
-                  {REFUNDABLE.includes(order.status) && (
+                  {canRefund ? (
                     <Link
                       to={`/refunds?orderId=${order.id}`}
                       className="inline-flex items-center justify-center gap-2 rounded-full bg-surface-low px-5 py-2.5 font-label text-sm font-semibold hover:bg-surface-high"
                     >
                       <Undo2 size={15} /> Yêu cầu hoàn tiền
                     </Link>
+                  ) : ['DELIVERED', 'RECEIVED', 'CANCELLED'].includes(order.status) ? (
+                    <a
+                      href={`/marketplace/${firstProductId}`}
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-surface-low px-5 py-2.5 font-label text-sm font-semibold hover:bg-surface-high"
+                    >
+                      <RotateCcw size={15} /> Mua lại
+                    </a>
+                  ) : null}
+                  {['DELIVERED', 'RECEIVED'].includes(order.status) && (
+                    <a
+                      href={`/marketplace/${firstProductId}?tab=reviews&orderItemId=${firstItem?.id || ''}`}
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-orange px-5 py-2.5 font-label text-sm font-semibold text-white shadow-xs hover:bg-orange-deep"
+                    >
+                      <Star size={15} className="fill-white" /> Đánh giá sản phẩm
+                    </a>
                   )}
                 </div>
               </section>
