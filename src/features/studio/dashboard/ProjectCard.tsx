@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box, Circle, KeyRound, MoreHorizontal, PackageOpen, Shapes, Smartphone, Type } from 'lucide-react';
 import { relativeTime, type ProjectMeta } from '../services/projects';
+import { useProjectTurntable } from '../lib/turntable';
+import { TurntableThumb } from '../../../shared/ui/TurntableThumb';
 
 export function ShapeIcon({ icon, size = 56 }: { icon?: string; size?: number }) {
-  const p = { size, strokeWidth: 1.1, color: 'var(--secondary)' };
+  const p = { size, strokeWidth: 1.1, color: 'var(--st-secondary)' };
   switch (icon) {
     case 'keychain': return <KeyRound {...p} />;
     case 'tray': return <PackageOpen {...p} />;
@@ -57,13 +59,21 @@ export function StatusPill({ status }: { status: ProjectMeta['status'] }) {
   return <span className="badge plain-dot">{status === 'saved' ? 'Đã lưu' : 'Bản nháp'}</span>;
 }
 
-export function ProjectCard({ p, menu, onOpen, list }: { p: ProjectMeta; menu: MenuItem[]; onOpen: () => void; list?: boolean }) {
+/** Ảnh thẻ: bàn xoay chụp từ scene; dự án rỗng / lỗi thì dùng thumbnail cũ hoặc icon. */
+function CardThumb({ p, iconSize, hovered }: { p: ProjectMeta; iconSize: number; hovered?: boolean }) {
   const thumb = useProjectThumb(p);
+  const turn = useProjectTurntable(p);
+  if (turn.done && !turn.src) return thumb ? <img src={thumb} alt={`Xem trước ${p.name}`} /> : <ShapeIcon icon={p.icon} size={iconSize} />;
+  return <TurntableThumb src={turn.src} alt={`Xem trước ${p.name}`} spinning={hovered} />;
+}
+
+export function ProjectCard({ p, menu, onOpen, list }: { p: ProjectMeta; menu: MenuItem[]; onOpen: () => void; list?: boolean }) {
+  const [hovered, setHovered] = useState(false);
   const meta = `${relativeTime(p.updatedAt)} · Cá nhân`;
   if (list) {
     return (
       <div className="p-row" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); }}>
-        <div className="p-row-thumb">{thumb ? <img src={thumb} alt="" /> : <ShapeIcon icon={p.icon} size={28} />}</div>
+        <div className="p-row-thumb"><CardThumb p={p} iconSize={28} /></div>
         <div className="p-row-name">{p.name}</div>
         <div className="p-row-meta">{meta}</div>
         <StatusPill status={p.status} />
@@ -72,8 +82,9 @@ export function ProjectCard({ p, menu, onOpen, list }: { p: ProjectMeta; menu: M
     );
   }
   return (
-    <article className="p-card" role="button" tabIndex={0} aria-label={`Mở ${p.name}`} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) onOpen(); }}>
-      <div className="p-thumb">{thumb ? <img src={thumb} alt={`Xem trước ${p.name}`} /> : <ShapeIcon icon={p.icon} />}</div>
+    <article className="p-card" role="button" tabIndex={0} aria-label={`Mở ${p.name}`} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) onOpen(); }}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocus={() => setHovered(true)} onBlur={() => setHovered(false)}>
+      <div className="p-thumb"><CardThumb p={p} iconSize={56} hovered={hovered} /></div>
       <div className="p-body">
         <div className="p-title"><h3>{p.name}</h3><ActionMenu items={menu} label={`Thao tác cho ${p.name}`} /></div>
         <p>{meta}</p>

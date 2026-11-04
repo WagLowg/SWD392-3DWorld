@@ -30,7 +30,7 @@ export function ProjectPicker({ hrefFor, title }: { hrefFor: (versionId: string)
       <p className="muted" style={{ margin: 0 }}>{title}</p>
       <div className="grid-cards">
         {items.map((p) => (
-          <button key={p.id} type="button" onClick={() => open(p)} disabled={opening === p.id} className="card summary-card" style={{ color: 'var(--text)', padding: 14, textAlign: 'left' }}>
+          <button key={p.id} type="button" onClick={() => open(p)} disabled={opening === p.id} className="card summary-card" style={{ color: 'var(--ai-text)', padding: 14, textAlign: 'left' }}>
             <span className="ph" style={{ width: 72, height: 72 }} />
             <div><b>{p.title}</b><div className="muted small">{p.versionCount} phiên bản · {date(p.updatedAt)}</div><div className="muted small">{opening === p.id ? 'Đang mở…' : p.formats.map((f) => f.toUpperCase()).join(' · ')}</div></div>
           </button>

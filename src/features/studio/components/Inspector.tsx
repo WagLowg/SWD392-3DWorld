@@ -154,18 +154,47 @@ function GeometryPanel({ node }: { node: SceneNode }) {
   );
 }
 
+/** Bề mặt vật liệu đặt sẵn (chỉ để xem trước; STL không mang vật liệu — vật liệu in chọn ở POD). */
+const FINISHES: { id: string; label: string; roughness: number; metalness: number; color?: string }[] = [
+  { id: 'matte', label: 'Nhựa mờ', roughness: 0.8, metalness: 0 },
+  { id: 'satin', label: 'Lụa', roughness: 0.45, metalness: 0.05 },
+  { id: 'gloss', label: 'Bóng', roughness: 0.12, metalness: 0 },
+  { id: 'metal', label: 'Kim loại', roughness: 0.3, metalness: 0.9 },
+  { id: 'gold', label: 'Vàng', roughness: 0.25, metalness: 0.95, color: '#E2B13C' },
+  { id: 'copper', label: 'Đồng', roughness: 0.35, metalness: 0.85, color: '#C98B55' },
+];
+
 function MaterialPanel({ node }: { node: SceneNode }) {
   const st = useStudio.getState;
   const [hex, setHex] = useState(node.appearance.color);
   useEffect(() => setHex(node.appearance.color), [node.appearance.color]);
   const setA = (patch: Partial<SceneNode['appearance']>) => st().updateNode(node.id, { appearance: { ...node.appearance, ...patch } }, 'Đổi appearance');
+  const activeFinish = FINISHES.find((f) => Math.abs(f.roughness - node.appearance.roughness) < 0.03 && Math.abs(f.metalness - node.appearance.metalness) < 0.03 && (!f.color || f.color === node.appearance.color.toUpperCase()));
   return (
     <section className="section">
-      <h3>Appearance</h3>
+      <h3>Vật liệu & màu sắc</h3>
+      <span className="label">Bề mặt</span>
+      <div className="finish-grid" role="radiogroup" aria-label="Bề mặt vật liệu">
+        {FINISHES.map((f) => {
+          const c = f.color ?? node.appearance.color;
+          return (
+            <button key={f.id} type="button" role="radio" aria-checked={activeFinish?.id === f.id} className="finish"
+              title={`${f.label} · độ nhám ${f.roughness} · kim loại ${f.metalness}`}
+              onClick={() => setA({ roughness: f.roughness, metalness: f.metalness, ...(f.color ? { color: f.color } : {}) })}>
+              {/* Quả cầu xem trước: độ bóng của vệt sáng theo độ nhám, tương phản theo độ kim loại */}
+              <span className="finish-ball" style={{
+                background: `radial-gradient(circle at 32% 28%, rgba(255,255,255,${(1 - f.roughness) * 0.95}) 0%, rgba(255,255,255,0) ${18 + f.roughness * 40}%), radial-gradient(circle at 50% 50%, ${c} 0%, ${c} 52%, color-mix(in srgb, ${c} ${f.metalness > 0.5 ? 45 : 75}%, #000) 100%)`,
+              }} />
+              <span>{f.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <span className="label">Màu</span>
       <div className="row wrap">
         {SWATCHES.map((c) => (
           <button key={c} aria-label={`Màu ${c}`} title={c} onClick={() => setA({ color: c })}
-            style={{ width: 28, height: 28, borderRadius: 14, background: c, cursor: 'pointer', border: node.appearance.color.toUpperCase() === c ? '2px solid var(--text)' : '2px solid transparent', outline: '1px solid var(--border)' }} />
+            style={{ width: 28, height: 28, borderRadius: 14, background: c, cursor: 'pointer', border: node.appearance.color.toUpperCase() === c ? '2px solid var(--st-text)' : '2px solid transparent', outline: '1px solid var(--st-border)' }} />
         ))}
       </div>
       <span className="label">HEX</span>
@@ -248,7 +277,7 @@ function AlignPanel({ ids }: { ids: string[] }) {
       <h3>Căn chỉnh & phân bố</h3>
       {(['X', 'Y', 'Z'] as const).map((a, i) => (
         <div className="row" key={a} style={{ marginBottom: 6 }}>
-          <span style={{ width: 18, color: 'var(--text-2)' }}>{a}</span>
+          <span style={{ width: 18, color: 'var(--st-text-2)' }}>{a}</span>
           <button className="btn sm icon" title={`Căn min ${a}`} onClick={() => st().align(i as 0 | 1 | 2, 'min')}><AlignStartHorizontal size={13} /></button>
           <button className="btn sm icon" title={`Căn giữa ${a}`} onClick={() => st().align(i as 0 | 1 | 2, 'center')}><AlignCenterHorizontal size={13} /></button>
           <button className="btn sm icon" title={`Căn max ${a}`} onClick={() => st().align(i as 0 | 1 | 2, 'max')}><AlignEndHorizontal size={13} /></button>

@@ -129,7 +129,7 @@ export function DeleteDialog({ project, onClose, onDeleted }: { project: Project
           ? <button className="btn" disabled><Loader2 size={14} className="spin" /> Đang xóa…</button>
           : <button className="btn danger-fill" onClick={() => void run()}>{state === 'failed' ? 'Thử lại' : 'Xóa dự án'}</button>}
       </>}>
-      <p style={{ marginTop: 0, color: 'var(--text-2)' }}>Xóa dự án này khỏi danh sách của bạn. Snapshot đã gửi POD và lịch sử yêu cầu không bị thay đổi.</p>
+      <p style={{ marginTop: 0, color: 'var(--st-text-2)' }}>Xóa dự án này khỏi danh sách của bạn. Snapshot đã gửi POD và lịch sử yêu cầu không bị thay đổi.</p>
       <dl className="kv" style={{ marginTop: 18 }}>
         <dt>Dự án</dt><dd>{project.name}</dd>
         <dt>Lần cập nhật</dt><dd>{when}</dd>
