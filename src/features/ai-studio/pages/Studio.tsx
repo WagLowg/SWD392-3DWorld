@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   RotateCcw, Grid3x3, Box as BoxIcon, Sun, Camera, Maximize, RefreshCw, Download, Printer, Plus,
-  Check, Loader2, Circle, Pencil, AlertTriangle, Sparkles, Cuboid, Play,
+  Check, Loader2, Circle, Pencil, AlertTriangle, Sparkles, Cuboid, Play, Video, Columns2, Keyboard, Dices, X, History, ChevronsLeftRight,
 } from 'lucide-react';
 import { ApiError, newKey, type ConfigOptions, type Estimate, type GenConfig, type ProjectDetail, type SourceImage, type SourceMode, type Task } from '../lib/api';
 import { aiStudio } from '../lib/backend';
@@ -11,12 +11,81 @@ import { useAuth, useToast } from '../lib/app-state';
 import { bytes, elapsed, isActive, MODEL_LABEL, num, TASK_STATUS, time, dateTime } from '../lib/format';
 import { useCrumb } from '../components/AppShell';
 import { Badge, Modal, Progress, Segmented, Switch, Empty } from '../components/ui';
-import { ImagePicker } from '../components/ImagePicker';
+import { ImagePicker, useUploader } from '../components/ImagePicker';
+import { Inspiration } from '../components/Inspiration';
+import { sampleFile, type Sample } from '../lib/sampleImages';
 import { DEFAULT_CONFIG, GeneratePanel, type Preset } from '../components/GeneratePanel';
-import { Viewer3D, type RenderMode, type ViewerHandle, type ViewerStats } from '../components/Viewer3D';
-import { EmptyStage, GeneratingStage } from '../components/Stage';
+import { Viewer3D, canRecord, type RenderMode, type ViewerHandle, type ViewerStats } from '../components/Viewer3D';
+import { confetti } from '../../../shared/ui/confetti';
+import { EmptyStage, GeneratingStage, STAGE_SCENES, type StageScene } from '../components/Stage';
 
 const EMPTY_IMGS: (SourceImage | null)[] = [null, null, null, null];
+
+/** Chip phong cách cho chế độ Văn bản: bấm để thêm/bỏ cụm mô tả tiếng Anh vào prompt. */
+const STYLE_CHIPS: [string, string][] = [
+  ['Chibi', 'cute chibi style'],
+  ['Low-poly', 'low-poly'],
+  ['Hoạt hình', 'stylized cartoon'],
+  ['Tả thực', 'photorealistic, highly detailed'],
+  ['Kim loại', 'polished metal'],
+  ['Gỗ mộc', 'carved wood'],
+  ['Gốm sứ', 'glazed ceramic'],
+  ['Pastel', 'soft pastel colors'],
+  ['Cyberpunk', 'cyberpunk, neon accents'],
+  ['Đồ chơi', 'vinyl toy figure'],
+];
+
+/** Ý tưởng ngẫu nhiên cho nút xúc xắc. */
+const RANDOM_IDEAS = [
+  'A tiny astronaut cat sitting on a crescent moon',
+  'A cozy mushroom house with a round wooden door',
+  'A steampunk owl with brass gears and goggles',
+  'A retro arcade cabinet with glowing buttons',
+  'A baby dragon hatching from a cracked egg',
+  'A miniature bonsai tree in a ceramic pot',
+  'A cute robot barista holding a coffee cup',
+  'A treasure chest overflowing with gold coins',
+  'A hot air balloon shaped like a strawberry',
+  'A knight helmet decorated with feathers',
+  'A sleepy panda hugging a bamboo pillow',
+  'A vintage camera with leather details',
+];
+
+const PROMPT_HISTORY_KEY = '3dw.ai.promptHistory';
+const readHistory = (): string[] => {
+  try { return (JSON.parse(localStorage.getItem(PROMPT_HISTORY_KEY) || '[]') as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 6); } catch { return []; }
+};
+const pushHistory = (p: string) => {
+  const t = p.trim();
+  if (t.length < 3) return;
+  try { localStorage.setItem(PROMPT_HISTORY_KEY, JSON.stringify([t, ...readHistory().filter((x) => x !== t)].slice(0, 6))); } catch { /* bị chặn */ }
+};
+
+const hasPhrase = (prompt: string, phrase: string) => prompt.toLowerCase().includes(phrase.toLowerCase());
+function togglePhrase(prompt: string, phrase: string) {
+  if (hasPhrase(prompt, phrase)) {
+    const i = prompt.toLowerCase().indexOf(phrase.toLowerCase());
+    return (prompt.slice(0, i) + prompt.slice(i + phrase.length)).replace(/\s*,\s*,/g, ',').replace(/^[\s,]+|[\s,]+$/g, '');
+  }
+  const base = prompt.trim().replace(/[\s,]+$/, '');
+  return (base ? `${base}, ${phrase}` : phrase).slice(0, 800);
+}
+
+/** Phím tắt của khung xem. */
+const VIEWER_KEYS: [string, string][] = [
+  ['1 · 2 · 3', 'Vật liệu · Đất sét · Khung lưới'],
+  ['A', 'Bật/tắt tự xoay'],
+  ['R', 'Đặt lại góc nhìn'],
+  ['G', 'Lưới & trục'],
+  ['B', 'Khung bao'],
+  ['L', 'Ánh sáng studio'],
+  ['[ · ]', 'Xoay nguồn sáng'],
+  ['C', 'So sánh với ảnh gốc'],
+  ['P', 'Chụp ảnh'],
+  ['V', 'Quay video 360°'],
+  ['F', 'Toàn màn hình'],
+  ['?', 'Hiện/ẩn bảng này'],
+];
 
 function stepsFor(t: Task) {
   const order = ['send', 'queue', 'run', 'save'];
@@ -28,6 +97,7 @@ function stepsFor(t: Task) {
 export default function Studio() {
   const { projectId } = useParams();
   const nav = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const { refreshWallet, provider } = useAuth();
 
@@ -58,7 +128,20 @@ export default function Studio() {
   const [bbox, setBbox] = useState(false);
   const [autoRotate, setAutoRotate] = useState(true);
   const [light, setLight] = useState(true);
+  const [stageScene, setStageScene] = useState<StageScene>(() => {
+    try { return (localStorage.getItem('3dw.ai.stageScene') as StageScene) || 'studio'; } catch { return 'studio'; }
+  });
+  const pickScene = (s: StageScene) => {
+    setStageScene(s);
+    try { localStorage.setItem('3dw.ai.stageScene', s); } catch { /* bị chặn */ }
+  };
   const [stats, setStats] = useState<ViewerStats | null>(null);
+  const [lightAngle, setLightAngle] = useState(0);
+  const [compare, setCompare] = useState(false);
+  const [comparePos, setComparePos] = useState(50);
+  const [showKeys, setShowKeys] = useState(false);
+  const [recordPct, setRecordPct] = useState<number | null>(null);
+  const [history, setHistory] = useState<string[]>(readHistory);
   const [dockTab, setDockTab] = useState<'variants' | 'tasks'>('variants');
   const [editingTitle, setEditingTitle] = useState(false);
   const viewer = useRef<ViewerHandle>(null);
@@ -81,7 +164,12 @@ export default function Studio() {
       for (const t of d.tasks) {
         const before = prevStatuses.current[t.id];
         if (!initial && before && before !== t.status) {
-          if (t.status === 'AVAILABLE') toast('success', 'Mô hình đã sẵn sàng', `${d.project.title} · biến thể ${t.variantIndex + 1}`);
+          if (t.status === 'AVAILABLE') {
+            toast('success', 'Mô hình đã sẵn sàng', `${d.project.title} · biến thể ${t.variantIndex + 1}`);
+            // Khoảnh khắc "xong rồi!": pháo hoa bắn từ giữa khung xem 3D
+            const r = vpRef.current?.getBoundingClientRect();
+            confetti(r ? { x: r.left + r.width / 2, y: r.top + r.height * 0.55 } : {});
+          }
           if (t.status === 'FAILED') toast('error', 'Tạo mô hình thất bại', t.errorMessage || 'Credit đã được hoàn lại.');
           if (t.status === 'ASSET_ERROR') toast('warning', 'Lưu kết quả gặp lỗi', 'Hệ thống sẽ tự thử lại.');
           if (['AVAILABLE', 'FAILED', 'CANCELLED'].includes(t.status)) refreshWallet();
@@ -111,6 +199,33 @@ export default function Studio() {
       setImages(EMPTY_IMGS); setCfg(DEFAULT_CONFIG); setPreset('balanced'); setConsent(false); setTitle(''); setVariants(1); setMode('single'); setPrompt('');
     }
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const wanted = (location.state as { mode?: SourceMode } | null)?.mode;
+    if (wanted && !projectId) setMode(wanted);
+  }, [location.key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- cột Cảm hứng: ảnh mẫu & ý tưởng mô tả ---
+  const { upload: uploadSample } = useUploader();
+  const [sampleBusy, setSampleBusy] = useState(false);
+  const pickSample = async (s: Sample) => {
+    setSampleBusy(true);
+    try {
+      const img = await uploadSample(await sampleFile(s));
+      if (img) {
+        setMode('single');
+        setImages([img, null, null, null]);
+        if (!title.trim()) setTitle(s.label);
+        loadRecent();
+        toast('success', 'Đã dùng ảnh mẫu', `${s.label} — chọn cấu hình rồi bấm Generate.`);
+      }
+    } catch (e) {
+      toast('error', 'Không dùng được ảnh mẫu', (e as Error).message);
+    } finally {
+      setSampleBusy(false);
+    }
+  };
+  const pickPrompt = (p: string) => { setMode('text'); setPrompt(p); };
 
   const activeTasks = useMemo(() => detail?.tasks.filter((t) => isActive(t.status)) || [], [detail]);
   // Polling khi còn task đang chạy: đọc trạng thái mỗi 2 giây.
@@ -176,6 +291,7 @@ export default function Studio() {
         key: confirm.key,
       });
       setConfirm(null);
+      if (mode === 'text') { pushHistory(prompt); setHistory(readHistory()); }
       toast('info', 'Đã gửi tác vụ', `${r.tasks.length} tác vụ đang được xử lý. Bạn có thể rời trang, tiến trình vẫn được lưu.`);
       refreshWallet();
       loadRecent();
@@ -242,6 +358,59 @@ export default function Studio() {
     else vpRef.current?.requestFullscreen?.();
   };
 
+  const recordVideo = async () => {
+    if (recordPct !== null || !viewer.current) return;
+    if (!canRecord()) return toast('warning', 'Trình duyệt chưa hỗ trợ quay video', 'Hãy dùng Chrome, Edge hoặc Firefox bản mới.');
+    setCompare(false);
+    setRecordPct(0);
+    const blob = await viewer.current.record(6, setRecordPct);
+    setRecordPct(null);
+    if (!blob) return toast('error', 'Không quay được video');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${project?.title || 'model'}_360.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('success', 'Đã quay xong video 360°', 'Tệp video đã được tải xuống — sẵn sàng để chia sẻ.');
+  };
+
+  // Ảnh gốc của phiên bản đang xem (để so sánh A/B với mô hình)
+  const sourceImg = useMemo(() => {
+    const v = detail?.versions.find((x) => x.id === selectedId);
+    const task = v && detail?.tasks.find((t) => t.id === v.sourceTaskId);
+    return (task && detail?.images.find((i) => i.id === task.imageIds[0])) || null;
+  }, [detail, selectedId]);
+  useEffect(() => { if (!sourceImg) setCompare(false); }, [sourceImg]);
+
+  const dragCompare = (e: RPointerEvent<HTMLDivElement>) => {
+    const r = vpRef.current?.getBoundingClientRect();
+    if (!r || !(e.buttons & 1)) return;
+    setComparePos(Math.min(98, Math.max(2, ((e.clientX - r.left) / r.width) * 100)));
+  };
+
+  // Phím tắt khung xem (chỉ khi đang xem một mô hình và không gõ vào ô nhập)
+  const hasModel = !!detail?.versions.find((x) => x.id === selectedId)?.glbUrl;
+  const keyActions = useRef<Record<string, () => void>>({});
+  keyActions.current = {
+    '1': () => setRenderMode('textured'), '2': () => setRenderMode('clay'), '3': () => setRenderMode('wireframe'),
+    a: () => setAutoRotate((v) => !v), r: () => viewer.current?.reset(), g: () => setGrid((v) => !v), b: () => setBbox((v) => !v),
+    l: () => setLight((v) => !v), '[': () => setLightAngle((x) => Math.max(-180, x - 15)), ']': () => setLightAngle((x) => Math.min(180, x + 15)),
+    c: () => { if (sourceImg) setCompare((v) => !v); }, p: () => screenshot(), v: () => void recordVideo(), f: () => fullscreen(),
+    '?': () => setShowKeys((v) => !v), escape: () => { setShowKeys(false); setCompare(false); },
+  };
+  useEffect(() => {
+    if (!hasModel) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (e.ctrlKey || e.metaKey || e.altKey || (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable))) return;
+      if (document.querySelector('.modal, [aria-modal="true"]')) return;
+      const fn = keyActions.current[e.key.toLowerCase()];
+      if (fn) { e.preventDefault(); fn(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [hasModel]);
+
   if (projectId && loadError && !detail) {
     return <div className="page"><Empty icon={<AlertTriangle />} title="Không mở được dự án" text={loadError} action={<Link className="btn primary" to="/studio">Tạo dự án mới</Link>} /></div>;
   }
@@ -268,6 +437,31 @@ export default function Studio() {
               <textarea rows={5} maxLength={800} value={prompt} onChange={(e) => setPrompt(e.target.value)}
                 placeholder="VD: Rương gỗ cổ điển có khoá đồng, chạm khắc hoa văn" style={{ resize: 'vertical' }} />
               <small className="muted">{prompt.length}/800 ký tự · mô tả bằng tiếng Anh thường cho kết quả tốt hơn.</small>
+              <div className="prompt-tools">
+                <span className="prompt-tools-label">Phong cách</span>
+                <button type="button" className="prompt-dice" title="Ý tưởng ngẫu nhiên" aria-label="Ý tưởng ngẫu nhiên"
+                  onClick={(e) => {
+                    const pool = RANDOM_IDEAS.filter((x) => x !== prompt);
+                    setPrompt(pool[Math.floor(Math.random() * pool.length)]);
+                    const d = e.currentTarget; d.classList.remove('roll'); void d.offsetWidth; d.classList.add('roll');
+                  }}><Dices size={15} />Ngẫu nhiên</button>
+              </div>
+              <div className="chips" role="group" aria-label="Phong cách mô tả">
+                {STYLE_CHIPS.map(([label, phrase]) => (
+                  <button key={label} type="button" className="chip" aria-pressed={hasPhrase(prompt, phrase)} title={phrase}
+                    onClick={() => setPrompt((p) => togglePhrase(p, phrase))}>{label}</button>
+                ))}
+              </div>
+              {history.length > 0 && (
+                <>
+                  <span className="prompt-tools-label" style={{ marginTop: 6 }}><History size={13} />Đã dùng gần đây</span>
+                  <div className="prompt-history">
+                    {history.map((h) => (
+                      <button key={h} type="button" title={h} onClick={() => setPrompt(h)}>{h}</button>
+                    ))}
+                  </div>
+                </>
+              )}
             </label>
           ) : (
             <ImagePicker mode={mode} images={images} onChange={(imgs) => { setImages(imgs); loadRecent(); }} recent={recent} />
@@ -284,11 +478,45 @@ export default function Studio() {
 
       {/* ---------------- Giữa: viewport ---------------- */}
       <section className="studio-center">
-        <div className="viewport" ref={vpRef}>
+        <div className="viewport" ref={vpRef} data-scene={version?.glbUrl ? stageScene : 'studio'}>
           {version?.glbUrl ? (
             <>
-              <Viewer3D ref={viewer} url={version.glbUrl} mode={renderMode} grid={grid} bbox={bbox} autoRotate={autoRotate} studioLight={light}
-                fallbackImage={version.thumbnailUrl} onStats={setStats} />
+              <Viewer3D ref={viewer} url={version.glbUrl} mode={renderMode} grid={grid} bbox={bbox} autoRotate={autoRotate && recordPct === null} studioLight={light}
+                fallbackImage={version.thumbnailUrl} onStats={setStats} scene={stageScene} lightAngle={lightAngle} />
+              {compare && sourceImg && (
+                <div className="vp-compare" style={{ '--x': `${comparePos}%` } as CSSProperties}>
+                  <div className="vp-compare-img"><AuthedImg src={sourceImg.url} alt="Ảnh gốc" /></div>
+                  <span className="vp-compare-tag l">Ảnh gốc</span>
+                  <span className="vp-compare-tag r">Mô hình 3D</span>
+                  <div className="vp-compare-handle" role="slider" tabIndex={0} aria-label="Vị trí so sánh" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(comparePos)}
+                    onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); dragCompare(e); }}
+                    onPointerMove={dragCompare}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowLeft') { e.stopPropagation(); setComparePos((x) => Math.max(2, x - 4)); }
+                      if (e.key === 'ArrowRight') { e.stopPropagation(); setComparePos((x) => Math.min(98, x + 4)); }
+                    }}>
+                    <span><ChevronsLeftRight size={16} /></span>
+                  </div>
+                </div>
+              )}
+              {recordPct !== null && (
+                <div className="vp-rec" aria-live="polite">
+                  <span className="dot" />REC · đang quay 360°
+                  <span className="vp-rec-bar"><i style={{ width: `${recordPct}%` }} /></span>
+                  <span className="tabular">{recordPct}%</span>
+                </div>
+              )}
+              {showKeys && (
+                <div className="vp-keys" aria-label="Phím tắt khung xem">
+                  <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+                    <b>Phím tắt</b>
+                    <button className="icon-btn" aria-label="Đóng" onClick={() => setShowKeys(false)}><X size={14} /></button>
+                  </div>
+                  <dl>
+                    {VIEWER_KEYS.map(([k, d]) => <div key={k}><dt><kbd>{k}</kbd></dt><dd>{d}</dd></div>)}
+                  </dl>
+                </div>
+              )}
               <div className="vp-label">
                 <b>{project?.title} · {version.label.split(' ')[0]}</b>
                 {version.metadata.texture ? <Badge tone="success">Có Texture</Badge> : <Badge tone="warning">Chưa có Texture</Badge>}
@@ -301,18 +529,43 @@ export default function Studio() {
                 <button className={`icon-btn${bbox ? ' on' : ''}`} title="Khung bao" aria-label="Khung bao" aria-pressed={bbox} onClick={() => setBbox((v) => !v)}><BoxIcon size={17} /></button>
                 <button className={`icon-btn${light ? ' on' : ''}`} title="Ánh sáng studio" aria-label="Ánh sáng studio" aria-pressed={light} onClick={() => setLight((v) => !v)}><Sun size={17} /></button>
                 <span className="sep" />
-                <button className="icon-btn" title="Chụp ảnh màn hình" aria-label="Chụp ảnh" onClick={screenshot}><Camera size={17} /></button>
-                <button className="icon-btn" title="Toàn màn hình" aria-label="Toàn màn hình" onClick={fullscreen}><Maximize size={17} /></button>
+                {sourceImg && <button className={`icon-btn${compare ? ' on' : ''}`} title="So sánh với ảnh gốc (C)" aria-label="So sánh với ảnh gốc" aria-pressed={compare} onClick={() => setCompare((v) => !v)}><Columns2 size={17} /></button>}
+                <button className="icon-btn" title="Chụp ảnh màn hình (P)" aria-label="Chụp ảnh" onClick={screenshot}><Camera size={17} /></button>
+                <button className={`icon-btn${recordPct !== null ? ' on rec' : ''}`} title="Quay video xoay 360° (V)" aria-label="Quay video 360°" disabled={recordPct !== null} onClick={() => void recordVideo()}><Video size={17} /></button>
+                <button className="icon-btn" title="Toàn màn hình (F)" aria-label="Toàn màn hình" onClick={fullscreen}><Maximize size={17} /></button>
+                <button className={`icon-btn${showKeys ? ' on' : ''}`} title="Phím tắt (?)" aria-label="Phím tắt" aria-pressed={showKeys} onClick={() => setShowKeys((v) => !v)}><Keyboard size={17} /></button>
               </div>
               <div className="vp-bottom">
+                <div className="vp-left">
                 <div className="vp-modes" role="group" aria-label="Chế độ hiển thị">
                   {([['textured', 'Vật liệu'], ['clay', 'Đất sét'], ['wireframe', 'Khung lưới']] as const).map(([k, l]) => (
                     <button key={k} aria-pressed={renderMode === k} onClick={() => setRenderMode(k)}>{l}</button>
                   ))}
                 </div>
+                <div className="vp-scenes" role="group" aria-label="Bối cảnh trưng bày">
+                  {STAGE_SCENES.map((s) => (
+                    <button key={s.id} type="button" aria-pressed={stageScene === s.id} aria-label={`Bối cảnh ${s.label}`} title={s.label}
+                      style={{ background: s.swatch }} onClick={() => pickScene(s.id)} />
+                  ))}
+                </div>
+                <label className="vp-light" title="Xoay nguồn sáng quanh mô hình ([ ]) · nhấp đúp để đặt lại">
+                  <Sun size={14} style={{ transform: `rotate(${lightAngle}deg)` }} />
+                  <input type="range" min={-180} max={180} step={5} value={lightAngle} aria-label="Góc nguồn sáng"
+                    onChange={(e) => setLightAngle(Number(e.target.value))} onDoubleClick={() => setLightAngle(0)} />
+                </label>
+                </div>
                 <span className="vp-stats tabular">{num(stats?.vertices ?? ms?.vertices)} đỉnh · {num(stats?.triangles ?? ms?.triangles)} tam giác</span>
               </div>
             </>
+          ) : version && !version.glbUrl && version.label.includes('3D Studio') ? (
+            <div className="vp-overlay">
+              <div className="box">
+                <Cuboid size={40} color="var(--ai-primary)" style={{ margin: '0 auto' }} />
+                <h3>{version.label} được lưu từ 3D Studio</h3>
+                <p className="muted">Phiên bản này là cảnh chỉnh sửa trong 3D Studio (không phải tệp GLB), nên mở bằng trình chỉnh sửa để xem và sửa tiếp.</p>
+                <a className="btn primary" style={{ marginTop: 12 }} href={`/studio/#/studio/${version.projectId}`}>Mở trong 3D Studio</a>
+              </div>
+            </div>
           ) : primaryActive ? (
             <>
               {(() => { const src = detail?.images.find((i) => i.id === primaryActive.imageIds[0]); return src ? <AuthedImg className="vp-src-img" src={src.url} alt="" /> : null; })()}
@@ -341,9 +594,26 @@ export default function Studio() {
             <EmptyStage />
             <div className="vp-caption">
               <div>
-                <span className="eyebrow">{mode === 'text' ? 'Văn bản' : 'Ảnh'} → Mô hình 3D</span>
-                <h3>Imagine it. <span className="grad-text">Make it 3D.</span></h3>
-                <p>{mode === 'text' ? 'Mô tả vật thể ở bảng bên trái' : 'Tải một ảnh vật thể ở bảng bên trái'}, chọn cấu hình và bấm Generate. Mô hình sẽ hiện hình ngay trên bệ này để bạn xoay, phóng to và kiểm tra.</p>
+                {(mode !== 'text' && images[0]) || (mode === 'text' && prompt.trim().length >= 3) ? (
+                  <>
+                    <span className="eyebrow">Sẵn sàng tạo</span>
+                    <div className="vp-ready">
+                      {mode !== 'text' && images[0]
+                        ? <AuthedImg className="vp-ready-img" src={images[0].url} alt={images[0].name} />
+                        : <span className="vp-ready-quote">“{prompt.trim().slice(0, 90)}{prompt.trim().length > 90 ? '…' : ''}”</span>}
+                      <div>
+                        <h3>Bấm <span className="grad-text">Generate</span> để dựng</h3>
+                        <p>{blocker ?? 'Mọi thứ đã sẵn sàng. Mô hình sẽ hiện hình ngay trên bệ này.'}</p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="eyebrow">{mode === 'text' ? 'Văn bản' : 'Ảnh'} → Mô hình 3D</span>
+                    <h3>Imagine it. <span className="grad-text">Make it 3D.</span></h3>
+                    <p>{mode === 'text' ? 'Mô tả vật thể ở bảng bên trái' : 'Tải một ảnh vật thể ở bảng bên trái'}, chọn cấu hình và bấm Generate. Mô hình sẽ hiện hình ngay trên bệ này để bạn xoay, phóng to và kiểm tra.</p>
+                  </>
+                )}
                 {provider === 'unconfigured' && <div className="banner warning" style={{ textAlign: 'left', marginTop: 16 }}><AlertTriangle size={16} style={{ flex: 'none' }} /><span>Máy chủ <b>chưa cấu hình nhà cung cấp AI</b> (Meshy) nên chưa tạo được mô hình mới. Bạn vẫn xem được các mô hình đã có.</span></div>}
                 {provider === 'mock' && <div className="banner warning" style={{ textAlign: 'left', marginTop: 16 }}><AlertTriangle size={16} style={{ flex: 'none' }} /><span>Đang ở <b>chế độ mô phỏng</b>: chưa cấu hình <code>MESHY_API_KEY</code> nên kết quả là mô hình mẫu, không gọi Meshy.</span></div>}
               </div>
@@ -398,9 +668,9 @@ export default function Studio() {
 
       {/* ---------------- Phải: inspector ---------------- */}
       <aside className="studio-right" aria-label="Thuộc tính mô hình">
-        <div className="panel-title"><h2>Thuộc tính mô hình</h2></div>
+        {detail && <div className="panel-title"><h2>Thuộc tính mô hình</h2></div>}
         {!detail ? (
-          <p className="muted small">Thông tin mô hình, kích thước và các thao tác xuất/in sẽ hiển thị sau khi tạo.</p>
+          projectId ? <div className="skeleton" style={{ height: 240 }} /> : <Inspiration mode={mode} busy={sampleBusy} onSample={pickSample} onPrompt={pickPrompt} />
         ) : (
           <div className="stack lg">
             <div>

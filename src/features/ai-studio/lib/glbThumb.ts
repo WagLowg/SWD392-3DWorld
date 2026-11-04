@@ -132,15 +132,20 @@ export function glbThumbnail(url: string): Promise<string> {
   return p;
 }
 
-/** Trả data URL dải ảnh bàn xoay của mô hình, hoặc null khi đang dựng / lỗi. */
+/**
+ * Dải ảnh bàn xoay của mô hình. `failed` = không chụp được (vd. tệp không phải GLB — bản lưu từ 3D Studio)
+ * để thẻ hiện icon thay vì hiệu ứng chờ mãi.
+ */
 export function useGlbThumbnail(url: string | null | undefined) {
-  const [src, setSrc] = useState<string | null>(null);
+  const [state, setState] = useState<{ src: string | null; failed: boolean }>({ src: null, failed: false });
   useEffect(() => {
-    setSrc(null);
+    setState({ src: null, failed: false });
     if (!url) return;
     let active = true;
-    glbThumbnail(url).then((d) => { if (active) setSrc(d); }).catch(() => undefined);
+    glbThumbnail(url)
+      .then((d) => { if (active) setState({ src: d, failed: false }); })
+      .catch(() => { if (active) setState({ src: null, failed: true }); });
     return () => { active = false; };
   }, [url]);
-  return src;
+  return state;
 }

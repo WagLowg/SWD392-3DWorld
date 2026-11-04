@@ -216,11 +216,12 @@ export async function fetchProject(id: string): Promise<(StoredProject & { meta:
   }
 }
 
-export async function createProject(input: { name: string; templateId?: string; preset?: string }): Promise<ProjectMeta> {
+export async function createProject(input: { name: string; templateId?: string; preset?: string; nodes?: SceneNode[] }): Promise<ProjectMeta> {
   const err = validateProjectName(input.name);
   if (err) throw new Error(err);
   const tpl = TEMPLATES.find((t) => t.id === input.templateId);
-  const nodes = tpl ? tpl.build() : [];
+  // `nodes` cho phép tạo từ một thiết kế đã tùy biến (vd. hero "gõ tên" ở trang chủ Studio)
+  const nodes = input.nodes ?? (tpl ? tpl.build() : []);
   const scene: SceneDoc = { nodes, templateId: tpl?.id, preset: input.preset, icon: tpl?.icon ?? 'box', thumbnail: thumbOf(nodes) };
   const d = await call<BDetail>('/projects', {
     body: {

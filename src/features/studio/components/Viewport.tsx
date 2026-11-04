@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
-import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import {
   CameraControls, Edges, GizmoHelper, GizmoViewport, Grid, Html, Line, OrthographicCamera, PerspectiveCamera, TransformControls,
 } from '@react-three/drei';
 import CameraControlsImpl from 'camera-controls';
 import { AlertTriangle, Box as BoxIcon, Plus } from 'lucide-react';
 import { useStudio } from '../store';
+import ViewPanel, { BedVolume, SectionCap, useSceneBox } from './ViewPanel';
 import { buildGeometry, decompose, worldBox } from '../lib/geometry';
 import type { SceneNode } from '../types';
 
@@ -15,7 +16,8 @@ export const objectRegistry = new Map<string, THREE.Object3D>();
 
 function NodeObject({ node, childrenOf }: { node: SceneNode; childrenOf: Map<string | null, SceneNode[]> }) {
   const selection = useStudio((s) => s.selection);
-  const tool = useStudio((s) => s.tool);
+  const xray = useStudio((s) => s.view.xray);
+  const sectioned = useStudio((s) => s.view.section !== null);
   const selected = selection.includes(node.id);
   const built = useMemo(() => buildGeometry(node), [node]);
   const kids = childrenOf.get(node.id) ?? [];
@@ -51,11 +53,12 @@ function NodeObject({ node, childrenOf }: { node: SceneNode; childrenOf: Map<str
             color={node.appearance.color}
             roughness={node.appearance.roughness}
             metalness={node.appearance.metalness}
-            side={node.kind === 'plane' ? THREE.DoubleSide : THREE.FrontSide}
+            side={node.kind === 'plane' || sectioned ? THREE.DoubleSide : THREE.FrontSide}
             emissive={selected ? '#16a37b' : '#000000'}
             emissiveIntensity={selected ? 0.16 : 0}
-            transparent={tool === 'measure'}
-            opacity={1}
+            transparent={xray}
+            opacity={xray ? (selected ? 0.55 : 0.28) : 1}
+            depthWrite={!xray}
           />
           {/* Viền mảnh cho mọi vật thể: chi tiết sáng màu (vd. chữ trắng) không hòa vào nền sáng; vật đang chọn viền xanh */}
           <Edges threshold={30} color={selected ? '#16a37b' : '#4d5a56'} lineWidth={selected ? 2.2 : 1} />
@@ -73,7 +76,55 @@ function SceneContent() {
     nodes.forEach((n) => { const k = n.parentId; m.set(k, [...(m.get(k) ?? []), n]); });
     return m;
   }, [nodes]);
-  return <>{(childrenOf.get(null) ?? []).map((n) => <NodeObject key={n.id} node={n} childrenOf={childrenOf} />)}</>;
+  const roots = childrenOf.get(null) ?? [];
+  return <>{roots.map((n) => <Exploded key={n.id} node={n} nodes={nodes}><NodeObject node={n} childrenOf={childrenOf} /></Exploded>)}</>;
+}
+
+/**
+ * Bọc mỗi đối tượng gốc: khi bật Explode thì đẩy nó ra xa tâm scene (mượt theo khung hình).
+ * Độ lệch nằm ở group bọc ngoài nên gizmo vẫn đọc/ghi đúng vị trí thật của node.
+ */
+function Exploded({ node, nodes, children }: { node: SceneNode; nodes: SceneNode[]; children: ReactNode }) {
+  const explode = useStudio((s) => s.view.explode);
+  const ref = useRef<THREE.Group>(null);
+  const target = useMemo(() => {
+    if (!explode) return new THREE.Vector3();
+    const roots = nodes.filter((n) => !n.parentId && n.visible);
+    if (roots.length < 2) return new THREE.Vector3();
+    const all = worldBox(roots.map((n) => n.id), nodes);
+    const own = worldBox([node.id], nodes);
+    if (all.isEmpty() || own.isEmpty()) return new THREE.Vector3();
+    const c = all.getCenter(new THREE.Vector3());
+    const dir = own.getCenter(new THREE.Vector3()).sub(c);
+    if (dir.lengthSq() < 1e-6) dir.set(0, 1, 0);
+    const span = all.getSize(new THREE.Vector3()).length();
+    return dir.normalize().multiplyScalar(explode * span * 0.6).add(new THREE.Vector3(0, explode * span * 0.08, 0));
+  }, [explode, node.id, nodes]);
+  useFrame((_, dt) => { ref.current?.position.lerp(target, Math.min(1, dt * 8)); });
+  return <group ref={ref}>{children}</group>;
+}
+
+/** Mặt cắt: áp mặt phẳng cắt cho mọi vật liệu trong scene (kể cả viền) mỗi khung hình. */
+const sectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+function SectionClip({ children }: { children: ReactNode }) {
+  const section = useStudio((s) => s.view.section);
+  const box = useSceneBox();
+  const ref = useRef<THREE.Group>(null);
+  const gl = useThree((s) => s.gl);
+  useEffect(() => { gl.localClippingEnabled = true; }, [gl]);
+  useFrame(() => {
+    const on = section !== null && !box.isEmpty();
+    if (on) sectionPlane.constant = box.min.y + (box.max.y - box.min.y) * section;
+    ref.current?.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      if (!m) return;
+      for (const mat of Array.isArray(m) ? m : [m]) {
+        const want = on ? [sectionPlane] : null;
+        if ((mat.clippingPlanes?.length ?? 0) !== (want?.length ?? 0)) { mat.clippingPlanes = want; mat.needsUpdate = true; }
+      }
+    });
+  });
+  return <group ref={ref}>{children}</group>;
 }
 
 function Gizmo() {
@@ -270,7 +321,9 @@ export default function Viewport() {
           <shadowMaterial opacity={0.18} color="#0f6b52" />
         </mesh>
         <axesHelper args={[20]} />
-        <SceneContent />
+        <SectionClip><SceneContent /></SectionClip>
+        <SectionCap />
+        <BedVolume />
         <SelectionBounds />
         <Measure />
         <Gizmo />
@@ -278,6 +331,7 @@ export default function Viewport() {
           <GizmoViewport axisColors={['#e5484d', '#12a150', '#3b6ff5']} labelColor="#ffffff" />
         </GizmoHelper>
       </Canvas>
+      <ViewPanel />
       {nodes.length === 0 && (
         <div className="empty-scene">
           <div>

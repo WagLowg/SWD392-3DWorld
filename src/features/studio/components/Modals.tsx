@@ -364,6 +364,7 @@ function SendModal({ onClose }: { onClose: () => void }) {
 /* ---------------- Help ---------------- */
 const SHORTCUTS: [string, string][] = [
   ['V / G / R / S', 'Chọn / Di chuyển / Xoay / Tỷ lệ'], ['M', 'Đo khoảng cách'], ['F', 'Fit selection / scene'],
+  ['X', 'Chế độ X-ray'], ['E', 'Tách rời (Explode)'], ['B', 'Hiện bàn in 3D'],
   ['Ctrl + Z', 'Hoàn tác'], ['Ctrl + Shift + Z / Ctrl + Y', 'Làm lại'], ['Ctrl + S', 'Lưu'], ['Ctrl + D', 'Nhân bản'],
   ['Ctrl + G', 'Group'], ['Ctrl + Shift + G', 'Ungroup'], ['Delete', 'Xóa'], ['H', 'Ẩn/hiện'], ['L', 'Khóa/mở khóa'],
   ['Ctrl + A', 'Chọn tất cả'], ['Esc', 'Hủy thao tác / bỏ chọn'], ['1 / 3 / 7 / 0', 'Front / Right / Top / Perspective'],

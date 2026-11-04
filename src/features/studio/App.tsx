@@ -1,5 +1,9 @@
-import { Component, useEffect, useState, type ReactNode } from 'react';
-import { href, useRoute } from './router';
+import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Box as BoxI, Circle, Cylinder, Cone, Torus, Square, Type, Save, Undo2, Redo2, ShieldCheck, Download, Upload, Grid3x3, Eye, LayoutTemplate, FolderOpen, Plus, Sparkles, Store, Home, Keyboard, Copy, Trash2 } from 'lucide-react';
+import { CommandPalette, useCommandPalette, type Command } from '../../shared/ui/CommandPalette';
+import { TEMPLATES } from './lib/scene';
+import type { NodeKind } from './types';
+import { href, navigate, useRoute } from './router';
 import Dashboard from './dashboard/Dashboard';
 import { Monitor } from 'lucide-react';
 import { useStudio } from './store';
@@ -40,6 +44,9 @@ function useShortcuts() {
       if (k === 'r') s.setTool('rotate');
       if (k === 's') s.setTool('scale');
       if (k === 'm') s.setTool('measure');
+      if (k === 'x') s.setView({ xray: !s.view.xray });
+      if (k === 'e') s.setView({ explode: s.view.explode > 0 ? 0 : 0.6 });
+      if (k === 'b') s.setView({ bed: s.view.bed ? null : 'ender' });
       if (k === 'f') s.requestView('fit');
       if (k === 'h') s.selection.forEach((id) => s.toggleFlag(id, 'visible'));
       if (k === 'l') s.selection.forEach((id) => s.toggleFlag(id, 'locked'));
@@ -157,12 +164,70 @@ class StudioErrorBoundary extends Component<{ children: ReactNode; resetKey: str
   }
 }
 
+/** Mở hộp thoại tạo dự án ở trang chủ (từ thanh lệnh, kể cả khi đang ở trình chỉnh sửa). */
+function requestNewProject(templateId?: string) {
+  const fire = () => window.dispatchEvent(new CustomEvent('3dw:studio-new-project', { detail: templateId }));
+  if (parseHashName() === 'studio') { navigate({ name: 'welcome' }); setTimeout(fire, 150); } else fire();
+}
+const parseHashName = () => (location.hash.replace(/^#\/?/, '').split('/')[0] || 'welcome');
+
+/** Thanh lệnh Ctrl/⌘+K của 3D Studio: điều hướng, tạo từ mẫu, và (trong editor) thao tác dựng hình. */
+function StudioCommands({ inEditor }: { inEditor: boolean }) {
+  const palette = useCommandPalette();
+  const commands = useMemo<Command[]>(() => {
+    const s = () => useStudio.getState();
+    const shape = (kind: NodeKind, label: string, icon: ReactNode, keywords: string): Command =>
+      ({ id: `add-${kind}`, group: 'Thêm hình', label: `Thêm ${label}`, icon, keywords, run: () => { s().addNode(kind); } });
+    const editor: Command[] = inEditor ? [
+      shape('box', 'hộp', <BoxI size={16} />, 'cube box'),
+      shape('sphere', 'khối cầu', <Circle size={16} />, 'sphere ball'),
+      shape('cylinder', 'khối trụ', <Cylinder size={16} />, 'cylinder'),
+      shape('cone', 'khối nón', <Cone size={16} />, 'cone'),
+      shape('torus', 'vòng xuyến', <Torus size={16} />, 'torus ring'),
+      shape('plane', 'mặt phẳng', <Square size={16} />, 'plane'),
+      shape('text', 'chữ 3D', <Type size={16} />, 'text chu'),
+      { id: 'save', group: 'Dự án', label: 'Lưu dự án', icon: <Save size={16} />, shortcut: 'Ctrl S', keywords: 'save', run: () => { void s().save(); } },
+      { id: 'undo', group: 'Dự án', label: 'Hoàn tác', icon: <Undo2 size={16} />, shortcut: 'Ctrl Z', keywords: 'undo', run: () => s().undo() },
+      { id: 'redo', group: 'Dự án', label: 'Làm lại', icon: <Redo2 size={16} />, shortcut: 'Ctrl Y', keywords: 'redo', run: () => s().redo() },
+      { id: 'check', group: 'Dự án', label: 'Kiểm tra khả năng in', icon: <ShieldCheck size={16} />, keywords: 'check print validate', run: () => s().setModal('check') },
+      { id: 'export', group: 'Dự án', label: 'Xuất STL', icon: <Download size={16} />, keywords: 'export download stl', run: () => s().setModal('export') },
+      { id: 'import', group: 'Dự án', label: 'Nhập tệp STL', icon: <Upload size={16} />, keywords: 'import upload stl', run: () => s().setModal('import') },
+      { id: 'dup', group: 'Chỉnh sửa', label: 'Nhân bản đối tượng đang chọn', icon: <Copy size={16} />, shortcut: 'Ctrl D', keywords: 'duplicate copy', run: () => s().duplicateSelected() },
+      { id: 'del', group: 'Chỉnh sửa', label: 'Xóa đối tượng đang chọn', icon: <Trash2 size={16} />, shortcut: 'Del', keywords: 'delete remove', run: () => s().deleteSelected() },
+      { id: 'all', group: 'Chỉnh sửa', label: 'Chọn tất cả', icon: <BoxI size={16} />, shortcut: 'Ctrl A', keywords: 'select all', run: () => s().selectAll() },
+      { id: 'grid', group: 'Góc nhìn', label: 'Bật / tắt lưới', icon: <Grid3x3 size={16} />, keywords: 'grid', run: () => s().setGrid({ show: !s().grid.show }) },
+      { id: 'v-fit', group: 'Góc nhìn', label: 'Vừa khung tất cả', icon: <Eye size={16} />, keywords: 'fit zoom', run: () => s().requestView('fit') },
+      { id: 'v-top', group: 'Góc nhìn', label: 'Nhìn từ trên', icon: <Eye size={16} />, keywords: 'top view', run: () => s().requestView('top') },
+      { id: 'v-front', group: 'Góc nhìn', label: 'Nhìn chính diện', icon: <Eye size={16} />, keywords: 'front view', run: () => s().requestView('front') },
+      { id: 'v-right', group: 'Góc nhìn', label: 'Nhìn bên phải', icon: <Eye size={16} />, keywords: 'right view', run: () => s().requestView('right') },
+      { id: 'keys', group: 'Trợ giúp', label: 'Phím tắt & trợ giúp', icon: <Keyboard size={16} />, keywords: 'shortcut help', run: () => s().setModal('shortcuts') },
+    ] : [];
+    return [
+      ...editor,
+      { id: 'new', group: 'Tạo mới', label: 'Dự án trống', icon: <Plus size={16} />, keywords: 'new project tao moi', run: () => requestNewProject() },
+      ...TEMPLATES.map<Command>((t) => ({ id: `tpl-${t.id}`, group: 'Tạo từ mẫu', label: t.name, hint: t.desc, icon: <LayoutTemplate size={16} />, keywords: `template mau ${t.category}`, run: () => navigate({ name: 'template', id: t.id }) })),
+      { id: 'go-projects', group: 'Đi tới', label: 'Dự án của tôi', icon: <FolderOpen size={16} />, keywords: 'projects', run: () => navigate({ name: 'projects' }) },
+      { id: 'go-templates', group: 'Đi tới', label: 'Thư viện mẫu', icon: <LayoutTemplate size={16} />, keywords: 'templates', run: () => navigate({ name: 'templates' }) },
+      { id: 'mod-ai', group: 'Chuyển module', label: 'AI Studio', hint: 'Ảnh / mô tả → mô hình 3D', icon: <Sparkles size={16} />, keywords: 'ai', run: () => { window.location.href = '/ai/'; } },
+      { id: 'mod-market', group: 'Chuyển module', label: 'Marketplace', icon: <Store size={16} />, keywords: 'shop cho', run: () => { window.location.href = '/marketplace/'; } },
+      { id: 'mod-home', group: 'Chuyển module', label: 'Trang chủ 3DWorld', icon: <Home size={16} />, keywords: 'landing home', run: () => { window.location.href = '/'; } },
+    ];
+  }, [inEditor]);
+  return <CommandPalette open={palette.open} onClose={() => palette.setOpen(false)} commands={commands} accent="#16a37b"
+    placeholder={inEditor ? 'Thêm hình, lưu, kiểm tra in, đổi góc nhìn…' : 'Tạo dự án, mở mẫu, chuyển trang…'} />;
+}
+
 export default function App() {
   const route = useRoute();
   const key = route.name === 'studio' ? `studio:${route.id}` : route.name === 'template' ? `template:${route.id}` : route.name;
   return (
-    <StudioErrorBoundary resetKey={key}>
-      {route.name === 'studio' ? <StudioPage key={route.id} projectId={route.id} /> : <Dashboard route={route} />}
-    </StudioErrorBoundary>
+    <>
+      <StudioErrorBoundary resetKey={key}>
+        <div className="route-fade" key={route.name === 'studio' ? 'studio' : route.name}>
+          {route.name === 'studio' ? <StudioPage key={route.id} projectId={route.id} /> : <Dashboard route={route} />}
+        </div>
+      </StudioErrorBoundary>
+      <StudioCommands inEditor={route.name === 'studio'} />
+    </>
   );
 }

@@ -135,3 +135,25 @@ a.btn { text-decoration: none; }
 .p-card, .p-row { position: relative; }
 .p-card:has(.menu), .p-row:has(.menu), .p-card:focus-within, .p-row:focus-within { z-index: 40; }
 .p-card:has(.menu) { transform: none; }
+
+/* ---------- Hero tương tác: gõ tên → biển tên 3D ---------- */
+.hero-art-live { position: relative; display: block; min-height: 360px; }
+.hero-live { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.hero-live-canvas { position: relative; flex: 1; min-height: 0; cursor: grab; }
+.hero-live-canvas:active { cursor: grabbing; }
+.hero-live-hint { position: absolute; top: 14px; right: 16px; font: 600 10px 'Inter', sans-serif; letter-spacing: .2em; text-transform: uppercase; color: var(--st-text-2); background: rgba(255, 255, 255, .7); padding: 5px 10px; border-radius: 999px; pointer-events: none; }
+.hero-live-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 14px 14px; padding: 10px; border-radius: 22px; background: rgba(255, 255, 255, .78); border: 1px solid #fff; backdrop-filter: blur(14px); box-shadow: var(--st-shadow); }
+.hero-live-input { flex: 1 1 160px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 8px; padding: 6px 14px; border-radius: 16px; background: #fff; border: 1px solid var(--st-border); }
+.hero-live-input:focus-within { border-color: var(--st-primary); box-shadow: 0 0 0 3px rgba(22, 163, 123, .16); }
+.hero-live-input span { grid-column: 1 / -1; font: 600 10px 'Inter', sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--st-muted); }
+.hero-live-input input { border: 0; outline: 0; background: transparent; font: 700 18px var(--st-font-head); letter-spacing: .04em; color: var(--st-text); min-width: 0; }
+.hero-live-input small { color: var(--st-muted); font-size: 11px; }
+.hero-live-colors { display: flex; gap: 6px; }
+.hero-live-colors button { width: 26px; height: 26px; border-radius: 50%; border: 3px solid #fff; padding: 0; cursor: pointer; box-shadow: 0 0 0 1px rgba(32, 32, 39, .14); transition: transform .2s, box-shadow .2s; }
+.hero-live-colors button:hover { transform: scale(1.1); }
+.hero-live-colors button[aria-checked='true'] { box-shadow: 0 0 0 2px var(--st-primary); transform: scale(1.12); }
+.hero-live-cta { gap: 10px; padding-right: 6px; }
+.hero-live-arrow { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--st-primary); color: #fff; transition: transform .3s; }
+.hero-live-cta:hover .hero-live-arrow { transform: translateX(3px); }
+.hero-live-form .err-text { flex-basis: 100%; margin: 0 4px; }
+@media (prefers-reduced-motion: reduce) { .hero-live-arrow, .hero-live-colors button { transition: none; } }

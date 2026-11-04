@@ -177,20 +177,28 @@ function toTask(t: BTaskSummary | BTaskDetail, projectId: string): Task {
   };
 }
 
+/**
+ * Phiên bản lưu từ 3D Studio (sourceType EDITOR_SAVE) có tệp chính là cảnh JSON, không phải GLB,
+ * dù Backend vẫn gắn vào `glbDownloadUrl`. Đưa tệp đó vào trình xem GLB sẽ báo lỗi, nên coi như chưa có GLB.
+ */
+export const isStudioSave = (sourceType?: string | null) => (sourceType ?? '').toUpperCase() === 'EDITOR_SAVE';
+
 function versionFromSummary(v: BVersionSummary, projectId: string): Version {
-  const assets: Asset[] = v.glbDownloadUrl
-    ? [{ id: String(v.fileId ?? v.modelVersionId), kind: 'model', format: 'glb', sizeBytes: 0, checksum: '', url: v.glbDownloadUrl }]
+  const studio = isStudioSave(v.sourceType);
+  const glb = studio ? null : v.glbDownloadUrl ?? null;
+  const assets: Asset[] = glb
+    ? [{ id: String(v.fileId ?? v.modelVersionId), kind: 'model', format: 'glb', sizeBytes: 0, checksum: '', url: glb }]
     : [];
   return {
     id: String(v.modelVersionId),
     projectId,
-    label: `V${v.versionNumber}`,
+    label: studio ? `V${v.versionNumber} · 3D Studio` : `V${v.versionNumber}`,
     sourceTaskId: null,
     metadata: { stats: null },
     dimensions: null,
     createdAt: ts(v.createdAt),
     assets,
-    glbUrl: v.glbDownloadUrl ?? null,
+    glbUrl: glb,
     thumbnailUrl: null,
   };
 }
@@ -381,11 +389,12 @@ export const aiStudio = {
         archived: false,
         visibility: d.visibility ?? 'PRIVATE',
         status: projectStatus(versions.length, tasks),
-        activeVersionId: versions[versions.length - 1]?.id ?? null,
+        // Phiên bản chính mặc định: bản mới nhất có tệp GLB (bỏ qua bản lưu từ 3D Studio)
+        activeVersionId: ([...versions].reverse().find((v) => v.glbUrl) ?? versions[versions.length - 1])?.id ?? null,
         versionCount: versions.length,
         formats: versions.length ? ['glb'] : [],
         thumbnailUrl: null,
-        modelUrl: versions[versions.length - 1]?.glbUrl ?? null,
+        modelUrl: [...versions].reverse().find((v) => v.glbUrl)?.glbUrl ?? null,
         stats,
         createdAt: ts(d.createdAt),
         updatedAt: ts(d.updatedAt),

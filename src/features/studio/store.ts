@@ -18,6 +18,24 @@ export type Tool = 'select' | 'move' | 'rotate' | 'scale' | 'measure';
 export type Modal = null | 'import' | 'export' | 'check' | 'send' | 'shortcuts' | 'onboarding' | 'boolean';
 export type ViewPreset = 'perspective' | 'top' | 'front' | 'right';
 
+/** Tùy chọn hiển thị của viewport — chỉ ảnh hưởng cách xem, không lưu vào dự án. */
+export interface ViewOptions {
+  xray: boolean;
+  /** Mặt cắt ngang: null = tắt, 0..1 = độ cao cắt theo khung bao scene. */
+  section: number | null;
+  /** Tách rời các đối tượng gốc ra xa tâm: 0 = không tách, 1 = tối đa. */
+  explode: number;
+  /** Khung bàn in: null = ẩn, ngược lại là id máy in trong PRINT_BEDS. */
+  bed: string | null;
+}
+
+export const PRINT_BEDS = [
+  { id: 'mini', label: 'Mini 180', size: [180, 180, 180] as const },
+  { id: 'ender', label: 'Ender 3 · 220', size: [220, 220, 250] as const },
+  { id: 'bambu', label: 'Bambu X1 · 256', size: [256, 256, 256] as const },
+  { id: 'large', label: 'Khổ lớn · 350', size: [350, 350, 400] as const },
+];
+
 export interface Toast { id: number; kind: 'info' | 'success' | 'warning' | 'error'; title: string; text?: string }
 
 export { uid, makeNode, keychainTemplate, TEMPLATES, DEFAULT_PARAMS } from './lib/scene';
@@ -50,6 +68,7 @@ interface State {
   toasts: Toast[];
   measure: THREE.Vector3[];
   lockRatio: boolean;
+  view: ViewOptions;
 
   projectId: string;
   init(projectId: string): Promise<boolean>;
@@ -63,6 +82,7 @@ interface State {
   setProjection(p: State['projection']): void;
   requestView(p: ViewPreset | 'fit' | 'home'): void;
   setLockRatio(v: boolean): void;
+  setView(p: Partial<ViewOptions>): void;
   rename(name: string): string | null;
 
   commit(nodes: SceneNode[], label: string, selection?: string[]): void;
@@ -126,6 +146,7 @@ export const useStudio = create<State>((set, get) => ({
   toasts: [],
   measure: [],
   lockRatio: true,
+  view: { xray: false, section: null, explode: 0, bed: null },
 
   async init(projectId) {
     if (initialized === projectId) return true;
@@ -175,6 +196,7 @@ export const useStudio = create<State>((set, get) => ({
   setProjection(projection) { set({ projection }); },
   requestView(preset) { set((s) => ({ viewRequest: { preset, n: s.viewRequest.n + 1 } })); },
   setLockRatio(lockRatio) { set({ lockRatio }); },
+  setView(p) { set((s) => ({ view: { ...s.view, ...p } })); },
   rename(name) {
     const t = name.trim();
     if (!t) return 'Tên không được rỗng';

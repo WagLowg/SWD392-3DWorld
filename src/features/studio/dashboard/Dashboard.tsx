@@ -14,6 +14,7 @@ import { useStudio } from '../store';
 import { Toasts } from '../components/StatusBar';
 import { ActionMenu, ProjectCard, ShapeIcon, SkeletonGrid, type MenuItem } from './ProjectCard';
 import { CreateProjectDialog, DeleteDialog, RenameDialog } from './dialogs';
+import { HeroNameplate } from './HeroNameplate';
 import { sessionUser } from '../session';
 import StudioSidebar from '../components/StudioSidebar';
 import StudioGlobalHeader from '../components/StudioGlobalHeader';
@@ -162,7 +163,6 @@ function ProjectsSection({ onNew, limitHint }: { onNew: (templateId?: string) =>
 
 /* ---------------- DASH-01 welcome ---------------- */
 function Welcome({ onNew }: { onNew: (templateId?: string) => void }) {
-  const hero = useMemo(() => cachedThumbnail('hero', keychainTemplate, { width: 1160, height: 680, view: [0.3, 1.2, 0.85], padding: 0.85 }), []);
   return (
     <>
       <PageHead title={`Chào ${USER.first}, hôm nay bạn muốn tạo gì?`} sub="Không cần kinh nghiệm 3D. Bắt đầu nhỏ, tạo thứ của riêng bạn." onNew={() => onNew()} />
@@ -176,7 +176,7 @@ function Welcome({ onNew }: { onNew: (templateId?: string) => void }) {
             <a className="btn lg" href={href({ name: 'templates' })}><LayoutTemplate size={16} /> Khám phá mẫu</a>
           </div>
         </div>
-        <div className="hero-art">{hero ? <img src={hero} alt="Móc khóa STUDIO 60 × 24 × 4 mm" /> : <Box size={96} color="var(--st-primary)" strokeWidth={1} />}</div>
+        <div className="hero-art hero-art-live"><HeroNameplate defaultName={USER.first} /></div>
       </div>
       <ProjectsSection onNew={onNew} />
     </>
@@ -287,6 +287,11 @@ function TemplateDetail({ id, onNew, onUse }: { id: string; onNew: () => void; o
 export default function Dashboard({ route }: { route: Exclude<Route, { name: 'studio' }> }) {
   const [creating, setCreating] = useState<{ templateId?: string } | null>(null);
   const onNew = (templateId?: string) => setCreating({ templateId });
+  useEffect(() => {
+    const open = (e: Event) => setCreating({ templateId: (e as CustomEvent<string | undefined>).detail });
+    window.addEventListener('3dw:studio-new-project', open);
+    return () => window.removeEventListener('3dw:studio-new-project', open);
+  }, []);
   const useTemplate = async (t: Template) => {
     try {
       const p = await createProject({ name: t.name, templateId: t.id });

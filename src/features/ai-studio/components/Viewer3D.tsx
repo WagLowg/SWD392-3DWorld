@@ -4,10 +4,19 @@ import { OrbitControls, useGLTF, Grid, ContactShadows } from '@react-three/drei'
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useAuthedUrl } from '../lib/authed';
-import { Pedestal, StageLights, StudioEnv, VIOLET, fitDistance, reducedMotion } from './Stage';
+import { Pedestal, StageLights, StudioEnv, VIOLET, fitDistance, reducedMotion, type StageScene } from './Stage';
 
 export type RenderMode = 'textured' | 'clay' | 'wireframe';
-export type ViewerHandle = { reset: () => void; screenshot: () => string | null };
+export type ViewerHandle = {
+  reset: () => void;
+  screenshot: () => string | null;
+  /** Quay video mô hình xoay 360° (WebM). Trả null nếu trình duyệt không hỗ trợ. */
+  record: (seconds: number, onProgress?: (pct: number) => void) => Promise<Blob | null>;
+};
+
+/** Trình duyệt có quay được video từ canvas không. */
+export const canRecord = () =>
+  typeof MediaRecorder !== 'undefined' && typeof HTMLCanvasElement.prototype.captureStream === 'function';
 export type ViewerStats = { vertices: number; triangles: number; size: [number, number, number] };
 
 type Props = {
@@ -19,7 +28,46 @@ type Props = {
   studioLight: boolean;
   fallbackImage?: string | null;
   onStats?: (s: ViewerStats) => void;
+  /** Bối cảnh trưng bày (màu ánh sáng); nền do CSS [data-scene] của .viewport */
+  scene?: StageScene;
+  /** Góc xoay của nguồn sáng quanh mô hình (độ). */
+  lightAngle?: number;
 };
+
+/** Nền vẽ kèm khi chụp ảnh / quay video (canvas trong suốt, nền thật nằm ở CSS). */
+const BG: Record<StageScene, [string, string, string]> = {
+  studio: ['#eee8ff', '#d4e2ff', 'rgba(255,255,255,.75)'],
+  sunset: ['#fff1e2', '#ffbd8a', 'rgba(255,255,255,.6)'],
+  night: ['#2b2a55', '#121329', 'rgba(121,85,255,.38)'],
+  paper: ['#ffffff', '#eceaf2', 'rgba(255,255,255,.8)'],
+};
+
+function composite(src: HTMLCanvasElement, scene: StageScene, out: HTMLCanvasElement) {
+  if (out.width !== src.width) out.width = src.width;
+  if (out.height !== src.height) out.height = src.height;
+  const ctx = out.getContext('2d');
+  if (!ctx) return out;
+  const { width: w, height: h } = out;
+  const [a, b, glow] = BG[scene];
+  const lin = ctx.createLinearGradient(0, 0, 0, h);
+  lin.addColorStop(0, a);
+  lin.addColorStop(1, b);
+  ctx.fillStyle = lin;
+  ctx.fillRect(0, 0, w, h);
+  const rad = ctx.createRadialGradient(w / 2, h * 0.4, 0, w / 2, h * 0.4, Math.max(w, h) * 0.55);
+  rad.addColorStop(0, glow);
+  rad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = rad;
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(src, 0, 0);
+  // Dấu nhỏ ở góc: ảnh/video chia sẻ ra ngoài vẫn nhận ra từ 3DWorld
+  const fs = Math.max(12, Math.round(h * 0.022));
+  ctx.font = `600 ${fs}px "Space Grotesk", system-ui, sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillStyle = scene === 'night' ? 'rgba(255,255,255,.6)' : 'rgba(32,32,39,.45)';
+  ctx.fillText('3DWorld · AI Studio', w - fs, h - fs);
+  return out;
+}
 
 const TARGET_SIZE = 2;
 const clayMat = new THREE.MeshStandardMaterial({ color: '#e4defa', roughness: 0.62, metalness: 0.02 });
@@ -126,8 +174,17 @@ function Model({ url, mode, bbox, onStats, onReady }: { url: string; mode: Rende
   );
 }
 
-const CameraRig = forwardRef<ViewerHandle, { height: number }>(function CameraRig({ height }, ref) {
+type Recording = {
+  out: HTMLCanvasElement; rec: MediaRecorder; start: number; ms: number;
+  tgt: THREE.Vector3; offset: THREE.Vector3; pct: number; done: boolean; onProgress?: (pct: number) => void;
+};
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+
+const CameraRig = forwardRef<ViewerHandle, { height: number; scene: StageScene }>(function CameraRig({ height, scene }, ref) {
   const { camera, gl } = useThree();
+  const recording = useRef<Recording | null>(null);
+  const sceneRef = useRef(scene);
+  sceneRef.current = scene;
   const aspect = useThree((s) => s.size.width / Math.max(s.size.height, 1));
   const controls = useThree((s) => s.controls) as unknown as OrbitControlsImpl | null;
   const reset = () => {
@@ -140,8 +197,36 @@ const CameraRig = forwardRef<ViewerHandle, { height: number }>(function CameraRi
   useEffect(reset, [height, controls, aspect]); // eslint-disable-line react-hooks/exhaustive-deps
   useImperativeHandle(ref, () => ({
     reset,
-    screenshot: () => { try { return gl.domElement.toDataURL('image/png'); } catch { return null; } },
+    screenshot: () => {
+      try { return composite(gl.domElement, sceneRef.current, document.createElement('canvas')).toDataURL('image/png'); } catch { return null; }
+    },
+    record: (seconds, onProgress) => new Promise<Blob | null>((resolve) => {
+      if (!canRecord() || recording.current) return resolve(null);
+      const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'].find((m) => MediaRecorder.isTypeSupported(m));
+      if (!mime) return resolve(null);
+      const out = composite(gl.domElement, sceneRef.current, document.createElement('canvas'));
+      const rec = new MediaRecorder(out.captureStream(30), { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      rec.onstop = () => { recording.current = null; resolve(chunks.length ? new Blob(chunks, { type: mime.split(';')[0] }) : null); };
+      const tgt = controls?.target.clone() ?? new THREE.Vector3(0, height / 2, 0);
+      recording.current = { out, rec, start: performance.now(), ms: seconds * 1000, tgt, offset: camera.position.clone().sub(tgt), pct: -1, done: false, onProgress };
+      rec.start(250);
+    }),
   }));
+
+  // Khi quay: tự xoay camera đúng một vòng rồi chép khung hình (kèm nền) sang canvas ghi hình.
+  useFrame(() => {
+    const r = recording.current;
+    if (!r || r.done) return;
+    const t = Math.min(1, (performance.now() - r.start) / r.ms);
+    camera.position.copy(r.offset).applyAxisAngle(Y_AXIS, t * Math.PI * 2).add(r.tgt);
+    camera.lookAt(r.tgt);
+    composite(gl.domElement, sceneRef.current, r.out);
+    const pct = Math.round(t * 100);
+    if (pct !== r.pct) { r.pct = pct; r.onProgress?.(pct); }
+    if (t >= 1) { r.done = true; setTimeout(() => r.rec.stop(), 120); }
+  });
   return null;
 });
 
@@ -182,6 +267,7 @@ export const Viewer3D = forwardRef<ViewerHandle, Props>(function Viewer3D(p, ref
   useImperativeHandle(ref, () => ({
     reset: () => rigRef.current?.reset(),
     screenshot: () => rigRef.current?.screenshot() ?? null,
+    record: (sec, cb) => rigRef.current?.record(sec, cb) ?? Promise.resolve(null),
   }));
 
   const fallback = (
@@ -204,7 +290,9 @@ export const Viewer3D = forwardRef<ViewerHandle, Props>(function Viewer3D(p, ref
         dpr={[1, 2]}
         style={{ position: 'absolute', inset: 0 }}
       >
-        <StageLights soft={p.studioLight} />
+        <group rotation={[0, ((p.lightAngle ?? 0) * Math.PI) / 180, 0]}>
+          <StageLights soft={p.studioLight} scene={p.scene} />
+        </group>
         <StudioEnv on={p.studioLight} />
         <Pedestal />
         <Suspense fallback={<Loading />}>
@@ -224,7 +312,7 @@ export const Viewer3D = forwardRef<ViewerHandle, Props>(function Viewer3D(p, ref
           </>
         )}
         <OrbitControls makeDefault enableDamping dampingFactor={0.08} autoRotate={p.autoRotate} autoRotateSpeed={1.2} minDistance={0.5} maxDistance={20} />
-        <CameraRig ref={rigRef} height={h} />
+        <CameraRig ref={rigRef} height={h} scene={p.scene ?? 'studio'} />
       </Canvas>
     </ViewerBoundary>
   );

@@ -56,14 +56,32 @@ export function StudioEnv({ on = true, intensity = 0.6 }: { on?: boolean; intens
   return null;
 }
 
-/** Ánh sáng ban ngày dịu như Landing: trời trắng, nền tím nhạt, đèn chính + hai đèn viền tím / xanh. */
-export function StageLights({ soft = false }: { soft?: boolean }) {
+/** Bối cảnh trưng bày của trình xem: đổi nền (CSS theo data-scene trên .viewport) và màu ánh sáng. */
+export type StageScene = 'studio' | 'sunset' | 'night' | 'paper';
+
+export const STAGE_SCENES: { id: StageScene; label: string; swatch: string }[] = [
+  { id: 'studio', label: 'Studio', swatch: 'linear-gradient(135deg,#eee8ff,#d4e2ff)' },
+  { id: 'sunset', label: 'Hoàng hôn', swatch: 'linear-gradient(135deg,#ffe2cc,#ffb27a)' },
+  { id: 'night', label: 'Ban đêm', swatch: 'linear-gradient(135deg,#2b2a55,#121329)' },
+  { id: 'paper', label: 'Giấy trắng', swatch: 'linear-gradient(135deg,#ffffff,#eceaf2)' },
+];
+
+const LIGHTS: Record<StageScene, { sky: string; ground: string; hemi: number; key: string; keyI: number; rimA: string; rimAI: number; rimB: string; rimBI: number }> = {
+  studio: { sky: '#ffffff', ground: '#d9d0ff', hemi: 0.95, key: '#ffffff', keyI: 1.45, rimA: LAVENDER, rimAI: 0.7, rimB: '#98c8ff', rimBI: 0.5 },
+  sunset: { sky: '#fff1e2', ground: '#ffcfb0', hemi: 0.85, key: '#ffd2a8', keyI: 1.7, rimA: '#ff9a52', rimAI: 0.9, rimB: '#b9a7ff', rimBI: 0.5 },
+  night: { sky: '#8fa0ff', ground: '#1b1840', hemi: 0.55, key: '#dfe6ff', keyI: 1.25, rimA: '#7955ff', rimAI: 1.4, rimB: '#3fd0ff', rimBI: 1.1 },
+  paper: { sky: '#ffffff', ground: '#e9e7ef', hemi: 1.05, key: '#ffffff', keyI: 1.3, rimA: '#ffffff', rimAI: 0.4, rimB: '#ffffff', rimBI: 0.3 },
+};
+
+/** Ánh sáng dịu như Landing: trời, nền, đèn chính + hai đèn viền; màu theo bối cảnh trưng bày. */
+export function StageLights({ soft = false, scene = 'studio' }: { soft?: boolean; scene?: StageScene }) {
+  const l = LIGHTS[scene];
   return (
     <>
-      <hemisphereLight intensity={soft ? 0.8 : 0.95} color="#ffffff" groundColor="#d9d0ff" />
-      <directionalLight position={[3, 5, 4]} intensity={soft ? 1.2 : 1.45} />
-      <directionalLight position={[-4, 2.5, -3]} intensity={0.7} color={LAVENDER} />
-      <directionalLight position={[2, 1.5, -5]} intensity={0.5} color="#98c8ff" />
+      <hemisphereLight intensity={soft ? l.hemi * 0.85 : l.hemi} color={l.sky} groundColor={l.ground} />
+      <directionalLight position={[3, 5, 4]} intensity={soft ? l.keyI * 0.83 : l.keyI} color={l.key} />
+      <directionalLight position={[-4, 2.5, -3]} intensity={l.rimAI} color={l.rimA} />
+      <directionalLight position={[2, 1.5, -5]} intensity={l.rimBI} color={l.rimB} />
     </>
   );
 }

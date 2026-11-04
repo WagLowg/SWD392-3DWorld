@@ -1,5 +1,5 @@
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Plus, MoreHorizontal, Search, Cuboid, Pencil, Download, Printer, Star, Archive } from 'lucide-react';
 import type { ProjectDetail, ProjectSummary } from '../lib/api';
 import { aiStudio } from '../lib/backend';
@@ -16,8 +16,8 @@ import { TurntableThumb } from '../../../shared/ui/TurntableThumb';
 function ProjectThumb({ p, style }: { p: ProjectSummary; style?: CSSProperties }) {
   const shot = useGlbThumbnail(p.thumbnailUrl ? null : p.modelUrl);
   if (p.thumbnailUrl) return <AuthedImg src={p.thumbnailUrl} alt="" loading="lazy" style={style} />;
-  if (!p.modelUrl) return <div style={{ display: 'grid', placeItems: 'center', height: '100%', ...style }}><Cuboid size={style ? 20 : 36} className="muted" /></div>;
-  return <TurntableThumb src={shot} alt={`Xem trước ${p.title}`} style={style} />;
+  if (!p.modelUrl || shot.failed) return <div style={{ display: 'grid', placeItems: 'center', height: '100%', ...style }}><Cuboid size={style ? 20 : 36} className="muted" /></div>;
+  return <TurntableThumb src={shot.src} alt={`Xem trước ${p.title}`} style={style} />;
 }
 
 type Tab = 'all' | 'recent' | 'favorites' | 'archived';
@@ -56,7 +56,13 @@ export default function Library() {
   useCrumb(<><span>Thư viện</span><span>/</span><b>Mô hình của tôi</b></>);
   const toast = useToast();
   const nav = useNavigate();
-  const [tab, setTab] = useState<Tab>('all');
+  const location = useLocation();
+  const [tab, setTab] = useState<Tab>(() => ((location.state as { tab?: Tab } | null)?.tab ?? 'all'));
+  // Thanh lệnh (Ctrl+K) có thể mở thẳng một tab, kể cả khi đang ở trang này
+  useEffect(() => {
+    const wanted = (location.state as { tab?: Tab } | null)?.tab;
+    if (wanted) setTab(wanted);
+  }, [location.key]); // eslint-disable-line react-hooks/exhaustive-deps
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [sort, setSort] = useState('newest');
