@@ -324,30 +324,49 @@ const SUB_PAYMENT: Record<string, Subscription['history'][number]['status']> = {
   CANCELLED: 'FAILED',
 }
 
-function subRow(s: ApiSubscription): Subscription['history'][number] {
+function subRow(s: ApiSubscription) {
   const range = [s.startAt, s.endAt]
     .filter(Boolean)
     .map((d) => new Date(d as string).toLocaleDateString('vi-VN'))
     .join(' – ')
   return {
+    id: s.id,
     period: range || 'Kỳ chờ thanh toán',
     txnId: `SUB-${s.id}`,
     amount: Number(s.fee) || 0,
     status: SUB_PAYMENT[s.status?.toUpperCase()] ?? 'PENDING',
-    paidAt: s.paidAt ?? s.startAt ?? nowIso(),
+    paidAt: s.paidAt ?? s.startAt ?? null,
+    startAt: s.startAt ?? null,
+    endAt: s.endAt ?? null,
+    rawStatus: s.status,
   }
 }
 
 function toSubscription(o: ApiSubscriptionOverview): { subscription: Subscription; monthlyFee: number; hasPendingPayment: boolean } {
-  const expiresAt = o.storefrontExpiresAt ?? o.latest?.endAt ?? null
+  // Shop đã từng kích hoạt gói khi có ngày hết hạn hoặc kỳ gần nhất đã thanh toán thành công
+  const hasSubscribed = Boolean(o.storefrontExpiresAt || (o.latest && o.latest.status === 'SUCCESS'))
+  const expiresAt = o.storefrontExpiresAt ?? (o.latest?.status === 'SUCCESS' ? o.latest?.endAt : null) ?? null
   const left = expiresAt ? Date.parse(expiresAt) - Date.now() : -1
   const rows = [o.pending, o.latest].filter((s): s is ApiSubscription => !!s)
+
+  let status: Subscription['status'] = 'INACTIVE'
+  if (hasSubscribed && expiresAt) {
+    if (left < 0) {
+      status = 'EXPIRED'
+    } else if (left < 7 * 86_400_000) {
+      status = 'EXPIRING'
+    } else {
+      status = 'ACTIVE'
+    }
+  }
+
   return {
     subscription: {
       planId: 'monthly',
-      status: left < 0 ? 'EXPIRED' : left < 7 * 86_400_000 ? 'EXPIRING' : 'ACTIVE',
-      startedAt: o.latest?.startAt ?? nowIso(),
-      expiresAt: expiresAt ?? nowIso(),
+      status,
+      hasSubscribed,
+      startedAt: o.latest?.startAt ?? null,
+      expiresAt,
       autoRenew: false,
       history: rows.filter((s, i) => rows.findIndex((x) => x.id === s.id) === i).map(subRow),
     },
