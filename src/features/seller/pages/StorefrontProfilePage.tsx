@@ -1,72 +1,184 @@
-import { CalendarClock, CreditCard, Eye, Pencil, Save, ShieldCheck, Store, X } from 'lucide-react'
+import { ArrowRight, CalendarClock, CreditCard, Eye, Pencil, Save, ShieldCheck, Sparkles, Store, X } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useProfile } from '../../account/hooks/useAccount'
+import { getRegisteredStorefront } from '../services/sellerSubmissionStorage'
 import { formatDate } from '../../../shared/lib/format'
 import { inputClass } from '../../../shared/ui/form'
 import { Btn, DetailLayout, Hero, KeyValues, Section, StatusPill } from '../../../shared/ui/kit'
 import { QueryState } from '../../../shared/ui/QueryState'
 import type { Storefront } from '../data/seller.fixtures'
-import { useCreateStorefront, useStorefront, useUpdateStorefront } from '../hooks/useSeller'
+import { useApplication, useCreateStorefront, useStorefront, useUpdateStorefront } from '../hooks/useSeller'
 import { STOREFRONT_STATUS } from '../lib/status'
 
 /** MP 040 · Hồ Sơ Gian Hàng — GET/PATCH /api/storefronts/me, POST /api/storefronts */
 export function StorefrontProfilePage() {
   const q = useStorefront()
+  const app = useApplication()
+  const profile = useProfile()
   useEffect(() => {
     document.title = 'Hồ sơ gian hàng · 3DWorld'
   }, [])
   return (
     <>
       <Hero code="MP 040" eyebrow="Gian hàng" title="Hồ Sơ Gian Hàng" accent="Nhận Diện Xưởng Trên Chợ Đồ Chơi." />
-      <QueryState isLoading={q.isLoading} error={q.error}>
-        {q.data ? <Editor store={q.data} /> : q.isSuccess && <CreateForm />}
+      <QueryState isLoading={q.isLoading || app.isLoading} error={q.error}>
+        {q.data ? (
+          <Editor store={q.data} />
+        ) : (
+          q.isSuccess && <CreateForm application={app.data} profileName={profile.data?.fullName} />
+        )}
       </QueryState>
     </>
   )
 }
 
-function CreateForm() {
+function CreateForm({
+  application,
+  profileName,
+}: {
+  application?: import('../data/seller.fixtures').SellerApplication
+  profileName?: string
+}) {
   const uid = useId()
+  const navigate = useNavigate()
   const create = useCreateStorefront()
-  const [form, setForm] = useState({ name: '', description: '' })
+
+  const userId =
+    application?.userId ??
+    (application?.id ? Number(application.id.replace(/\D/g, '')) : undefined)
+  const saved = getRegisteredStorefront(userId)
+
+  const candidateName =
+    application?.storefrontName?.trim() ||
+    saved?.name?.trim() ||
+    (profileName ? `Xưởng ${profileName.trim()}` : '') ||
+    ''
+
+  const candidateDescription =
+    application?.description?.trim() ||
+    saved?.description?.trim() ||
+    'Chuyên chế tác mô hình đồ chơi và sản phẩm in 3D cá nhân hóa chất lượng cao.'
+
+  const [form, setForm] = useState({
+    name: candidateName,
+    description: candidateDescription,
+  })
+
+  // Đồng bộ tức thời khi application hoặc profile hoàn tất tải
+  useEffect(() => {
+    if (!form.name && candidateName) {
+      setForm((prev) => ({ ...prev, name: candidateName }))
+    }
+    if (!form.description && candidateDescription) {
+      setForm((prev) => ({ ...prev, description: candidateDescription }))
+    }
+  }, [candidateName, candidateDescription, form.name, form.description])
+
+  const handleCreate = (redirectToSubscription = true) => {
+    const trimmedName = form.name.trim()
+    const trimmedDesc = form.description.trim() || undefined
+    create.mutate(
+      { name: trimmedName, description: trimmedDesc },
+      {
+        onSuccess: () => {
+          if (redirectToSubscription) {
+            navigate('/seller/subscription')
+          }
+        },
+      },
+    )
+  }
+
+  const isAutoPrefilled = Boolean(candidateName && candidateName === form.name)
+
   return (
-    <Section title="Tạo gian hàng" className="mt-6">
-      <p className="text-sm text-ink-soft">
-        Tài khoản chưa có gian hàng. Bạn cần được duyệt xác thực người bán trước; gian hàng mới tạo ở trạng thái chưa
-        kích hoạt cho tới khi thanh toán gói thuê bao.
-      </p>
+    <Section
+      title="Tạo gian hàng"
+      className="mt-6"
+      aside={
+        isAutoPrefilled ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-mint px-3 py-1 font-label text-xs font-semibold text-[#0f5132]">
+            <Sparkles size={13} /> Đã điền từ hồ sơ đăng ký
+          </span>
+        ) : null
+      }
+    >
+      {isAutoPrefilled ? (
+        <div className="mb-4 rounded-2xl border border-mint bg-mint/30 p-4 text-sm text-[#0f5132]">
+          <div className="flex items-start gap-3">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-emerald-600 shadow-sm">
+              <Sparkles size={16} />
+            </span>
+            <div>
+              <p className="font-semibold">Hồ sơ xưởng đã được lưu tự động từ đơn đăng ký của bạn</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-[#0f5132]/85">
+                Tên gian hàng và phần giới thiệu năng lực chế tác đã được hệ thống giữ lại nguyên vẹn sau khi Admin duyệt hồ sơ.
+                Bạn có thể giữ nguyên hoặc chỉnh sửa nhanh, sau đó bấm <strong>Tạo gian hàng & Đến mua gói</strong> để kích hoạt kinh doanh ngay.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-ink-soft">
+          Tài khoản chưa có gian hàng. Bạn cần được duyệt xác thực người bán trước; gian hàng mới tạo ở trạng thái chưa
+          kích hoạt cho tới khi thanh toán gói thuê bao.
+        </p>
+      )}
+
       <div className="mt-4 grid gap-4">
         <label htmlFor={`${uid}-n`} className="block">
-          <span className="mb-1.5 block font-label text-xs font-semibold text-ink-soft">Tên gian hàng *</span>
+          <span className="mb-1.5 block font-label text-xs font-semibold text-ink-soft">
+            Tên gian hàng *
+          </span>
           <input
             id={`${uid}-n`}
             value={form.name}
             maxLength={255}
+            placeholder="vd. Xưởng In 3D Chế Tác..."
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             className={inputClass}
           />
+          <span className="mt-1 block text-right font-label text-[11px] text-ink-soft">
+            {form.name.length}/255 ký tự
+          </span>
         </label>
         <label htmlFor={`${uid}-d`} className="block">
-          <span className="mb-1.5 block font-label text-xs font-semibold text-ink-soft">Giới thiệu xưởng</span>
+          <span className="mb-1.5 block font-label text-xs font-semibold text-ink-soft">
+            Giới thiệu xưởng & phong cách chế tác
+          </span>
           <textarea
             id={`${uid}-d`}
             rows={4}
             value={form.description}
+            placeholder="Giới thiệu phong cách sản phẩm, công nghệ in nổi bật và cam kết chất lượng..."
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             className={inputClass}
           />
         </label>
       </div>
-      <div className="mt-5 flex flex-wrap justify-end gap-2">
+
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line/60 pt-4">
         <Btn to="/seller/register" variant="white">
           Xem hồ sơ xác thực
         </Btn>
-        <Btn
-          variant="primary"
-          disabled={form.name.trim().length < 3 || create.isPending}
-          onClick={() => create.mutate({ name: form.name.trim(), description: form.description.trim() || undefined })}
-        >
-          Tạo gian hàng
-        </Btn>
+        <div className="flex flex-wrap gap-2">
+          <Btn
+            variant="white"
+            disabled={form.name.trim().length < 3 || create.isPending}
+            onClick={() => handleCreate(false)}
+          >
+            Chỉ tạo gian hàng
+          </Btn>
+          <Btn
+            variant="primary"
+            icon={ArrowRight}
+            disabled={form.name.trim().length < 3 || create.isPending}
+            onClick={() => handleCreate(true)}
+          >
+            {create.isPending ? 'Đang tạo...' : 'Tạo gian hàng & Đến mua gói'}
+          </Btn>
+        </div>
       </div>
     </Section>
   )

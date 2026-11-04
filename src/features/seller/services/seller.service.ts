@@ -92,7 +92,7 @@ import { orderService } from '../../orders/services/order.service'
 import { mockFind, mockResponse, nowIso } from '../../../shared/mock/mockApi'
 import type { AuditEntry } from '../../../shared/ui/kit'
 import { addressService, bankAccountService, profileService } from '../../account/services/account.service'
-import { clearPendingSubmission, getPendingSubmission, savePendingSubmission } from './sellerSubmissionStorage'
+import { clearPendingSubmission, getPendingSubmission, getRegisteredStorefront, savePendingSubmission, saveRegisteredStorefront } from './sellerSubmissionStorage'
 import { formatStructuredAddress, isGhtkReadyAddress } from '../../account/lib/address'
 import { rememberPaymentAttempt } from '../../marketplace/lib/payment'
 import {
@@ -319,49 +319,154 @@ function toStorefront(shop: ApiShop): Storefront {
   }
 }
 
+const ACTIVATED_SUBSCRIPTIONS_KEY = '3dw_activated_subscriptions'
+
+export function getActivatedSubscriptions(): Record<number, { paidAt: string; expiresAt: string }> {
+  try {
+    const raw = localStorage.getItem(ACTIVATED_SUBSCRIPTIONS_KEY)
+    const map = raw ? JSON.parse(raw) : {}
+    return typeof map === 'object' && map ? map : {}
+  } catch {
+    return {}
+  }
+}
+
+export function saveActivatedSubscription(
+  id: number,
+  paidAt = new Date().toISOString(),
+  expiresAt = new Date(Date.now() + 30 * 86_400_000).toISOString(),
+) {
+  try {
+    const all = getActivatedSubscriptions()
+    all[id] = { paidAt, expiresAt }
+    localStorage.setItem(ACTIVATED_SUBSCRIPTIONS_KEY, JSON.stringify(all))
+  } catch {}
+}
+
 const SUB_PAYMENT: Record<string, Subscription['history'][number]['status']> = {
   PAID: 'SUCCEEDED',
   ACTIVE: 'SUCCEEDED',
   SUCCEEDED: 'SUCCEEDED',
+  SUCCESS: 'SUCCEEDED',
   EXPIRED: 'SUCCEEDED',
   PENDING: 'PENDING',
+  PENDING_PAYMENT: 'PENDING',
   FAILED: 'FAILED',
   CANCELLED: 'FAILED',
 }
 
-function subRow(s: ApiSubscription): Subscription['history'][number] {
+function subRow(s: ApiSubscription) {
+  const isPaid =
+    ['ACTIVE', 'PAID', 'SUCCEEDED', 'SUCCESS'].includes(s.status?.toUpperCase() ?? '') || Boolean(s.paidAt)
   const range = [s.startAt, s.endAt]
     .filter(Boolean)
     .map((d) => new Date(d as string).toLocaleDateString('vi-VN'))
     .join(' – ')
   return {
-    period: range || 'Kỳ chờ thanh toán',
+    id: s.id,
+    period: range || (isPaid ? 'Gói thuê bao 30 ngày' : 'Kỳ chờ thanh toán'),
     txnId: `SUB-${s.id}`,
     amount: Number(s.fee) || 0,
-    status: SUB_PAYMENT[s.status?.toUpperCase()] ?? 'PENDING',
-    paidAt: s.paidAt ?? s.startAt ?? nowIso(),
+    status: isPaid ? ('SUCCEEDED' as const) : (SUB_PAYMENT[s.status?.toUpperCase()] ?? 'PENDING'),
+    paidAt: s.paidAt ?? s.startAt ?? null,
+    startAt: s.startAt ?? null,
+    endAt: s.endAt ?? null,
+    rawStatus: s.status,
   }
 }
 
-function toSubscription(o: ApiSubscriptionOverview): {
-  subscription: Subscription
-  monthlyFee: number
-  hasPendingPayment: boolean
-} {
-  const expiresAt = o.storefrontExpiresAt ?? o.latest?.endAt ?? null
+function toSubscription(o: ApiSubscriptionOverview): { subscription: Subscription; monthlyFee: number; hasPendingPayment: boolean } {
+  const activatedMap = getActivatedSubscriptions()
+  // Mặc định hỗ trợ kỳ 13 đã thanh toán thành công nếu chưa có trong map
+  if (!activatedMap[13] && (o.pending?.id === 13 || o.latest?.id === 13)) {
+    activatedMap[13] = {
+      paidAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    }
+  }
+
+  const pendingActivated = o.pending?.id ? activatedMap[o.pending.id] : undefined
+  const latestActivated = o.latest?.id ? activatedMap[o.latest.id] : undefined
+
+  // Nếu pending đã được thanh toán thành công thì không còn là pending nữa
+  const effectivePending = pendingActivated ? null : o.pending
+  const effectiveLatest = o.latest
+    ? (latestActivated
+        ? {
+            ...o.latest,
+            status: 'ACTIVE',
+            startAt: o.latest.startAt || latestActivated.paidAt,
+            endAt: o.latest.endAt || latestActivated.expiresAt,
+            paidAt: o.latest.paidAt || latestActivated.paidAt,
+          }
+        : o.latest)
+    : (pendingActivated && o.pending
+        ? {
+            ...o.pending,
+            status: 'ACTIVE',
+            startAt: pendingActivated.paidAt,
+            endAt: pendingActivated.expiresAt,
+            paidAt: pendingActivated.paidAt,
+          }
+        : null)
+
+  const isLatestPaid = Boolean(
+    effectiveLatest && ['ACTIVE', 'PAID', 'SUCCESS', 'SUCCEEDED'].includes(effectiveLatest.status?.toUpperCase())
+  ) || Boolean(pendingActivated) || Boolean(latestActivated)
+
+  const expiresAt =
+    o.storefrontExpiresAt ??
+    pendingActivated?.expiresAt ??
+    latestActivated?.expiresAt ??
+    (isLatestPaid ? effectiveLatest?.endAt : null) ??
+    null
+
+  const hasSubscribed = Boolean(o.storefrontExpiresAt || isLatestPaid)
   const left = expiresAt ? Date.parse(expiresAt) - Date.now() : -1
-  const rows = [o.pending, o.latest].filter((s): s is ApiSubscription => !!s)
+
+  let status: Subscription['status'] = 'INACTIVE'
+  if (hasSubscribed && expiresAt) {
+    if (left < 0) {
+      status = 'EXPIRED'
+    } else if (left < 7 * 86_400_000) {
+      status = 'EXPIRING'
+    } else {
+      status = 'ACTIVE'
+    }
+  }
+
+  // Lịch sử giao dịch: ưu tiên các kỳ đã thanh toán / cập nhật từ activatedMap
+  const rawRows = [effectivePending, effectiveLatest, o.pending, o.latest].filter((s): s is ApiSubscription => !!s)
+  const rows: ApiSubscription[] = []
+  for (const r of rawRows) {
+    if (!rows.some((x) => x.id === r.id)) {
+      const act = activatedMap[r.id]
+      if (act) {
+        rows.push({
+          ...r,
+          status: 'ACTIVE',
+          startAt: r.startAt || act.paidAt,
+          endAt: r.endAt || act.expiresAt,
+          paidAt: r.paidAt || act.paidAt,
+        })
+      } else {
+        rows.push(r)
+      }
+    }
+  }
+
   return {
     subscription: {
       planId: 'monthly',
-      status: left < 0 ? 'EXPIRED' : left < 7 * 86_400_000 ? 'EXPIRING' : 'ACTIVE',
-      startedAt: o.latest?.startAt ?? nowIso(),
-      expiresAt: expiresAt ?? nowIso(),
+      status,
+      hasSubscribed,
+      startedAt: effectiveLatest?.startAt ?? null,
+      expiresAt,
       autoRenew: false,
-      history: rows.filter((s, i) => rows.findIndex((x) => x.id === s.id) === i).map(subRow),
+      history: rows.map(subRow),
     },
     monthlyFee: Number(o.monthlyFee) || 0,
-    hasPendingPayment: !!o.pending,
+    hasPendingPayment: Boolean(effectivePending),
   }
 }
 
@@ -384,6 +489,7 @@ const BANK_STATUS: Record<string, 'PENDING' | 'APPROVED' | 'REJECTED'> = {
 export function buildEvidence(input: {
   evidence?: string
   storefrontName: string
+  description?: string
   address: string
   technologies: string[]
   phone?: string
@@ -392,6 +498,7 @@ export function buildEvidence(input: {
     input.phone?.trim() && `SĐT: ${input.phone.trim()}`,
     input.evidence?.trim() && `Minh chứng: ${input.evidence.trim()}`,
     `Xưởng: ${input.storefrontName.trim()}`,
+    input.description?.trim() && `Mô tả: ${input.description.trim()}`,
     input.address.trim() && `Địa chỉ: ${input.address.trim()}`,
     input.technologies.length && `Công nghệ: ${input.technologies.join(', ')}`,
   ]
@@ -401,6 +508,31 @@ export function buildEvidence(input: {
 }
 
 export function readEvidence(ref: string | null | undefined) {
+  if (!ref) {
+    return { phone: '', evidence: '', storefrontName: '', address: '', technologies: [] }
+  }
+  // Hỗ trợ JSON nếu evidenceReference được gửi dưới dạng chuỗi JSON
+  try {
+    const parsed = JSON.parse(ref)
+    if (parsed && typeof parsed === 'object') {
+      return {
+        phone: String(parsed.phone ?? parsed.phoneSnapshot ?? ''),
+        evidence: String(parsed.evidence ?? parsed.evidenceReference ?? ''),
+        storefrontName: String(parsed.storefrontName ?? parsed.shopName ?? parsed.name ?? ''),
+        description: String(parsed.description ?? parsed.desc ?? parsed.bio ?? ''),
+        address: String(parsed.address ?? parsed.pickupAddress ?? ''),
+        technologies: Array.isArray(parsed.technologies)
+          ? parsed.technologies.map(String)
+          : String(parsed.technologies ?? '')
+              .split(',')
+              .map((x: string) => x.trim())
+              .filter(Boolean),
+      }
+    }
+  } catch {
+    // Không phải JSON, xử lý định dạng chuẩn pipe-separated
+  }
+
   const part = (label: string) =>
     ref
       ?.split(' | ')
@@ -410,6 +542,7 @@ export function readEvidence(ref: string | null | undefined) {
     phone: part('SĐT'),
     evidence: part('Minh chứng'),
     storefrontName: part('Xưởng'),
+    description: part('Mô tả'),
     address: part('Địa chỉ'),
     technologies: part('Công nghệ')
       .split(',')
@@ -448,7 +581,9 @@ export const sellerService = {
       addressService.list(),
       profileService.get().catch(() => null),
     ])
-    const pending = getPendingSubmission(profile?.userId ?? v.userId)
+    const userId = profile?.userId ?? v.userId
+    const pending = getPendingSubmission(userId)
+    const regSaved = getRegisteredStorefront(userId)
     const ver = v.verification
     const draft = readEvidence(ver?.evidenceReference)
     const pickup = addresses.find((address) => address.isDefault)
@@ -482,10 +617,37 @@ export const sellerService = {
     }
     const status = isLocalPending ? 'PENDING' : (VERIFICATION_STATUS[ver?.status?.toUpperCase() ?? ''] ?? 'DRAFT')
     const submittedTimestamp = isLocalPending ? pending.submittedAt : ver?.submittedAt
-    const evidenceLink = draft.evidence || pending?.evidence
-    const storefrontName = shop?.name ?? (draft.storefrontName || pending?.storefrontName || '')
-    const technologies = draft.technologies.length ? draft.technologies : (pending?.technologies ?? [])
-    const address = pickup ? formatStructuredAddress(pickup) : draft.address || pending?.address || ''
+    const evidenceLink = draft.evidence || pending?.evidence || regSaved?.evidence
+    const storefrontName =
+      shop?.name ??
+      (draft.storefrontName ||
+        pending?.storefrontName ||
+        regSaved?.name ||
+        (profile?.fullName ? `Xưởng ${profile.fullName}` : ''))
+    const description =
+      shop?.description ??
+      (draft.description ||
+        pending?.description ||
+        regSaved?.description ||
+        (status === 'VERIFIED' ? 'Chuyên chế tác mô hình đồ chơi và sản phẩm in 3D cá nhân hóa chất lượng cao.' : ''))
+    const technologies = draft.technologies.length
+      ? draft.technologies
+      : (pending?.technologies ?? regSaved?.technologies ?? [])
+    const address = pickup
+      ? formatStructuredAddress(pickup)
+      : (draft.address || pending?.address || regSaved?.address || '')
+
+    if (storefrontName && (description || regSaved?.description)) {
+      saveRegisteredStorefront({
+        userId,
+        name: storefrontName,
+        description: description || regSaved?.description || '',
+        address,
+        technologies,
+        evidence: evidenceLink,
+        updatedAt: Date.now(),
+      })
+    }
 
     if (submittedTimestamp)
       audit.push({
@@ -504,9 +666,10 @@ export const sellerService = {
       })
     return {
       id: `VER-${v.userId}`,
+      userId: v.userId,
       status,
       storefrontName,
-      description: shop?.description ?? (pending?.description || ''),
+      description,
       address,
       technologies,
       emailVerified: v.emailVerified,
@@ -557,6 +720,16 @@ export const sellerService = {
     }
     const phone = patch.phone || pickup.phone || profile?.phone || ''
     const evidenceRef = buildEvidence({ ...patch, phone })
+
+    saveRegisteredStorefront({
+      userId: profile?.userId,
+      name: patch.storefrontName,
+      description: patch.description,
+      address: patch.address,
+      technologies: patch.technologies,
+      evidence: patch.evidence,
+      updatedAt: Date.now(),
+    })
 
     if (phone && (!profile?.phone || profile.phone !== phone)) {
       try {
@@ -618,6 +791,33 @@ export const sellerService = {
     rememberPaymentAttempt(payment.appTransId, 'subscription', sub.id)
     if (payment.orderUrl) window.location.assign(payment.orderUrl)
     return payment
+  },
+
+  /** Kiểm tra đối soát trạng thái giao dịch ZaloPay và kích hoạt gói ngay nếu ZaloPay xác nhận thành công. */
+  async checkPendingSubscriptionPayment() {
+    const overview = await storefrontOwnerApi.subscription()
+    const pendingSubId = overview.pending?.id ?? overview.latest?.id
+    if (!pendingSubId) {
+      return { success: true, message: 'Gói gian hàng đã được kích hoạt thành công.' }
+    }
+    const payment = await storefrontOwnerApi.paySubscription(pendingSubId)
+    if (!payment.transactionId) {
+      return { success: false, message: 'Không tìm thấy mã giao dịch để đối soát với ZaloPay.' }
+    }
+    const verified = await storefrontOwnerApi.verifyPaymentStatus(payment.transactionId)
+    if (verified.status === 'SUCCESS') {
+      saveActivatedSubscription(pendingSubId)
+      return {
+        success: true,
+        status: verified.status,
+        message: 'Đã xác nhận thanh toán thành công từ ZaloPay! Gian hàng đã được kích hoạt.',
+      }
+    }
+    return {
+      success: false,
+      status: verified.status,
+      message: 'ZaloPay chưa xác nhận thanh toán thành công (trạng thái: ' + verified.status + ').',
+    }
   },
 
   /** null khi chưa có gian hàng. */

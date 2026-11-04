@@ -8,6 +8,7 @@ import { AuditTimeline, Btn, DetailLayout, Hero, Section, StatusPill } from '../
 import { QueryState } from '../../../shared/ui/QueryState'
 import type { SellerApplication } from '../data/seller.fixtures'
 import { useApplication, useSubmitApplication } from '../hooks/useSeller'
+import { saveRegisteredStorefront } from '../services/sellerSubmissionStorage'
 import { APPLICATION_STATUS } from '../lib/status'
 import { SellerPrerequisites } from '../components/SellerPrerequisites'
 
@@ -57,6 +58,29 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
     setForm((current) => (current.address === address ? current : { ...current, address }))
   }, [pickup, pickupReady])
 
+  useEffect(() => {
+    if (app.storefrontName && !form.storefrontName) {
+      setForm((prev) => ({ ...prev, storefrontName: app.storefrontName }))
+    }
+    if (app.description && !form.description) {
+      setForm((prev) => ({ ...prev, description: app.description }))
+    }
+  }, [app.storefrontName, app.description, form.storefrontName, form.description])
+
+  useEffect(() => {
+    if (form.storefrontName || form.description) {
+      saveRegisteredStorefront({
+        userId: app.userId,
+        name: form.storefrontName,
+        description: form.description,
+        address: form.address,
+        technologies: form.technologies,
+        evidence: form.evidence,
+        updatedAt: Date.now(),
+      })
+    }
+  }, [app.userId, form.address, form.description, form.evidence, form.storefrontName, form.technologies])
+
   const locked = app.status === 'PENDING' || app.status === 'VERIFIED'
   // Nghiep vu moi: seller nop ca bo ho so gom SDT da luu + ngan hang dang hoat dong (PENDING OK) + ho so xuong.
   // SDT va ngan hang duoc Admin xac minh SAU khi ho so duoc nop - khong can verified truoc.
@@ -89,7 +113,7 @@ function ApplicationForm({ app }: { app: SellerApplication }) {
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-mint p-4 text-sm text-[#0f5132]">
                 <span>Đã xác thực người bán. {app.storefrontId ? 'Gian hàng đã được tạo.' : 'Bước tiếp theo: tạo gian hàng và thanh toán gói.'}</span>
                 <Btn to="/seller/storefront" size="sm" variant="primary" icon={Store}>
-                  {app.storefrontId ? 'Quản lý gian hàng' : 'Tạo gian hàng'}
+                  {app.storefrontId ? 'Quản lý gian hàng' : 'Tạo gian hàng & Mua gói'}
                 </Btn>
               </div>
             )}

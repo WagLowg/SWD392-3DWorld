@@ -123,7 +123,7 @@ export default function ExportPage() {
               {!!asset?.checksum && <><dt>SHA-256</dt><dd style={{ fontSize: 11, wordBreak: 'break-all' }} className="muted">{asset.checksum.slice(0, 24)}…</dd></>}
             </dl>
             {fmt === 'stl' && !version.dimensions && (
-              <div className="banner warning" style={{ marginTop: 16 }}>STL không lưu đơn vị. Hãy <Link to={`/print/${version.id}`}>xác nhận kích thước thật</Link> trước khi in.</div>
+              <div className="banner warning" style={{ marginTop: 16 }}><span>STL không lưu đơn vị. Hãy <Link to={`/print/${version.id}`}>xác nhận kích thước thật</Link> trước khi in.</span></div>
             )}
             <hr className="divider" />
             <button className="btn primary block" onClick={download} disabled={!canExport(fmt) || job?.state === 'running'}>
@@ -135,7 +135,7 @@ export default function ExportPage() {
               <h3>Tác vụ xuất</h3>
               <div className="row small" style={{ margin: '10px 0' }}>
                 <span className="grow">{job.result?.fileName || `${detail.project.title}.${job.result?.packaging === 'zip' ? 'zip' : job.format}`}</span>{job.result && <span className="muted">{bytes(job.result.sizeBytes)}</span>}
-                {job.state === 'running' && <span style={{ color: 'var(--primary)' }}>Đang chuẩn bị…</span>}
+                {job.state === 'running' && <span style={{ color: 'var(--ai-primary)' }}>Đang chuẩn bị…</span>}
               </div>
               <Progress value={job.state === 'running' ? 40 : 100} indeterminate={job.state === 'running'} />
               {job.state === 'done' && <p className="badge success" style={{ marginTop: 12 }}><i className="dot" />Xuất hoàn tất · tệp đang được tải xuống</p>}

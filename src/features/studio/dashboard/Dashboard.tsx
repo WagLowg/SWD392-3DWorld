@@ -14,6 +14,7 @@ import { useStudio } from '../store';
 import { Toasts } from '../components/StatusBar';
 import { ActionMenu, ProjectCard, ShapeIcon, SkeletonGrid, type MenuItem } from './ProjectCard';
 import { CreateProjectDialog, DeleteDialog, RenameDialog } from './dialogs';
+import { HeroNameplate } from './HeroNameplate';
 import { sessionUser } from '../session';
 import StudioSidebar from '../components/StudioSidebar';
 import StudioGlobalHeader from '../components/StudioGlobalHeader';
@@ -127,17 +128,17 @@ function ProjectsSection({ onNew, limitHint }: { onNew: (templateId?: string) =>
 
       {status === 'loading' && <SkeletonGrid />}
       {status === 'error' && (
-        <StateBlock icon={<WifiOff size={44} color="var(--primary)" strokeWidth={1.2} />} title="Không thể tải dự án"
+        <StateBlock icon={<WifiOff size={44} color="var(--st-primary)" strokeWidth={1.2} />} title="Không thể tải dự án"
           text="Kiểm tra kết nối mạng rồi thử lại. Chúng tôi giữ nguyên bộ lọc của bạn."
           actions={<><button className="btn primary" onClick={() => void load()}>Thử lại</button><a className="btn" href={href({ name: 'welcome' })}>Về Studio</a></>} />
       )}
       {status === 'ready' && projects.length === 0 && (
-        <StateBlock icon={<Box size={44} color="var(--primary)" strokeWidth={1.2} />} title="Chưa có dự án nào"
+        <StateBlock icon={<Box size={44} color="var(--st-primary)" strokeWidth={1.2} />} title="Chưa có dự án nào"
           text="Từ một Cube đến vật thể đầu tiên. Tạo dự án trống hoặc bắt đầu với mẫu."
           actions={<><button className="btn primary" onClick={() => onNew()}>Tạo dự án</button><a className="btn" href={href({ name: 'templates' })}>Chọn mẫu</a></>} />
       )}
       {status === 'ready' && projects.length > 0 && shown.length === 0 && (
-        <StateBlock icon={<SearchX size={44} color="var(--primary)" strokeWidth={1.2} />} title="Không tìm thấy dự án"
+        <StateBlock icon={<SearchX size={44} color="var(--st-primary)" strokeWidth={1.2} />} title="Không tìm thấy dự án"
           text="Thử tên khác hoặc xóa bộ lọc. Các dự án của bạn không bị thay đổi."
           actions={<><button className="btn primary" onClick={() => setQuery('')}>Xóa bộ lọc</button><a className="btn" href={href({ name: 'welcome' })}>Về Studio</a></>} />
       )}
@@ -162,7 +163,6 @@ function ProjectsSection({ onNew, limitHint }: { onNew: (templateId?: string) =>
 
 /* ---------------- DASH-01 welcome ---------------- */
 function Welcome({ onNew }: { onNew: (templateId?: string) => void }) {
-  const hero = useMemo(() => cachedThumbnail('hero', keychainTemplate, { width: 1160, height: 680, view: [0.3, 1.2, 0.85], padding: 0.85 }), []);
   return (
     <>
       <PageHead title={`Chào ${USER.first}, hôm nay bạn muốn tạo gì?`} sub="Không cần kinh nghiệm 3D. Bắt đầu nhỏ, tạo thứ của riêng bạn." onNew={() => onNew()} />
@@ -176,7 +176,7 @@ function Welcome({ onNew }: { onNew: (templateId?: string) => void }) {
             <a className="btn lg" href={href({ name: 'templates' })}><LayoutTemplate size={16} /> Khám phá mẫu</a>
           </div>
         </div>
-        <div className="hero-art">{hero ? <img src={hero} alt="Móc khóa STUDIO 60 × 24 × 4 mm" /> : <Box size={96} color="var(--primary)" strokeWidth={1} />}</div>
+        <div className="hero-art hero-art-live"><HeroNameplate defaultName={USER.first} /></div>
       </div>
       <ProjectsSection onNew={onNew} />
     </>
@@ -187,7 +187,7 @@ function Welcome({ onNew }: { onNew: (templateId?: string) => void }) {
 function useTemplateThumb(t: Template, big = false) {
   return useMemo(() => cachedThumbnail(`tpl:${t.id}:${big ? 'big' : 'sm'}`, t.build, big
     ? { width: 1140, height: 780, view: [0.3, 1.2, 0.85], padding: 1.0 }
-    : { width: 576, height: 240, background: '#10141d' }), [t.id, big]);
+    : { width: 576, height: 240, background: '#e6f7ef' }), [t.id, big]);
 }
 
 function TemplateCard({ t, list, onUse }: { t: Template; list: boolean; onUse: () => void }) {
@@ -238,7 +238,7 @@ function Templates({ onNew }: { onNew: (templateId?: string) => void }) {
         ))}
       </div>
       {shown.length === 0 ? (
-        <StateBlock icon={<SearchX size={44} color="var(--primary)" strokeWidth={1.2} />} title="Không tìm thấy mẫu"
+        <StateBlock icon={<SearchX size={44} color="var(--st-primary)" strokeWidth={1.2} />} title="Không tìm thấy mẫu"
           text="Thử từ khóa khác hoặc chọn danh mục Tất cả."
           actions={<button className="btn primary" onClick={() => { setQuery(''); setCat('all'); }}>Xóa bộ lọc</button>} />
       ) : (
@@ -256,7 +256,7 @@ function TemplateDetail({ id, onNew, onUse }: { id: string; onNew: () => void; o
   const big = useMemo(() => (t ? cachedThumbnail(`tpl:${t.id}:big`, t.build, { width: 1140, height: 780, view: [0.3, 1.2, 0.85], padding: 1.0 }) : null), [t]);
   const [busy, setBusy] = useState(false);
   if (!t) {
-    return <StateBlock icon={<SearchX size={44} color="var(--primary)" />} title="Không tìm thấy mẫu" text="Mẫu có thể đã bị gỡ hoặc bạn không còn quyền sử dụng."
+    return <StateBlock icon={<SearchX size={44} color="var(--st-primary)" />} title="Không tìm thấy mẫu" text="Mẫu có thể đã bị gỡ hoặc bạn không còn quyền sử dụng."
       actions={<a className="btn primary" href={href({ name: 'templates' })}>Về Thư viện mẫu</a>} />;
   }
   const catLabel = TEMPLATE_CATEGORIES.find((c) => c.id === t.category)?.label;
@@ -287,6 +287,11 @@ function TemplateDetail({ id, onNew, onUse }: { id: string; onNew: () => void; o
 export default function Dashboard({ route }: { route: Exclude<Route, { name: 'studio' }> }) {
   const [creating, setCreating] = useState<{ templateId?: string } | null>(null);
   const onNew = (templateId?: string) => setCreating({ templateId });
+  useEffect(() => {
+    const open = (e: Event) => setCreating({ templateId: (e as CustomEvent<string | undefined>).detail });
+    window.addEventListener('3dw:studio-new-project', open);
+    return () => window.removeEventListener('3dw:studio-new-project', open);
+  }, []);
   const useTemplate = async (t: Template) => {
     try {
       const p = await createProject({ name: t.name, templateId: t.id });

@@ -262,6 +262,10 @@ export const storefrontOwnerApi = {
       })
     ).data
   },
+  /** Tra cứu trạng thái giao dịch ZaloPay và tự động kích hoạt gói nếu ZaloPay xác nhận thành công. */
+  async verifyPaymentStatus(transactionId: number) {
+    return (await http.get<ApiEnvelope<ApiPayment>>(`/api/payments/${transactionId}/status`)).data
+  },
 }
 
 export const sellerVerificationApi = {

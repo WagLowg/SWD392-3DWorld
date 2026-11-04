@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
-import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import {
   CameraControls, Edges, GizmoHelper, GizmoViewport, Grid, Html, Line, OrthographicCamera, PerspectiveCamera, TransformControls,
 } from '@react-three/drei';
 import CameraControlsImpl from 'camera-controls';
 import { AlertTriangle, Box as BoxIcon, Plus } from 'lucide-react';
 import { useStudio } from '../store';
+import ViewPanel, { BedVolume, SectionCap, useSceneBox } from './ViewPanel';
 import { buildGeometry, decompose, worldBox } from '../lib/geometry';
 import type { SceneNode } from '../types';
 
@@ -15,7 +16,8 @@ export const objectRegistry = new Map<string, THREE.Object3D>();
 
 function NodeObject({ node, childrenOf }: { node: SceneNode; childrenOf: Map<string | null, SceneNode[]> }) {
   const selection = useStudio((s) => s.selection);
-  const tool = useStudio((s) => s.tool);
+  const xray = useStudio((s) => s.view.xray);
+  const sectioned = useStudio((s) => s.view.section !== null);
   const selected = selection.includes(node.id);
   const built = useMemo(() => buildGeometry(node), [node]);
   const kids = childrenOf.get(node.id) ?? [];
@@ -51,13 +53,15 @@ function NodeObject({ node, childrenOf }: { node: SceneNode; childrenOf: Map<str
             color={node.appearance.color}
             roughness={node.appearance.roughness}
             metalness={node.appearance.metalness}
-            side={node.kind === 'plane' ? THREE.DoubleSide : THREE.FrontSide}
-            emissive={selected ? '#3b2f99' : '#000000'}
-            emissiveIntensity={selected ? 0.35 : 0}
-            transparent={tool === 'measure'}
-            opacity={1}
+            side={node.kind === 'plane' || sectioned ? THREE.DoubleSide : THREE.FrontSide}
+            emissive={selected ? '#16a37b' : '#000000'}
+            emissiveIntensity={selected ? 0.16 : 0}
+            transparent={xray}
+            opacity={xray ? (selected ? 0.55 : 0.28) : 1}
+            depthWrite={!xray}
           />
-          {selected && <Edges threshold={20} color="#a59aff" />}
+          {/* Viền mảnh cho mọi vật thể: chi tiết sáng màu (vd. chữ trắng) không hòa vào nền sáng; vật đang chọn viền xanh */}
+          <Edges threshold={30} color={selected ? '#16a37b' : '#4d5a56'} lineWidth={selected ? 2.2 : 1} />
         </mesh>
       )}
       {kids.map((k) => <NodeObject key={k.id} node={k} childrenOf={childrenOf} />)}
@@ -72,7 +76,55 @@ function SceneContent() {
     nodes.forEach((n) => { const k = n.parentId; m.set(k, [...(m.get(k) ?? []), n]); });
     return m;
   }, [nodes]);
-  return <>{(childrenOf.get(null) ?? []).map((n) => <NodeObject key={n.id} node={n} childrenOf={childrenOf} />)}</>;
+  const roots = childrenOf.get(null) ?? [];
+  return <>{roots.map((n) => <Exploded key={n.id} node={n} nodes={nodes}><NodeObject node={n} childrenOf={childrenOf} /></Exploded>)}</>;
+}
+
+/**
+ * Bọc mỗi đối tượng gốc: khi bật Explode thì đẩy nó ra xa tâm scene (mượt theo khung hình).
+ * Độ lệch nằm ở group bọc ngoài nên gizmo vẫn đọc/ghi đúng vị trí thật của node.
+ */
+function Exploded({ node, nodes, children }: { node: SceneNode; nodes: SceneNode[]; children: ReactNode }) {
+  const explode = useStudio((s) => s.view.explode);
+  const ref = useRef<THREE.Group>(null);
+  const target = useMemo(() => {
+    if (!explode) return new THREE.Vector3();
+    const roots = nodes.filter((n) => !n.parentId && n.visible);
+    if (roots.length < 2) return new THREE.Vector3();
+    const all = worldBox(roots.map((n) => n.id), nodes);
+    const own = worldBox([node.id], nodes);
+    if (all.isEmpty() || own.isEmpty()) return new THREE.Vector3();
+    const c = all.getCenter(new THREE.Vector3());
+    const dir = own.getCenter(new THREE.Vector3()).sub(c);
+    if (dir.lengthSq() < 1e-6) dir.set(0, 1, 0);
+    const span = all.getSize(new THREE.Vector3()).length();
+    return dir.normalize().multiplyScalar(explode * span * 0.6).add(new THREE.Vector3(0, explode * span * 0.08, 0));
+  }, [explode, node.id, nodes]);
+  useFrame((_, dt) => { ref.current?.position.lerp(target, Math.min(1, dt * 8)); });
+  return <group ref={ref}>{children}</group>;
+}
+
+/** Mặt cắt: áp mặt phẳng cắt cho mọi vật liệu trong scene (kể cả viền) mỗi khung hình. */
+const sectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+function SectionClip({ children }: { children: ReactNode }) {
+  const section = useStudio((s) => s.view.section);
+  const box = useSceneBox();
+  const ref = useRef<THREE.Group>(null);
+  const gl = useThree((s) => s.gl);
+  useEffect(() => { gl.localClippingEnabled = true; }, [gl]);
+  useFrame(() => {
+    const on = section !== null && !box.isEmpty();
+    if (on) sectionPlane.constant = box.min.y + (box.max.y - box.min.y) * section;
+    ref.current?.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      if (!m) return;
+      for (const mat of Array.isArray(m) ? m : [m]) {
+        const want = on ? [sectionPlane] : null;
+        if ((mat.clippingPlanes?.length ?? 0) !== (want?.length ?? 0)) { mat.clippingPlanes = want; mat.needsUpdate = true; }
+      }
+    });
+  });
+  return <group ref={ref}>{children}</group>;
 }
 
 function Gizmo() {
@@ -117,7 +169,7 @@ function SelectionBounds() {
   const top = new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y, (box.min.z + box.max.z) / 2);
   return (
     <>
-      <box3Helper args={[box, new THREE.Color('#68d9d0')]} />
+      <box3Helper args={[box, new THREE.Color('#7955ff')]} />
       <Html position={top} center style={{ transform: 'translateY(-22px)' }} zIndexRange={[5, 0]}>
         <div className="dim-label">{size.x.toFixed(2)} × {size.y.toFixed(2)} × {size.z.toFixed(2)} mm</div>
       </Html>
@@ -134,11 +186,11 @@ function Measure() {
   return (
     <>
       {pts.map((p, i) => (
-        <mesh key={i} position={p}><sphereGeometry args={[0.6, 16, 8]} /><meshBasicMaterial color="#68d9d0" depthTest={false} /></mesh>
+        <mesh key={i} position={p}><sphereGeometry args={[0.6, 16, 8]} /><meshBasicMaterial color="#7955ff" depthTest={false} /></mesh>
       ))}
       {pts.length === 2 && (
         <>
-          <Line points={[pts[0], pts[1]]} color="#68d9d0" lineWidth={2} depthTest={false} />
+          <Line points={[pts[0], pts[1]]} color="#7955ff" lineWidth={2} depthTest={false} />
           <Html position={mid} center zIndexRange={[5, 0]}>
             <div className="dim-label measure">
               {d.toFixed(2)} mm · Δx {Math.abs(pts[1].x - pts[0].x).toFixed(2)} Δy {Math.abs(pts[1].y - pts[0].y).toFixed(2)} Δz {Math.abs(pts[1].z - pts[0].z).toFixed(2)}
@@ -223,7 +275,7 @@ export default function Viewport() {
     return (
       <div className="empty-scene">
         <div>
-          <AlertTriangle size={28} color="var(--warning)" />
+          <AlertTriangle size={28} color="var(--st-warning)" />
           <h3>Thiết bị không hỗ trợ WebGL2</h3>
           <p>Hãy dùng Chrome/Edge bản mới trên desktop và bật tăng tốc phần cứng. Dữ liệu đã lưu không bị ảnh hưởng.</p>
         </div>
@@ -244,10 +296,10 @@ export default function Viewport() {
         }}
         style={{ cursor: tool === 'measure' ? 'crosshair' : 'default' }}
       >
-        <color attach="background" args={['#10141d']} />
+        {/* Không tô nền: để lộ gradient bạc hà của .viewport (giống Landing) */}
         <Cameras key={`cam-${projection}`} />
         <CameraRig key={`rig-${projection}`} />
-        <hemisphereLight args={['#dfe3ff', '#1a1d29', 0.9]} />
+        <hemisphereLight args={['#ffffff', '#cfeee0', 0.85]} />
         <directionalLight position={[80, 140, 60]} intensity={1.6} castShadow shadow-mapSize={[2048, 2048]}
           shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} />
         <directionalLight position={[-90, 60, -80]} intensity={0.5} />
@@ -256,8 +308,8 @@ export default function Viewport() {
             infiniteGrid
             cellSize={grid.size}
             sectionSize={grid.size * 10}
-            cellColor="#262c3a"
-            sectionColor="#3a4257"
+            cellColor="#c6e8da"
+            sectionColor="#8fd3b8"
             fadeDistance={600}
             fadeStrength={1.5}
             cellThickness={0.6}
@@ -266,21 +318,24 @@ export default function Viewport() {
         )}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
           <planeGeometry args={[2000, 2000]} />
-          <shadowMaterial opacity={0.25} />
+          <shadowMaterial opacity={0.18} color="#0f6b52" />
         </mesh>
         <axesHelper args={[20]} />
-        <SceneContent />
+        <SectionClip><SceneContent /></SectionClip>
+        <SectionCap />
+        <BedVolume />
         <SelectionBounds />
         <Measure />
         <Gizmo />
         <GizmoHelper alignment="bottom-right" margin={[64, 64]}>
-          <GizmoViewport axisColors={['#f27681', '#44c997', '#6aa8ff']} labelColor="#0b0e15" />
+          <GizmoViewport axisColors={['#e5484d', '#12a150', '#3b6ff5']} labelColor="#ffffff" />
         </GizmoHelper>
       </Canvas>
+      <ViewPanel />
       {nodes.length === 0 && (
         <div className="empty-scene">
           <div>
-            <BoxIcon size={28} color="var(--secondary)" />
+            <BoxIcon size={28} color="var(--st-secondary)" />
             <h3>Scene đang trống</h3>
             <p>Thêm hình khối đầu tiên, chèn mẫu từ Thư viện hoặc nhập tệp STL.</p>
             <button className="btn primary" onClick={() => useStudio.getState().addNode('box')}><Plus size={14} /> Thêm hộp 20 mm</button>
@@ -290,7 +345,7 @@ export default function Viewport() {
       {lost && (
         <div className="empty-scene">
           <div>
-            <AlertTriangle size={28} color="var(--warning)" />
+            <AlertTriangle size={28} color="var(--st-warning)" />
             <h3>Mất kết nối WebGL</h3>
             <p>Đang khôi phục ngữ cảnh đồ hoạ. Scene của bạn vẫn được giữ nguyên.</p>
           </div>

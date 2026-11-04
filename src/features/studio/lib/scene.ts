@@ -36,6 +36,47 @@ export function makeNode(kind: NodeKind, partial: Partial<SceneNode> = {}): Scen
   } as SceneNode;
 }
 
+const isVec3 = (v: unknown): v is Vec3 => Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === 'number' && Number.isFinite(x));
+
+/**
+ * Chuẩn hóa node đọc từ server. Backend dùng chung danh sách dự án với AI Studio, nên scene có thể chứa
+ * phần tử không phải node 3D Studio (vd. `{ type, name, sourceFileId }` trỏ tới tệp GLB của AI) hoặc node thiếu
+ * trường. Trước đây editor đọc thẳng → `params.segments` undefined làm sập cả trang. Ở đây: node hợp lệ được
+ * điền mặc định cho trường thiếu; phần tử lạ được trả riêng (`foreign`) để giữ nguyên khi lưu, không làm mất dữ liệu.
+ */
+export function normalizeNodes(raw: unknown[]): { nodes: SceneNode[]; foreign: unknown[] } {
+  const nodes: SceneNode[] = [];
+  const foreign: unknown[] = [];
+  for (const item of raw) {
+    const n = item as Partial<SceneNode> | null;
+    const kind = n?.kind;
+    if (!n || typeof n !== 'object' || !kind || !(kind in KIND_NAMES) || (kind === 'mesh' && typeof n.mesh?.positions !== 'string')) {
+      foreign.push(item);
+      continue;
+    }
+    const base = makeNode(kind);
+    nodes.push({
+      ...base,
+      ...n,
+      id: typeof n.id === 'string' && n.id ? n.id : base.id,
+      name: typeof n.name === 'string' && n.name ? n.name : base.name,
+      parentId: typeof n.parentId === 'string' ? n.parentId : null,
+      position: isVec3(n.position) ? n.position : base.position,
+      rotation: isVec3(n.rotation) ? n.rotation : base.rotation,
+      scale: isVec3(n.scale) ? n.scale : base.scale,
+      params: { ...base.params, ...(n.params && typeof n.params === 'object' ? n.params : {}) },
+      appearance: { ...base.appearance, ...(n.appearance && typeof n.appearance === 'object' ? n.appearance : {}) },
+      visible: n.visible !== false,
+      locked: n.locked === true,
+      includedForPrint: n.includedForPrint !== false,
+    });
+  }
+  // Node trỏ tới cha không còn tồn tại → đưa về gốc
+  const ids = new Set(nodes.map((x) => x.id));
+  for (const x of nodes) if (x.parentId && !ids.has(x.parentId)) x.parentId = null;
+  return { nodes, foreign };
+}
+
 const TEAL = { color: '#68D9D0', roughness: 0.55, metalness: 0 };
 const WHITE = { color: '#F5F6FA', roughness: 0.4, metalness: 0 };
 const AMBER = { color: '#F5B85C', roughness: 0.55, metalness: 0 };
