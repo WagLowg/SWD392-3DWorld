@@ -2,7 +2,7 @@ export type SellerPayoutRecord = {
   id: string
   transactionId: number
   amount: number
-  status: 'REQUESTED' | 'SUCCESS' | 'REJECTED' | string
+  status: 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'REQUESTED' | 'SUCCESS' | 'REJECTED'
   bankAccountId: number
   bankInfo?: string
   transferReference?: string | null
@@ -65,26 +65,6 @@ export function toWalletLedgerRecord(l: ApiWalletLedger): SellerWalletLedgerReco
     orderId: l.orderId,
     at: l.createdAt,
     status: 'POSTED',
-  }
-}
-
-const PAYOUT_STORAGE_KEY = '3dworld_seller_payout_history'
-
-export function getLocalPayoutHistory(): SellerPayoutRecord[] {
-  try {
-    const raw = localStorage.getItem(PAYOUT_STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
-export function saveLocalPayout(record: SellerPayoutRecord) {
-  try {
-    const current = getLocalPayoutHistory().filter((p) => p.transactionId !== record.transactionId)
-    localStorage.setItem(PAYOUT_STORAGE_KEY, JSON.stringify([record, ...current]))
-  } catch {
-    // ignore
   }
 }
 
@@ -1051,21 +1031,16 @@ export const sellerService = {
       earnings,
       wallet: (() => {
         const available = Number(data.availableBalance) || 0
-        const minimumReserve = Number(data.minimumReserve) || 100000
         const returnShippingDebt = Number(data.returnShippingDebt) || 0
         const withdrawable =
-          returnShippingDebt > 0
-            ? 0
-            : data.withdrawableBalance !== undefined
-              ? Number(data.withdrawableBalance)
-              : Math.max(0, available - minimumReserve)
+          data.withdrawableBalance !== undefined ? Number(data.withdrawableBalance) : available
         return {
           available,
           pending: Number(data.pendingBalance) || 0,
           held: Number(data.payoutHold) || 0,
           returnShippingDebt,
-          minimumReserve,
-          withdrawable,
+          minimumReserve: Number(data.minimumReserve) || 0,
+          withdrawable: Number.isFinite(withdrawable) ? Math.max(0, withdrawable) : available,
         }
       })(),
     }
@@ -1121,48 +1096,38 @@ export const sellerService = {
     return earning
   },
 
-  async requestPayout(input: { amount: number; bankAccountId: number; reason: string; bankInfo?: string }) {
-    const res = await sellerWalletApi.requestPayout({
-      amount: input.amount,
-      bankAccountId: input.bankAccountId,
-      reason: input.reason,
-    })
-    saveLocalPayout({
-      id: `PAYOUT-${res.transactionId}`,
-      transactionId: res.transactionId,
-      amount: res.amount,
-      status: res.status ?? 'REQUESTED',
-      bankAccountId: res.bankAccountId,
-      bankInfo: input.bankInfo ?? 'Tài khoản ngân hàng đã chọn',
-      transferReference: res.transferReference,
-      createdAt: new Date().toISOString(),
-      reason: input.reason,
-    })
+  async requestPayout(input: {
+    amount: number
+    bankAccountId: number
+    reason: string
+    idempotencyKey: string
+  }) {
+    const res = await sellerWalletApi.requestPayout(
+      {
+        amount: input.amount,
+        bankAccountId: input.bankAccountId,
+        reason: input.reason,
+      },
+      input.idempotencyKey,
+    )
     return res
   },
 
   async payouts(page = 0, size = 50): Promise<SellerPayoutRecord[]> {
-    try {
-      const res = await sellerWalletApi.payouts(page, size)
-      if (Array.isArray(res) && res.length > 0) {
-        return res.map((p) => ({
-          id: `PAYOUT-${p.transactionId}`,
-          transactionId: p.transactionId,
-          amount: Number(p.amount) || 0,
-          status: p.status,
-          bankAccountId: p.bankAccountId ?? 0,
-          bankInfo:
-            [p.bankName, p.accountNumberMasked, p.accountHolder].filter(Boolean).join(' · ') ||
-            'Tài khoản ngân hàng đã liên kết',
-          transferReference: p.transferReference,
-          createdAt: p.createdAt,
-          reason: p.reason ?? 'Rút doanh thu bán hàng về tài khoản ngân hàng',
-        }))
-      }
-    } catch (err) {
-      console.warn('Failed to fetch payouts from backend API:', err)
-    }
-    return getLocalPayoutHistory()
+    const res = await sellerWalletApi.payouts(page, size)
+    return res.map((p) => ({
+      id: `PAYOUT-${p.transactionId}`,
+      transactionId: p.transactionId,
+      amount: Number(p.amount) || 0,
+      status: p.status,
+      bankAccountId: p.bankAccountId ?? 0,
+      bankInfo:
+        [p.bankName, p.accountNumberMasked, p.accountHolder].filter(Boolean).join(' · ') ||
+        'Tài khoản ngân hàng đã liên kết',
+      transferReference: p.transferReference,
+      createdAt: p.createdAt,
+      reason: p.reason ?? 'Rút doanh thu bán hàng về tài khoản ngân hàng',
+    }))
   },
 
   async ledgers(page = 0, size = 50): Promise<SellerWalletLedgerRecord[]> {
