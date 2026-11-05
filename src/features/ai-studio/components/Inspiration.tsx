@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Cột "Cảm hứng" khi chưa có dự án: ảnh mẫu bấm là dùng, câu mô tả gợi ý, mẹo chụp ảnh.
+ */
 import { useEffect, useState } from 'react';
 import { Camera, Lightbulb, Sun, Wand2, Type } from 'lucide-react';
 import { SAMPLES, sampleImage, type Sample } from '../lib/sampleImages';

@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Giới hạn và cấu hình: dung lượng upload, số tam giác/node tối đa, thời gian autosave,
+ * số bước undo, bảng màu, danh mục dịch vụ in.
+ */
 // Capabilities/limits (FRD §6, DRAFT defaults). In production these come from the BE capabilities endpoint.
 export const CAPABILITIES = {
   configVersion: 'cfg-2026-10-22-draft',

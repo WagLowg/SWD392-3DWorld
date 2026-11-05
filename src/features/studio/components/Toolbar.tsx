@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Thanh công cụ: Chọn/Di chuyển/Xoay/Tỷ lệ/Đo, thêm hình cơ bản, group/ungroup, bật hút lưới.
+ */
 import {
   Box, Circle, Cone, Cylinder, Focus, Group, Hexagon, Magnet, MousePointer2, Move3d, Rotate3d, Ruler, Scale3d, Square, Type, Ungroup, Donut, Home,
 } from 'lucide-react';

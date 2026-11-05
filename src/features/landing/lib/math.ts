@@ -1,3 +1,10 @@
+/**
+ * [Giải thích] Hàm toán dùng cho animation:
+ * - range: tiến độ 0..1 của t trong một đoạn [a, b]
+ * - lerp: nội suy giữa hai giá trị
+ * - easeIn, easeOut, smooth, bell: đường cong tăng tốc/giảm tốc cho chuyển động tự nhiên
+ * - damp: kéo giá trị về đích như lò xo, không phụ thuộc FPS (có dt)
+ */
 export const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v))
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 /** 0..1 progress of `t` through [a, b] */

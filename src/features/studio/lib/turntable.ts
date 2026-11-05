@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Ảnh xoay vòng cho thẻ dự án: tải scene (tối đa 4 request cùng lúc), chụp, cache theo updatedAt.
+ */
 import { useEffect, useState } from 'react';
 import { fetchProject, type ProjectMeta } from '../services/projects';
 import { renderTurntable } from './thumbnail';

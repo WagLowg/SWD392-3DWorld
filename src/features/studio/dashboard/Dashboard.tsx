@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Trang trước khi vào editor: chào mừng, danh sách dự án (lưới/danh sách, tìm kiếm), thư viện mẫu.
+ */
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft, Box, ChevronDown, LayoutGrid, LayoutTemplate, List, Pencil, Plus, SearchX, WifiOff,

@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Trang Tín dụng: số dư ví, bảng giá từ server, nạp thử (chỉ khi Backend bật chế độ demo).
+ */
 import { Fragment, useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { aiStudio } from '../lib/backend';

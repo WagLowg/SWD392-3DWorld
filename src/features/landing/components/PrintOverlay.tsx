@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Lớp chữ HTML của world 4 (Order Print): trạng thái in theo lớp, panel chọn vật liệu/màu/kích cỡ.
+ */
 import { useEffect, useRef } from 'react'
 import { PRINT_COLORS, PRINT_SAMPLES, PRINT_SCALES, PRODUCTS } from '../config/content'
 import { ROUTES } from '../config/routes'

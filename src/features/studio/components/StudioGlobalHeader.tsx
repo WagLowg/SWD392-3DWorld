@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Header chung của module: logo, chuyển module (AI Studio, 3D Studio...), avatar người dùng.
+ */
 import { Bell, Box, LogOut } from 'lucide-react';
 import { ModuleSwitcher } from '../../../shared/ui/ModuleSwitcher';
 import { CommandTrigger, openCommandPalette } from '../../../shared/ui/CommandPalette';

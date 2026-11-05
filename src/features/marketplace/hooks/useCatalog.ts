@@ -39,10 +39,19 @@ export function useCategories() {
     queryFn: async ({ signal }) => {
       const page = await catalogService.search({ page: 0, size: 100 }, signal)
       const counts = new Map<string, number>()
-      for (const p of page.items) if (p.category) counts.set(p.category, (counts.get(p.category) ?? 0) + 1)
+      const covers = new Map<string, string[]>()
+      for (const p of page.items) {
+        if (!p.category) continue
+        counts.set(p.category, (counts.get(p.category) ?? 0) + 1)
+        const list = covers.get(p.category) ?? []
+        if (p.thumbnailUrl && list.length < 3) list.push(p.thumbnailUrl)
+        covers.set(p.category, list)
+      }
       return {
         total: page.totalElements,
-        categories: [...counts.entries()].map(([code, count]) => ({ code, count })).sort((a, b) => b.count - a.count),
+        categories: [...counts.entries()]
+          .map(([code, count]) => ({ code, count, covers: covers.get(code) ?? [] }))
+          .sort((a, b) => b.count - a.count),
       }
     },
     staleTime: 5 * 60_000,
@@ -130,15 +139,8 @@ export function useCreateReview() {
 export function useReplyReview() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      productId,
-      reviewId,
-      reply,
-    }: {
-      productId: number
-      reviewId: number
-      reply: string
-    }) => catalogService.replyReview(productId, reviewId, { reply }),
+    mutationFn: ({ productId, reviewId, reply }: { productId: number; reviewId: number; reply: string }) =>
+      catalogService.replyReview(productId, reviewId, { reply }),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: catalogKeys.all })
       qc.invalidateQueries({ queryKey: ['catalog', 'reviews', vars.productId] })

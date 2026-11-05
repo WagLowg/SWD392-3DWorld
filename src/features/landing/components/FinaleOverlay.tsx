@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Lớp chữ HTML của phần kết: tiêu đề "One World" và footer.
+ */
 import { Link } from '../lib/PageLink'
 import { WORLDS } from '../config/content'
 import { ROUTES } from '../config/routes'

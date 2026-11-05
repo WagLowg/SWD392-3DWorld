@@ -1,3 +1,8 @@
+/**
+ * [Giải thích] Bộ vật liệu cho model: <M c="màu" k="gloss|satin|glass|metal|emissive"/>.
+ * MaterialScope cho phép thay mọi vật liệu của model bằng một vật liệu chung (wireframe, nhựa in).
+ * createPrintMaterial + setPrintClip: vật liệu có mặt phẳng cắt để làm hiệu ứng in từng lớp.
+ */
 import { createContext, useContext, useMemo } from 'react'
 import * as THREE from 'three'
 

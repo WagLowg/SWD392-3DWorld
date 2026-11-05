@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Tải font (Latin + tiếng Việt) bằng opentype.js và chuyển chữ thành đường viền để đùn thành chữ 3D.
+ */
 import opentype from 'opentype.js';
 import latinUrl from '@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-700-normal.woff?url';
 import vietUrl from '@fontsource/be-vietnam-pro/files/be-vietnam-pro-vietnamese-700-normal.woff?url';

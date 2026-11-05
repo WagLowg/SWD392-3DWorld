@@ -60,4 +60,3 @@ export function clearPendingCheckout(idempotencyKey?: string) {
     // Không chặn checkout nếu browser không cho dùng sessionStorage.
   }
 }
-

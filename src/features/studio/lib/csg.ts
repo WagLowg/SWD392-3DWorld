@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Phép BOOLEAN (cộng/trừ/giao 2 khối) bằng three-bvh-csg, sau đó dọn tam giác rác.
+ */
 import * as THREE from 'three';
 import { Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION } from 'three-bvh-csg';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -12,6 +15,8 @@ export function runBoolean(a: THREE.BufferGeometry, b: THREE.BufferGeometry, op:
     out.computeVertexNormals();
     return out;
   };
+  // [GT] Brush = mesh dùng cho CSG. Evaluator chia tam giác bằng cây BVH để tìm nhanh chỗ cắt nhau,
+  // rồi giữ/bỏ từng phần theo phép tính (cộng/trừ/giao).
   const ba = new Brush(prep(a));
   const bb = new Brush(prep(b));
   ba.updateMatrixWorld();

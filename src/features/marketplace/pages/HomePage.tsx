@@ -1,5 +1,13 @@
 import { useEffect } from 'react'
 import { HeroSection } from '../components/HeroSection'
+import {
+  BestSellerRail,
+  CategoryTiles,
+  MarqueeStrip,
+  RecentlyViewedSection,
+  ReviewsWall,
+  TopRatedRail,
+} from '../components/HomeSections'
 import { useCatalog, useFeatured } from '../hooks/useCatalog'
 import { CatalogSection } from './CatalogPage'
 
@@ -16,9 +24,15 @@ export function HomePage() {
   return (
     <>
       <HeroSection featured={heroItems} />
-      <section id="catalog" className="mt-14 scroll-mt-24" aria-label="Khám phá vật phẩm">
+      <MarqueeStrip />
+      <CategoryTiles />
+      <BestSellerRail />
+      <TopRatedRail />
+      <RecentlyViewedSection />
+      <section id="catalog" className="mt-20 scroll-mt-24" aria-label="Khám phá vật phẩm">
         <CatalogSection />
       </section>
+      <ReviewsWall />
     </>
   )
 }

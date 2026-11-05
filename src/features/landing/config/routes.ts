@@ -1,4 +1,7 @@
 /**
+ * [Giải thích] Đường dẫn sang các module khác (AI Studio, 3D Studio, Marketplace, POD, Login).
+ */
+/**
  * Route của 4 module 3DWorld (mỗi module là một trang riêng, xem frontend/vite.config.ts).
  */
 export const ROUTES = {

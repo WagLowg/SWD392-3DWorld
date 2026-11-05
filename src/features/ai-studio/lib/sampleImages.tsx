@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Ảnh mẫu đầu vào, chụp từ các nhân vật 3D của trang Landing (không cần file ảnh có sẵn).
+ */
 import { createRoot, events } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FIGURE_HEIGHT, FIGURES } from '../../landing/three/figures';

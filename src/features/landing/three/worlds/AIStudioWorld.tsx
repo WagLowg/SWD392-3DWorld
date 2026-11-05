@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] World 1 – AI Studio: thẻ ảnh bay vào máy, máy quét (shader tự viết, uniform uTime/uScan),
+ * model 3D hiện ra và có thể kéo để xoay. Mọi bước được tính từ S.t (aiPhase).
+ */
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RoundedBox, Sparkles } from '@react-three/drei'
@@ -85,6 +89,7 @@ function Portal() {
   useFrame((state, dt) => {
     const { scan, card } = aiPhase(S.t)
     const time = state.clock.elapsedTime
+    // [GT] Truyền thời gian + mức quét vào shader (chạy trên GPU) mỗi frame để hiệu ứng xoáy/quét chuyển động.
     uniforms.uTime.value = time
     uniforms.uScan.value = damp(uniforms.uScan.value, scan, 6, dt)
     beamUniforms.uTime.value = time

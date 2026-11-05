@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
+import { useSession } from '../../../shared/session/useSession'
 import { addressService, orderService, paymentService, shippingService } from '../services/order.service'
 import type { AddressInput, CheckoutInput, ShippingQuoteInput } from '../types/catalog.types'
 import { cartKey } from './useCart'
-import { useSession } from '../../../shared/session/useSession'
 
 export const addressKey = ['addresses'] as const
 const shippingQuoteKey = ['shipping', 'quote'] as const
@@ -38,10 +38,7 @@ export function useShippingQuote(
   debounceMs = 300,
 ) {
   const signature = useMemo(
-    () =>
-      input
-        ? `${input.shippingAddressId}:${input.cartItemIds.join(',')}:${cartFingerprint}:${refreshKey}`
-        : '',
+    () => (input ? `${input.shippingAddressId}:${input.cartItemIds.join(',')}:${cartFingerprint}:${refreshKey}` : ''),
     [input, cartFingerprint, refreshKey],
   )
   const [debounced, setDebounced] = useState<DebouncedQuoteRequest | null>(null)

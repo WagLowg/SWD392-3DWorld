@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] World 3 – Marketplace: robot rơi xuống, sản phẩm xếp thành băng chuyền tròn (kéo để xoay),
+ * sản phẩm đang chọn biến thành wireframe rồi bay sang máy in ở world 4.
+ */
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Sparkles } from '@react-three/drei'

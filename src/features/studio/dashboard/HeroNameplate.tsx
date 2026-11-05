@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Hero tương tác: gõ tên → biển tên 3D đổi ngay, chọn màu, kéo xoay; bấm nút để tạo dự án đó.
+ */
 import { useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, Edges, OrbitControls } from '@react-three/drei';

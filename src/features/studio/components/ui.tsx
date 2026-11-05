@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Component dùng chung: NumberField (Enter/blur áp dụng, Esc hoàn tác, giá trị sai không ghi),
+ * Modal, Alert, LevelBadge (PASS/WARNING/BLOCK), hàm định dạng mm và giờ.
+ */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AlertCircle, CheckCircle2, Info, TriangleAlert, X } from 'lucide-react';
 import type { CheckLevel } from '../types';

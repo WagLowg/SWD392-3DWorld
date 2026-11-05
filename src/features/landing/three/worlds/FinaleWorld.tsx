@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Phần kết: logo 3DWorld dạng hành tinh có vành và khối lập phương bay quanh.
+ */
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RoundedBox, Sparkles } from '@react-three/drei'

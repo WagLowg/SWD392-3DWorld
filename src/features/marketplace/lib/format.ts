@@ -121,8 +121,54 @@ const COLOR_NAMES: Record<string, { label: string; hex: string }> = {
   gray: { label: 'Xám', hex: '#a1a1aa' },
 }
 
+/** Tên màu tiếng Việt (đã bỏ dấu) → hex. */
+const VI_COLORS: Record<string, string> = {
+  trang: '#ffffff',
+  den: '#1b1b22',
+  do: '#e5484d',
+  'xanh duong': '#4c7cf0',
+  'xanh da troi': '#7cc4fa',
+  'xanh la': '#46a758',
+  'xanh mint': '#b9f4d0',
+  'xanh ngoc': '#3dd6c6',
+  xanh: '#4c7cf0',
+  vang: '#ffd84d',
+  cam: '#f07a2e',
+  hong: '#ffb3c7',
+  'hong pastel': '#ffd1dc',
+  tim: '#a78bfa',
+  'tim pastel': '#d8ccff',
+  xam: '#a1a1aa',
+  nau: '#8b5e3c',
+  be: '#f1e3c8',
+  kem: '#fbf3dc',
+  bac: '#c9ccd3',
+  'vang dong': '#d4a537',
+  'trong suot': '#eef3f8',
+}
+
+const stripAccents = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim()
+
+/** Nhận tên màu tiếng Anh/Việt, mã hex hoặc tên màu CSS; trả về nhãn hiển thị + hex. */
 export function colorSwatch(value: string) {
-  return COLOR_NAMES[value.toLowerCase()]
+  const raw = value.trim()
+  const known = COLOR_NAMES[raw.toLowerCase()]
+  if (known) return known
+  const vi = VI_COLORS[stripAccents(raw)]
+  if (vi) return { label: raw, hex: vi }
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw)) return { label: raw.toUpperCase(), hex: raw }
+  if (typeof CSS !== 'undefined' && CSS.supports('color', raw)) return { label: raw, hex: raw }
+  return undefined
+}
+
+/** Màu nền tối → dùng dấu check màu trắng. */
+export function isDarkColor(hex: string) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex) ?? /^#?([0-9a-f]{3})$/i.exec(hex)
+  if (!m) return false
+  const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1]
+  const [r, g, b] = [0, 2, 4].map((i) => Number.parseInt(h.slice(i, i + 2), 16))
+  return 0.299 * r + 0.587 * g + 0.114 * b < 140
 }
 
 export function attributeValueLabel(key: string, value: string) {

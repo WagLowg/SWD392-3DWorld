@@ -1,4 +1,16 @@
-import { ArrowLeft, Boxes, CheckCircle2, History, MapPin, RotateCcw, Sparkles, Star, Truck, Undo2, XCircle } from 'lucide-react'
+import {
+  ArrowLeft,
+  Boxes,
+  CheckCircle2,
+  History,
+  MapPin,
+  RotateCcw,
+  Sparkles,
+  Star,
+  Truck,
+  Undo2,
+  XCircle,
+} from 'lucide-react'
 import { type ReactNode, useEffect, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
@@ -7,8 +19,11 @@ import { ErrorScreen } from '../../../shared/ui/ErrorScreen'
 import { Breadcrumbs } from '../../../shared/ui/primitives'
 import { QueryState } from '../../../shared/ui/QueryState'
 import { useToast } from '../../../shared/ui/toast'
+import { useCatalog } from '../../marketplace/hooks/useCatalog'
+import { useVariantIndexStore } from '../../marketplace/stores/variant-index.store'
+import { CodPaymentPanel } from '../components/CodPaymentPanel'
 import {
-  displayOrderCode,
+  OrderCode,
   OrderItemRow,
   OrderMoney,
   OrderStatusBadge,
@@ -17,16 +32,14 @@ import {
   REFUNDABLE,
   ShipmentStatusBadge,
   StorefrontLabel,
+  shortOrderCode,
 } from '../components/OrderParts'
 import { PayOrderButton } from '../components/PayOrderButton'
-import { CodPaymentPanel } from '../components/CodPaymentPanel'
 import { ShippingAddressSnapshot } from '../components/ShippingAddressSnapshot'
 import { useBuyerShipments, useConfirmReceived, useOrder, useOrderHistory, useOrderPackages } from '../hooks/useOrders'
 import { canRequestRefund } from '../lib/refundEligibility'
 import { statusMeta } from '../lib/status'
 import { useOrderPaymentsStore } from '../stores/order-payments.store'
-import { useCatalog } from '../../marketplace/hooks/useCatalog'
-import { useVariantIndexStore } from '../../marketplace/stores/variant-index.store'
 
 /** MP 025 · Chi Tiết Đơn Hàng Người Mua — GET /api/orders/{id}, /history, /packages, /shipments. */
 export function OrderDetailPage() {
@@ -75,7 +88,7 @@ export function OrderDetailPage() {
                     </Link>
                   ),
                 },
-                { label: `Chi tiết ${displayOrderCode(order)}` },
+                { label: `Chi tiết ${shortOrderCode(order)}` },
               ]}
             />
             <Link
@@ -87,10 +100,7 @@ export function OrderDetailPage() {
           </div>
 
           <section className="mt-4 grid gap-4 rounded-[2rem] bg-white/95 p-6 shadow-soft sm:grid-cols-4">
-            <Info
-              label="Mã đơn physical"
-              value={<span className="font-display text-2xl font-bold">{displayOrderCode(order)}</span>}
-            />
+            <Info label="Mã đơn hàng" value={<OrderCode order={order} className="font-display text-xl font-bold" />} />
             <Info label="Xưởng chế tác" value={<StorefrontLabel id={order.storefrontId} />} />
             <Info label="Trạng thái" value={<OrderStatusBadge status={order.status} />} />
             <Info label="Đặt lúc" value={<span className="font-semibold">{formatDateTime(order.createdAt)}</span>} />
@@ -112,7 +122,7 @@ export function OrderDetailPage() {
             <div className="space-y-6">
               <section className="rounded-[2rem] bg-white/95 p-6 shadow-soft">
                 <h2 className="font-display text-xl font-bold">Vật phẩm trong đơn ({order.items.length})</h2>
-                {['DELIVERED', 'RECEIVED'].includes(order.status) && (
+                {order.status === 'RECEIVED' && (
                   <div className="mt-3 mb-4 flex flex-col gap-2 rounded-2xl border border-orange/20 bg-[#fffbf8] p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-peach text-orange-deep">
@@ -120,7 +130,9 @@ export function OrderDetailPage() {
                       </div>
                       <div>
                         <p className="font-label text-xs font-bold text-ink">Bạn hài lòng với sản phẩm?</p>
-                        <p className="text-[11px] text-ink-soft">Hãy gửi đánh giá 1–5 sao để chia sẻ cảm nhận và giúp xưởng hoàn thiện nhé!</p>
+                        <p className="text-[11px] text-ink-soft">
+                          Hãy gửi đánh giá 1–5 sao để chia sẻ cảm nhận và giúp xưởng hoàn thiện nhé!
+                        </p>
                       </div>
                     </div>
                     <a
@@ -321,7 +333,7 @@ export function OrderDetailPage() {
                       <RotateCcw size={15} /> Mua lại
                     </a>
                   ) : null}
-                  {['DELIVERED', 'RECEIVED'].includes(order.status) && (
+                  {order.status === 'RECEIVED' && (
                     <a
                       href={`/marketplace/${firstProductId}?tab=reviews&orderItemId=${firstItem?.id || ''}`}
                       className="inline-flex items-center justify-center gap-2 rounded-full bg-orange px-5 py-2.5 font-label text-sm font-semibold text-white shadow-xs hover:bg-orange-deep"

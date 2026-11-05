@@ -1,3 +1,9 @@
+/**
+ * [Giải thích] BỘ NÃO của editor (Zustand): danh sách node, vật đang chọn, công cụ, lưới, camera...
+ * - Mọi thay đổi đi qua commit() → lưu bản cũ vào past (undo) và xoá future (redo).
+ * - save(): gửi lên server kèm baseRevision; server trả 409 nếu có xung đột.
+ * - Còn có group/ungroup, boolean, nhân bản, snapshot STL, gửi yêu cầu in.
+ */
 import { create } from 'zustand';
 import * as THREE from 'three';
 import type {
@@ -205,6 +211,7 @@ export const useStudio = create<State>((set, get) => ({
     return null;
   },
 
+  // [GT] MỌI thay đổi scene đi qua đây: đẩy bản cũ vào past (undo), xoá future (redo), đánh dấu "chưa lưu".
   commit(nodes, label, selection) {
     const s = get();
     if (nodes.length > CAPABILITIES.maxSceneNodes) {
@@ -256,6 +263,7 @@ export const useStudio = create<State>((set, get) => ({
     return null;
   },
 
+  // [GT] Gọi khi thả gizmo hoặc nhập số: bỏ qua giá trị NaN/scale 0, rồi cập nhật node (qua commit).
   setTransform(id, t) {
     const n = get().nodes.find((x) => x.id === id);
     if (!n || n.locked) return;
@@ -382,6 +390,7 @@ export const useStudio = create<State>((set, get) => ({
     }), 'Phân bố đều');
   },
 
+  // [GT] Boolean: chỉ chạy với 2 mesh kín; kết quả thành node "mesh" mới, 2 khối gốc bị ẩn hoặc xoá.
   booleanOp(op, aId, bId, keepSource) {
     const s = get();
     const byId = new Map(s.nodes.map((n) => [n.id, n]));
@@ -424,6 +433,7 @@ export const useStudio = create<State>((set, get) => ({
     get().commit([...get().nodes, node], `Import ${name}`, [node.id]);
   },
 
+  // [GT] Undo: lấy bản cuối của past làm hiện tại, đẩy bản hiện tại vào future.
   undo() {
     const s = get();
     const prev = s.past[s.past.length - 1];
@@ -434,6 +444,7 @@ export const useStudio = create<State>((set, get) => ({
       saveState: 'dirty', lastEditAt: Date.now(),
     });
   },
+  // [GT] Redo: ngược lại với undo.
   redo() {
     const s = get();
     const next = s.future[0];
@@ -445,6 +456,7 @@ export const useStudio = create<State>((set, get) => ({
     });
   },
 
+  // [GT] Lưu lên server kèm baseRevision; nếu server đã có bản mới hơn → lỗi 409 (xung đột).
   async save() {
     const s = get();
     if (s.saveState === 'saving' || s.saveState === 'conflict') return;

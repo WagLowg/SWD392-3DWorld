@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Thư viện "Mô hình của tôi": lưới dự án có tab (tất cả/gần đây/yêu thích/lưu trữ), tìm kiếm, phân trang,
+ * ảnh xem trước xoay vòng, xem nhanh (QuickView), đánh dấu yêu thích, lưu trữ.
+ */
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Plus, MoreHorizontal, Search, Cuboid, Pencil, Download, Printer, Star, Archive } from 'lucide-react';

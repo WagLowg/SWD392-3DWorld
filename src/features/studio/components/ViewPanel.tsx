@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Bảng tuỳ chọn hiển thị trên viewport (X-ray, explode, mặt cắt, bàn in).
+ * BedVolume vẽ khối bàn in và báo scene có vừa không; SectionCap tô mặt chỗ bị cắt.
+ */
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { Html } from '@react-three/drei';

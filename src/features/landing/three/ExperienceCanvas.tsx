@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Canvas WebGL DUY NHẤT của Landing (React Three Fiber).
+ * Chứa ánh sáng, camera, bộ xử lý kéo chuột và 5 world xếp chồng. Tự giảm độ phân giải khi máy yếu.
+ */
 import { Canvas } from '@react-three/fiber'
 import { AdaptiveDpr, PerformanceMonitor } from '@react-three/drei'
 import { Suspense, useState } from 'react'

@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] World 2 – 3D Studio demo: các khối bay từ world 1 xuống, lơ lửng rồi ghép thành robot theo t.
+ * Người dùng kéo thả khối bằng raycast lên mặt phẳng ngang, có hút lưới, xoay và hiệu ứng khi đặt xuống.
+ */
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Outlines, RoundedBox } from '@react-three/drei'
@@ -111,9 +115,11 @@ function EditorPart({ obj, index }: { obj: EditorObject; index: number }) {
     const t = S.t
     const time = state.clock.elapsedTime
     const ta = range(t, T.ta)
+    // [GT] asm: tiến độ lắp ráp 0→1 khi cuộn qua đoạn stAssemble (0 = đang lơ lửng, 1 = đã ghép vào robot).
     const asm = easeInOut(range(t, T.stAssemble))
     const idle = S.reduced ? 0 : 1
 
+    // [GT] Vị trí đích: đang kéo thì lấy vị trí tạm trong `live`, không thì lấy vị trí đã lưu trong store.
     const target = live.get(obj.id) ?? tmp.set(obj.pos[0], obj.pos[1], obj.pos[2])
     const fp = obj.floatPos
     const bob = Math.sin(time * 1.1 + index * 1.3) * 0.12 * idle * (1 - asm)
@@ -145,6 +151,7 @@ function EditorPart({ obj, index }: { obj: EditorObject; index: number }) {
     lift.current = damp(lift.current, hovering || drag.current ? 0.14 : 0, 10, dt)
     y += lift.current
 
+    // [GT] Đang kéo: khối đuổi theo con trỏ bằng damp (nhanh nhưng mượt). Không kéo: đặt thẳng vị trí tính từ t.
     if (live.has(obj.id)) {
       el.position.x = damp(el.position.x, x, 22, dt)
       el.position.z = damp(el.position.z, z, 22, dt)
@@ -179,9 +186,11 @@ function EditorPart({ obj, index }: { obj: EditorObject; index: number }) {
     ui.select(obj.id)
     const el = g.current!
     const worldY = el.getWorldPosition(hit).y
+    // [GT] Tạo mặt phẳng ngang vô hình ở độ cao của khối; tia từ camera qua con trỏ sẽ được chiếu lên mặt phẳng này.
     plane.set(new THREE.Vector3(0, 1, 0), -worldY)
     const p = e.ray.intersectPlane(plane, new THREE.Vector3())
     const local = p ? el.parent!.worldToLocal(p.clone()) : el.position.clone()
+    // [GT] Lưu offset giữa tâm khối và điểm nhấn → khối không bị giật tâm về dưới con trỏ.
     drag.current = {
       mode: ui.mode,
       off: new THREE.Vector3(obj.pos[0] - local.x, 0, obj.pos[2] - local.z),
@@ -189,6 +198,7 @@ function EditorPart({ obj, index }: { obj: EditorObject; index: number }) {
       startRot: obj.rotY,
       planeY: worldY,
     }
+    // [GT] Pointer capture: khối vẫn nhận sự kiện chuột kể cả khi con trỏ chạy ra ngoài khối.
     ;(e.target as unknown as Element).setPointerCapture?.(e.pointerId)
   }
   const onMove = (e: ThreeEvent<PointerEvent>) => {
@@ -196,6 +206,7 @@ function EditorPart({ obj, index }: { obj: EditorObject; index: number }) {
     if (!d) return
     e.stopPropagation()
     if (d.mode === 'move') {
+      // [GT] Mỗi lần di chuột: điểm tia chuột cắt mặt phẳng = vị trí mới của khối.
       const p = e.ray.intersectPlane(plane, hit)
       if (!p) return
       const local = g.current!.parent!.worldToLocal(p.clone())
@@ -206,6 +217,7 @@ function EditorPart({ obj, index }: { obj: EditorObject; index: number }) {
       const sz = snap(nz)
       if (Math.abs(sx - nx) < 0.06) nx = sx
       if (Math.abs(sz - nz) < 0.06) nz = sz
+      // [GT] Chỉ ghi vào map tạm (không làm React render); thả chuột mới lưu vào store.
       live.set(obj.id, new THREE.Vector3(nx, obj.pos[1], nz))
     } else {
       const rot = d.startRot + (e.clientX - d.startX) * 0.012
@@ -223,6 +235,7 @@ function EditorPart({ obj, index }: { obj: EditorObject; index: number }) {
       if (l) {
         const p: [number, number, number] = [snap(l.x), obj.pos[1], snap(l.z)]
         live.delete(obj.id)
+        // [GT] Thả chuột: vị trí đã làm tròn theo lưới được lưu vào store.
         ui.updateObject(obj.id, { pos: p })
         dropFx.pos.set(p[0], 0.02, p[2])
         dropFx.t = 0

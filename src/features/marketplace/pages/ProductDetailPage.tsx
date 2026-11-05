@@ -1,9 +1,7 @@
 import {
   ArrowLeft,
   ArrowRight,
-  Box,
   Flag,
-  Gem,
   Image as ImageIcon,
   Link2,
   Package,
@@ -14,13 +12,13 @@ import {
   Truck,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ProductReviewsSection } from '../components/ProductReviewsSection'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ApiClientError } from '../../../shared/api'
-import { Breadcrumbs, QuantityStepper, StockBar } from '../../../shared/ui/primitives'
+import { Breadcrumbs, QuantityStepper } from '../../../shared/ui/primitives'
 import { StatusBlock } from '../../../shared/ui/StatusBlock'
 import { ProductCard } from '../components/ProductCard'
 import { ProductMedia } from '../components/ProductMedia'
+import { ProductReviewsSection } from '../components/ProductReviewsSection'
 import { VariantPicker } from '../components/VariantPicker'
 import { useAddToCart } from '../hooks/useCart'
 import { useCatalog, useProductDetail, useProductReviews } from '../hooks/useCatalog'
@@ -35,6 +33,7 @@ import {
   resolveMediaUrl,
   shippingClassLabel,
 } from '../lib/format'
+import { rememberViewed } from '../lib/recentlyViewed'
 import { useMarketplaceUiStore } from '../stores/marketplace-ui.store'
 import type { ProductDetail, ProductVariant } from '../types/catalog.types'
 
@@ -46,7 +45,9 @@ export function ProductDetailPage() {
   const { data, isLoading, isError, error, refetch } = useProductDetail(valid ? id : undefined)
 
   useEffect(() => {
-    if (data) document.title = `${data.product.title} · Chợ Đồ Chơi 3DWorld`
+    if (!data) return
+    document.title = `${data.product.title} · Chợ Đồ Chơi 3DWorld`
+    rememberViewed(data.product)
   }, [data])
 
   const notFound =
@@ -203,9 +204,6 @@ function ProductView({ detail }: { detail: ProductDetail }) {
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-orange" /> Ảnh sản phẩm · Chế độ chi tiết
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-low px-3 py-1 text-ink-soft">
-                <Box size={12} /> Xem 3D sẽ có khi API trả file mô hình
-              </span>
             </div>
             <ProductMedia
               key={media[mediaIndex] ?? 'none'}
@@ -219,9 +217,6 @@ function ProductView({ detail }: { detail: ProductDetail }) {
           <div className="mt-6">
             <h2 className="inline-flex flex-wrap items-center gap-2 font-display text-xl font-bold">
               <ImageIcon size={18} className="text-orange" /> Thư Viện Ảnh Chế Tác
-              <span className="font-label text-xs font-semibold text-ink-soft">
-                ({media.length} ảnh từ product_media)
-              </span>
             </h2>
             {media.length ? (
               <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
@@ -245,9 +240,8 @@ function ProductView({ detail }: { detail: ProductDetail }) {
             )}
           </div>
 
-          <ul className="mt-6 grid gap-3 rounded-[2rem] bg-white/90 p-5 shadow-soft sm:grid-cols-3">
+          <ul className="mt-6 grid gap-3 rounded-[2rem] bg-white/90 p-5 shadow-soft sm:grid-cols-2">
             {[
-              { icon: Gem, title: 'In 3D vật lý', sub: 'Không bán file số', tone: 'bg-violet-soft text-violet' },
               { icon: ShieldCheck, title: 'Bảo vệ người mua', sub: 'Hỗ trợ hoàn tiền', tone: 'bg-teal-soft text-teal' },
               {
                 icon: Package,
@@ -303,11 +297,6 @@ function ProductView({ detail }: { detail: ProductDetail }) {
             <h1 className="mt-4 font-display text-4xl font-bold leading-tight tracking-tight md:text-5xl">
               {product.title}
             </h1>
-            {selected && (
-              <p className="mt-1 font-display text-xl font-semibold text-orange">
-                {formatAttributes(selected.attributes)}
-              </p>
-            )}
             <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-label text-xs text-ink-soft">
               <span className="inline-flex items-center gap-1">
                 <Star size={13} className={product.reviewCount ? 'fill-orange text-orange' : 'text-line'} />
@@ -357,19 +346,16 @@ function ProductView({ detail }: { detail: ProductDetail }) {
 
             {/* Tồn kho */}
             {selected && (
-              <div className="mt-6 rounded-2xl bg-surface-low p-4">
-                <div className="flex items-center justify-between font-label text-xs font-semibold">
-                  <span>Tình trạng khả dụng tồn kho:</span>
-                  <span className={soldOut || available <= 5 ? 'text-danger' : 'text-teal'}>
-                    {soldOut ? 'Tạm hết hàng' : `Còn ${available} sản phẩm`}
+              <div className="mt-6 flex items-center justify-between gap-3 rounded-2xl bg-surface-low px-4 py-3">
+                <span className="font-label text-xs font-semibold">Số sản phẩm còn lại:</span>
+                {soldOut ? (
+                  <span className="font-label text-sm font-semibold text-danger">Tạm hết hàng</span>
+                ) : (
+                  <span className={`font-display text-lg font-bold ${available <= 5 ? 'text-danger' : 'text-teal'}`}>
+                    {available.toLocaleString('vi-VN')}
+                    <span className="ml-1 font-label text-xs font-semibold text-ink-soft">sản phẩm</span>
                   </span>
-                </div>
-                <div className="mt-2.5">
-                  <StockBar available={available} stock={selected.stock} />
-                </div>
-                <p className="mt-2 font-mono text-[11px] text-ink-soft">
-                  stock: {selected.stock} · đang giữ chỗ: {selected.reserved} · sẵn sàng giao: {available}
-                </p>
+                )}
               </div>
             )}
 

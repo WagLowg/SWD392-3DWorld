@@ -1,3 +1,9 @@
+/**
+ * [Giải thích] Điều khiển CAMERA theo thời gian t:
+ * - SHOTS là các keyframe (điểm nhìn, khoảng cách, góc); nội suy giữa 2 keyframe gần nhất.
+ * - Camera đặt trên mặt cầu quanh điểm nhìn (yaw/pitch/dist), cộng parallax theo chuột và góc kéo của người dùng.
+ * - Khi chuyển world, camera bám theo vật thể đang bay (S.track).
+ */
 import { useFrame, useThree } from '@react-three/fiber'
 import { useRef } from 'react'
 import * as THREE from 'three'
@@ -34,6 +40,7 @@ const SHOTS: Shot[] = [
   { t: 16, f: [0, -87.4, 0], dist: 11, yaw: 0, pitch: 0.06, fx: 0 },
 ]
 
+// [GT] Tìm 2 keyframe kẹp t rồi nội suy (lerp + smooth) mọi thông số camera giữa chúng.
 function sample(t: number, out: Shot) {
   let i = 0
   while (i < SHOTS.length - 2 && t > SHOTS[i + 1].t) i++
@@ -71,6 +78,7 @@ export function CameraRig() {
     const distMul = portrait ? 1 + (1 / aspect - 1) * 0.55 : aspect < 1.3 ? 1.12 : 1
 
     const amt = S.reduced ? 0 : 1
+    // [GT] Parallax: camera lệch nhẹ theo vị trí chuột; damp làm nó trôi theo mượt chứ không dính cứng.
     par.current.x = damp(par.current.x, S.pointer.x * amt, 3, dt)
     par.current.y = damp(par.current.y, S.pointer.y * amt, 3, dt)
 
@@ -93,6 +101,7 @@ export function CameraRig() {
       if (w > 0) focus.current.lerp(S.track[key], w)
     }
     const f = focus.current
+    // [GT] Đặt camera trên mặt cầu quanh điểm nhìn f: yaw = góc xoay ngang, pitch = góc ngẩng, d = bán kính.
     camera.position.set(
       f.x + Math.sin(yaw) * Math.cos(pitch) * d,
       f.y + Math.sin(pitch) * d,
@@ -108,6 +117,7 @@ export function CameraRig() {
     // studio copy sits at the top on phones, so frame its model lower
     const studioW = clamp(1 - Math.abs(f.y - WORLD_Y[1] - 1.25) / 6)
     const offY = portrait ? (0.14 - 0.26 * studioW) * h : 0
+    // [GT] Dịch khung hình (không dịch camera) để model nằm cạnh chữ thay vì chính giữa.
     camera.setViewOffset(w, h, offX, offY, w, h)
   })
   return null

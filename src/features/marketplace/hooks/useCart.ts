@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiClientError } from '../../../shared/api'
 import { goLogin } from '../../../shared/session/session'
+import { useSession } from '../../../shared/session/useSession'
 import { cartService } from '../services/cart.service'
 import { useMarketplaceUiStore } from '../stores/marketplace-ui.store'
 import type { AddCartItemInput, Cart } from '../types/catalog.types'
-import { useSession } from '../../../shared/session/useSession'
 
 export const cartKey = ['cart'] as const
 

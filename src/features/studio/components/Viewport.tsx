@@ -1,3 +1,10 @@
+/**
+ * [Giải thích] KHUNG 3D của editor.
+ * - NodeObject vẽ đệ quy cây node (group chứa con → di chuyển cha thì con đi theo).
+ * - Gizmo: TransformControls kéo/xoay/scale; trong lúc kéo sửa thẳng object three.js, thả chuột mới ghi vào store.
+ * - CameraRig: xoay/pan/zoom bằng camera-controls; các góc nhìn Top/Front/Fit.
+ * - Explode, mặt cắt (clipping plane), X-ray, đo khoảng cách, hộp bao + kích thước.
+ */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
@@ -12,6 +19,7 @@ import { buildGeometry, decompose, worldBox } from '../lib/geometry';
 import type { SceneNode } from '../types';
 
 const DEG = Math.PI / 180;
+// [GT] Bản đồ id node → object three.js thật. Gizmo dùng nó để biết đang kéo object nào.
 export const objectRegistry = new Map<string, THREE.Object3D>();
 
 function NodeObject({ node, childrenOf }: { node: SceneNode; childrenOf: Map<string | null, SceneNode[]> }) {
@@ -19,11 +27,14 @@ function NodeObject({ node, childrenOf }: { node: SceneNode; childrenOf: Map<str
   const xray = useStudio((s) => s.view.xray);
   const sectioned = useStudio((s) => s.view.section !== null);
   const selected = selection.includes(node.id);
+  // [GT] Dựng hình 3D từ "công thức" của node (có cache, chỉ đổi vị trí thì không dựng lại).
   const built = useMemo(() => buildGeometry(node), [node]);
+  // [GT] Node con được vẽ bên trong <group> của cha → di chuyển cha thì con đi theo.
   const kids = childrenOf.get(node.id) ?? [];
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
+    // [GT] Chuột đã di chuyển >4px = người dùng đang xoay camera, không tính là click chọn.
     if (e.delta > 4) return;
     const s = useStudio.getState();
     if (s.tool === 'measure') { s.addMeasurePoint(e.point.clone()); return; }
@@ -100,6 +111,7 @@ function Exploded({ node, nodes, children }: { node: SceneNode; nodes: SceneNode
     const span = all.getSize(new THREE.Vector3()).length();
     return dir.normalize().multiplyScalar(explode * span * 0.6).add(new THREE.Vector3(0, explode * span * 0.08, 0));
   }, [explode, node.id, nodes]);
+  // [GT] Mỗi frame trượt dần tới vị trí explode → tách rời mượt.
   useFrame((_, dt) => { ref.current?.position.lerp(target, Math.min(1, dt * 8)); });
   return <group ref={ref}>{children}</group>;
 }
@@ -114,6 +126,7 @@ function SectionClip({ children }: { children: ReactNode }) {
   useEffect(() => { gl.localClippingEnabled = true; }, [gl]);
   useFrame(() => {
     const on = section !== null && !box.isEmpty();
+    // [GT] Đặt độ cao mặt cắt theo tỉ lệ (0..1) chiều cao của cả scene.
     if (on) sectionPlane.constant = box.min.y + (box.max.y - box.min.y) * section;
     ref.current?.traverse((o) => {
       const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
@@ -141,6 +154,8 @@ function Gizmo() {
     return () => cancelAnimationFrame(r);
   }, [node?.id, nodes]);
   if (!node || node.locked || !obj || !['move', 'rotate', 'scale'].includes(tool)) return null;
+  // [GT] TransformControls (drei) = gizmo mũi tên/vòng xoay. Khi kéo, nó sửa trực tiếp obj.position/rotation/scale
+  // (không qua React) nên rất mượt; onMouseUp mới đọc kết quả và ghi vào store (tạo 1 bước undo).
   const mode = tool === 'move' ? 'translate' : tool === 'rotate' ? 'rotate' : 'scale';
   return (
     <TransformControls
@@ -218,6 +233,7 @@ function CameraRig() {
     c.mouseButtons.right = A.ROTATE;
     c.mouseButtons.middle = A.TRUCK;
     c.mouseButtons.wheel = projection === 'orthographic' ? A.ZOOM : A.DOLLY;
+    // [GT] Lăn chuột thì zoom về phía con trỏ.
     c.dollyToCursor = true;
     const down = (e: KeyboardEvent) => { if (e.key === 'Shift') c.mouseButtons.left = A.TRUCK; };
     const up = (e: KeyboardEvent) => { if (e.key === 'Shift') c.mouseButtons.left = A.ROTATE; };

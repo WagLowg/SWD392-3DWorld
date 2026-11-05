@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Style của Landing (Tailwind v4): font, bảng màu (@theme), biến --accent đổi theo world,
+ * các lớp chữ (.display, .eyebrow), nút, và trạng thái ẩn ban đầu của chữ trước khi GSAP cho hiện.
+ */
 @import "tailwindcss";
 
 @theme {

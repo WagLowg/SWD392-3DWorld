@@ -1,3 +1,8 @@
+/**
+ * [Giải thích] Lớp nối với Backend (/api/ai-studio). Object aiStudio chứa mọi API:
+ * cấu hình, ví, ước tính chi phí, upload, tạo/huỷ/làm mới tác vụ, dự án, phiên bản, xuất file, kích thước in.
+ * Mỗi hàm gọi Backend rồi "dịch" dữ liệu Backend (kiểu B...) sang kiểu frontend trong api.ts.
+ */
 import { podService } from '../../pod/services/pod.service';
 import type { PrintRequest } from '../../pod/types';
 import {
@@ -248,6 +253,7 @@ function rememberFlags(id: string, patch: Flags) {
 
 const P = '/api/ai-studio';
 
+// [GT] Tập hợp mọi API của AI Studio (xem đoạn giải thích đầu file).
 export const aiStudio = {
   async configOptions(): Promise<ConfigOptions> {
     const d = await api<{
@@ -283,6 +289,7 @@ export const aiStudio = {
     await api(`${P}/wallet/topup`, { body: { amount } });
   },
 
+  // [GT] Server tính chi phí (tín dụng) cho cấu hình hiện tại và cho biết số dư có đủ không.
   async estimate(input: { mode: SourceMode; config: GenConfig; variants: number }, signal?: AbortSignal): Promise<Estimate> {
     const e = await api<{ perVariant: number; variants: number; total: number; userBalance: number; sufficient: boolean; priceVersion: string; config: GenConfig }>(
       `${P}/estimates`,
@@ -327,6 +334,7 @@ export const aiStudio = {
     if (input.mode !== 'text' && !uploadIds.length) throw new Error('Chưa chọn ảnh tham chiếu.');
     if (input.mode === 'text' && !prompt) throw new Error('Nhập mô tả mô hình để tạo từ văn bản.');
     const t = await api<BTaskDetail | BTaskDetail[]>(`${P}/tasks`, {
+      // [GT] Idempotency-Key: server nhận cùng khoá nhiều lần thì chỉ tạo tác vụ một lần.
       headers: { 'Idempotency-Key': input.key },
       body: {
         mode: MODE[input.mode],
@@ -359,6 +367,7 @@ export const aiStudio = {
     await api(`${P}/tasks/${id}/cancel`, { method: 'POST' });
   },
 
+  // [GT] Nhờ Backend hỏi lại Meshy trạng thái tác vụ (cần khi webhook của Meshy không gọi tới được, vd. chạy local).
   async refreshTask(id: string) {
     await api(`${P}/tasks/${id}/refresh`, { method: 'POST' });
   },

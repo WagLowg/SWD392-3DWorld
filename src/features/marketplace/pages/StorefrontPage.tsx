@@ -151,9 +151,7 @@ export function StorefrontPage() {
 
               <div className="min-w-0 flex-1 pt-2 sm:pt-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-                    {name}
-                  </h1>
+                  <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">{name}</h1>
                   {s?.verificationStatus === 'VERIFIED' && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-violet-soft px-2.5 py-0.5 font-label text-[11px] font-bold text-violet border border-violet/20">
                       <ShieldCheck size={13} className="text-violet" />
@@ -257,9 +255,7 @@ export function StorefrontPage() {
             type="button"
             onClick={() => update({ tab: 'products' })}
             className={`flex items-center gap-2 border-b-2 py-3.5 font-label text-sm font-bold transition ${
-              activeTab === 'products'
-                ? 'border-violet text-violet'
-                : 'border-transparent text-ink-soft hover:text-ink'
+              activeTab === 'products' ? 'border-violet text-violet' : 'border-transparent text-ink-soft hover:text-ink'
             }`}
           >
             <Package size={16} />
@@ -269,9 +265,7 @@ export function StorefrontPage() {
             type="button"
             onClick={() => update({ tab: 'about' })}
             className={`flex items-center gap-2 border-b-2 py-3.5 font-label text-sm font-bold transition ${
-              activeTab === 'about'
-                ? 'border-violet text-violet'
-                : 'border-transparent text-ink-soft hover:text-ink'
+              activeTab === 'about' ? 'border-violet text-violet' : 'border-transparent text-ink-soft hover:text-ink'
             }`}
           >
             <Info size={16} />
@@ -387,8 +381,8 @@ export function StorefrontPage() {
                   Chào mừng bạn đến với <strong>{name}</strong> trên sàn 3DWorld!
                   <br />
                   Xưởng chuyên thiết kế, chế tác mô hình in 3D hoàn thiện với độ chi tiết cao, Art Toy nghệ thuật và các
-                  vật phẩm sáng tạo độc bản. Mọi mẫu sản phẩm đều được kiểm định kỹ lưỡng về độ hoàn thiện trước khi đóng
-                  hộp gửi tới quý khách.
+                  vật phẩm sáng tạo độc bản. Mọi mẫu sản phẩm đều được kiểm định kỹ lưỡng về độ hoàn thiện trước khi
+                  đóng hộp gửi tới quý khách.
                 </>
               )}
             </p>

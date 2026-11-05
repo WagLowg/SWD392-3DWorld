@@ -1,3 +1,8 @@
+/**
+ * [Giải thích] "Sân khấu" 3D: bệ, ánh sáng, môi trường, các kiểu nền.
+ * ParticleForge: màn chờ khi AI đang tạo, các hạt tụ dần thành khối theo % tiến độ.
+ * Còn có màn trống với chú gấu của trang Landing.
+ */
 import { useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows, Float, Sparkles } from '@react-three/drei';
@@ -111,6 +116,7 @@ const EMPTY_VIEW: View = { dir: [0.55, 0.32, 0.85], dist: 5.6, target: [0, 0.75,
 const N = 2600;
 
 /** Điểm trên bề mặt một khối bo tròn (superellipsoid) — hình "đang thành hình". */
+// [GT] Vị trí đích của các hạt: phân bố đều trên một khối hộp bo tròn (dùng xoắn ốc vàng để rải đều).
 function targetShape(): Float32Array {
   const out = new Float32Array(N * 3);
   const sgnPow = (v: number, p: number) => Math.sign(v) * Math.abs(v) ** p;
@@ -126,6 +132,7 @@ function targetShape(): Float32Array {
   return out;
 }
 
+// [GT] Vị trí xuất phát của các hạt: rải ngẫu nhiên quanh bệ.
 function scattered(): Float32Array {
   const out = new Float32Array(N * 3);
   for (let i = 0; i < N; i++) {
@@ -172,6 +179,7 @@ function ParticleForge({ progress }: { progress: number }) {
       const wobble = still ? 0 : (1 - settled) * 0.08;
       for (let j = 0; j < 3; j++) {
         const idx = i * 3 + j;
+        // [GT] Mỗi hạt đi từ vị trí rải → vị trí đích theo mức "settled" (lerp), cộng thêm chút lắc lư cho sinh động.
         arr[idx] = from[idx] + (to[idx] - from[idx]) * settled + Math.sin(t * 1.3 + i * 0.37 + j) * wobble;
       }
     }

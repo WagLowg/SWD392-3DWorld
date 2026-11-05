@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] Khung chính 3D Studio: chọn Dashboard hay Editor theo route, phím tắt (Ctrl+S, Ctrl+Z...),
+ * autosave (debounce sau mỗi lần sửa) và bảng lệnh (command palette).
+ */
 import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Box as BoxI, Circle, Cylinder, Cone, Torus, Square, Type, Save, Undo2, Redo2, ShieldCheck, Download, Upload, Grid3x3, Eye, LayoutTemplate, FolderOpen, Plus, Sparkles, Store, Home, Keyboard, Copy, Trash2 } from 'lucide-react';
 import { CommandPalette, useCommandPalette, type Command } from '../../shared/ui/CommandPalette';

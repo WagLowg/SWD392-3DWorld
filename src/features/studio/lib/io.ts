@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Nhập/xuất STL: đọc STL binary/ASCII, đổi đơn vị sang mm, đổi trục Z-up ↔ Y-up, ghi STL binary.
+ */
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import type { SceneNode } from '../types';

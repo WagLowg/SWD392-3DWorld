@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { clearPendingCheckout, loadPendingCheckout, savePendingCheckout } from './checkoutAttempt'
 import type { CheckoutInput } from '../types/catalog.types'
+import { clearPendingCheckout, loadPendingCheckout, savePendingCheckout } from './checkoutAttempt'
 
 const payload: CheckoutInput = {
   cartItemIds: [12, 15],
@@ -46,4 +46,3 @@ describe('pending checkout attempt', () => {
     expect(loadPendingCheckout()).toBeNull()
   })
 })
-

@@ -1,3 +1,9 @@
+/**
+ * [Giải thích] Trang Landing chính.
+ * - Canvas 3D cố định phía sau (ExperienceCanvas), các lớp chữ HTML (Overlay) đè lên trên.
+ * - Thẻ div "spacer" rất cao chỉ để tạo chiều dài cuộn; GSAP đọc tiến độ cuộn của nó.
+ * - Không có WebGL thì hiện bản tối giản (WebGLFallback).
+ */
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from '../lib/PageLink'
 import { THEMES, WORLDS } from '../config/content'

@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Chụp ảnh xem trước scene bằng một renderer WebGL ẩn; renderTurntable chụp nhiều góc xoay vòng.
+ */
 import * as THREE from 'three';
 import type { SceneNode } from '../types';
 import { buildGeometry, worldMatrix } from './geometry';

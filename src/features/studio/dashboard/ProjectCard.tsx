@@ -1,3 +1,6 @@
+/**
+ * [Giải thích] Thẻ dự án: ảnh xem trước, nhãn trạng thái, menu ⋯ (đổi tên/nhân bản/xoá), khung xương khi tải.
+ */
 import { useEffect, useRef, useState } from 'react';
 import { Box, Circle, KeyRound, MoreHorizontal, PackageOpen, Shapes, Smartphone, Type } from 'lucide-react';
 import { relativeTime, type ProjectMeta } from '../services/projects';

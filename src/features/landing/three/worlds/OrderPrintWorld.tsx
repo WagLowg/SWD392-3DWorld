@@ -1,3 +1,7 @@
+/**
+ * [Giải thích] World 4 – Order Print: máy in 3D. Model được "in" từng lớp nhờ clipping plane nâng dần theo t,
+ * đầu in chạy qua lại, sau đó bàn in nâng lên khoe thành phẩm.
+ */
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { QuadraticBezierLine, RoundedBox } from '@react-three/drei'
@@ -305,6 +309,7 @@ function PrintJob({ colorRef }: { colorRef: React.RefObject<THREE.Color> }) {
       solid.current && (solid.current.rotation.y = ghost.current.visible ? 0 : solid.current.rotation.y)
     }
     const plane = ghostMat.clippingPlanes![0]
+    // [GT] Nâng mặt phẳng cắt theo tiến độ in → phần trên bị cắt bỏ, model hiện dần từ dưới lên như đang in.
     plane.constant = printed ? -clipWorld : 999
     ghostMat.opacity = above ? 0.55 + 0.4 * bell(ph.wireIn) : 0.45
 
