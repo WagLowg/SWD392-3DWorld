@@ -139,7 +139,7 @@ export type ApiWallet = {
 export type ApiPayout = {
   transactionId: number
   amount: number
-  status: string
+  status: 'PROCESSING' | 'COMPLETED' | 'FAILED'
   bankAccountId: number
   transferReference?: string | null
 }
@@ -147,7 +147,7 @@ export type ApiPayout = {
 export type ApiPayoutHistory = {
   transactionId: number
   amount: number
-  status: string
+  status: 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'REQUESTED' | 'SUCCESS' | 'REJECTED'
   bankAccountId?: number | null
   bankName?: string | null
   accountNumberMasked?: string | null
@@ -282,8 +282,8 @@ export const sellerWalletApi = {
   async mine() {
     return (await http.get<ApiEnvelope<ApiWallet>>('/api/users/me/wallet')).data
   },
-  async requestPayout(input: { amount: number; bankAccountId: number; reason: string }) {
-    return (await http.post<ApiEnvelope<ApiPayout>>('/api/users/me/payouts', input)).data
+  async requestPayout(input: { amount: number; bankAccountId: number; reason: string }, idempotencyKey: string) {
+    return (await http.post<ApiEnvelope<ApiPayout>>('/api/users/me/payouts', input, { idempotencyKey })).data
   },
   async payouts(page = 0, size = 50) {
     return (await http.get<ApiEnvelope<ApiPayoutHistory[]>>(`/api/users/me/payouts${toQueryString({ page, size })}`))

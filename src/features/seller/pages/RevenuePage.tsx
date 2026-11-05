@@ -61,6 +61,9 @@ export function RevenuePage() {
 
   // Dữ liệu Payout từ BE API GET /api/users/me/payouts
   const payoutList: SellerPayoutRecord[] = qPayouts.data ?? []
+  const processingPayoutTotal = payoutList
+    .filter((p) => p.status === 'PROCESSING')
+    .reduce((total, p) => total + p.amount, 0)
 
   // Dữ liệu Ledgers từ BE API GET /api/users/me/wallet/ledgers
   const rawLedgers: SellerWalletLedgerRecord[] = qLedgers.data ?? []
@@ -92,7 +95,7 @@ export function RevenuePage() {
         code="MP 053"
         eyebrow="Doanh thu & dòng tiền"
         title="Doanh Thu Xưởng Chế Tác"
-        accent="Ký Quỹ 72h & Đối Soát Giải Ngân."
+        accent="Rút Trực Tiếp Số Dư Khả Dụng."
         actions={
           <>
             <Btn to="/seller/payouts/new" variant="primary" icon={Wallet}>
@@ -115,7 +118,7 @@ export function RevenuePage() {
         </div>
       )}
 
-      {w && w.held > 0 && (
+      {processingPayoutTotal > 0 && (
         <div className="mt-5 flex flex-col gap-3 rounded-2xl bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-50/90 p-4 border border-amber-200/80 shadow-xs sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-100 text-amber-800 shadow-xs">
@@ -123,13 +126,13 @@ export function RevenuePage() {
             </span>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-bold text-ink">Đang xử lý yêu cầu rút {formatVnd(w.held)}</p>
+                <p className="text-sm font-bold text-ink">Đang chuyển khoản {formatVnd(processingPayoutTotal)}</p>
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-200/60 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900">
-                  Dự kiến trong 24 giờ
+                  Tự động xử lý
                 </span>
               </div>
               <p className="text-xs text-ink-soft mt-0.5">
-                Tiền đang trên đường chuyển về tài khoản ngân hàng của bạn. Bạn không cần thao tác gì thêm.
+                Tiền đang được tự động chuyển về tài khoản ngân hàng. Giao dịch không cần quản trị viên phê duyệt.
               </p>
             </div>
           </div>
@@ -147,21 +150,14 @@ export function RevenuePage() {
         </div>
       )}
 
-      {/* Grid thống kê 5 thẻ: Thể hiện số tiền được rút (403k), Ký quỹ dự phòng 100k, Chờ mở khóa, Nợ cước và Phí sàn đã khấu trừ */}
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* Tổng quan số dư có thể rút, tiền chờ mở khóa, công nợ và phí sàn. */}
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Có thể rút"
           value={w ? formatVnd(w.withdrawable) : '—'}
           icon={Wallet}
           tone="green"
           hint={w ? `Khả dụng: ${formatVnd(w.available)}` : 'Được phép rút'}
-        />
-        <StatCard
-          label="Ký quỹ dự phòng"
-          value={w ? formatVnd(w.minimumReserve) : '100.000đ'}
-          icon={ShieldCheck}
-          tone="violet"
-          hint="Bảo đảm hoàn trả & đổi hàng"
         />
         <StatCard
           label="Chờ mở khoá"
@@ -256,7 +252,7 @@ export function RevenuePage() {
 
           {viewTab === 'PAYOUTS' && (
             <Btn to="/seller/payouts/new" variant="primary" size="sm" icon={Wallet}>
-              Tạo yêu cầu rút tiền
+              Rút tiền
             </Btn>
           )}
         </div>
@@ -549,8 +545,8 @@ export function RevenuePage() {
           <QueryState isLoading={qPayouts.isLoading} error={qPayouts.error}>
             {payoutList.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-surface-low/40 p-8 text-center text-xs text-ink-soft">
-                Chưa phát sinh yêu cầu rút tiền nào. Khi bạn gửi yêu cầu rút tiền, tiến độ chuyển khoản sẽ được hiển thị
-                minh bạch tại đây.
+                Chưa phát sinh giao dịch rút tiền nào. Tiến độ chuyển khoản sẽ được hiển thị tại đây sau khi bạn rút
+                tiền.
               </div>
             ) : (
               <>
@@ -604,17 +600,24 @@ export function RevenuePage() {
                       header: 'Trạng thái xử lý',
                       render: (p) => {
                         const st = p.status?.toUpperCase()
-                        if (st === 'SUCCESS' || st === 'COMPLETED') {
+                        if (st === 'COMPLETED' || st === 'SUCCESS') {
                           return (
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-mint px-2.5 py-1 text-xs font-semibold text-[#0f5132]">
                               <CheckCircle2 size={13} /> Đã chuyển khoản
                             </span>
                           )
                         }
-                        if (st === 'REJECTED') {
+                        if (st === 'FAILED' || st === 'REJECTED') {
                           return (
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#ffdad6] px-2.5 py-1 text-xs font-semibold text-danger">
-                              <XCircle size={13} /> Bị từ chối
+                              <XCircle size={13} /> Chuyển khoản thất bại
+                            </span>
+                          )
+                        }
+                        if (st === 'REQUESTED') {
+                          return (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-low px-2.5 py-1 text-xs font-semibold text-ink-soft border border-line">
+                              <Clock size={13} /> Giao dịch cũ chờ xử lý
                             </span>
                           )
                         }
@@ -653,10 +656,10 @@ export function RevenuePage() {
 
       <div className="mt-8">
         <RuleBox
-          title="4 quy tắc dòng tiền & ký quỹ bảo đảm người bán"
+          title="4 quy tắc dòng tiền người bán"
           rules={[
             'Tự động cấn trừ hoa hồng sàn 5% tại nguồn: Với mỗi đơn hàng thanh toán thành công, hệ thống tự động khấu trừ ngay 5% phí dịch vụ nền tảng từ doanh số gốc và chỉ ghi nhận 95% thực nhận (Net Amount) vào ví người bán. Người bán tuyệt đối KHÔNG cần nạp tiền để đóng phí sàn.',
-            'Ký quỹ dự phòng tối thiểu 100.000đ: Ví xưởng luôn duy trì mức 100.000đ khả dụng để bảo đảm cấn trừ phí vận chuyển hai chiều khi phát sinh đơn hoàn hàng/khiếu nại. Seller được rút toàn bộ phần số dư vượt trên mức ký quỹ này (Số dư khả dụng - 100.000đ).',
+            'Rút tiền tự động: Seller được rút toàn bộ số dư khả dụng về tài khoản ngân hàng đã xác minh. Hệ thống xử lý giao dịch ngay mà không cần quản trị viên phê duyệt.',
             'Công nợ cước hoàn trả (Chỉ khi ví xưởng không đủ bù ship): Khi phát sinh khiếu nại hoàn tiền mà số dư ví không đủ cấn trừ phí ship 2 chiều, phần thiếu mới ghi nhận thành nợ cước và tự động thu hồi khi có doanh thu giải ngân mới.',
             'Chu kỳ giải ngân & đơn COD: Doanh thu thực nhận chuyển từ “chờ mở khóa” sang “khả dụng” sau 72h kể từ lúc người mua nhận hàng. Riêng đơn COD, doanh thu được ghi nhận sau khi bưu cục GHTK hoàn tất đối soát tiền thu hộ về sàn.',
           ]}

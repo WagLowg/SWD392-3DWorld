@@ -100,9 +100,15 @@ export const useChangePrice = () =>
   )
 export const useRequestPayout = () =>
   useMockAction(
-    (input: { amount: number; bankAccountId: number; reason: string; bankInfo?: string }) => sellerService.requestPayout(input),
+    (input: { amount: number; bankAccountId: number; reason: string; idempotencyKey: string }) =>
+      sellerService.requestPayout(input),
     [sellerKeys.earnings, ['seller', 'payouts'], ['seller', 'wallet-ledgers']],
-    'Đã gửi yêu cầu rút tiền thành công.',
+    (result) =>
+      result.status === 'COMPLETED'
+        ? 'Rút tiền thành công.'
+        : result.status === 'FAILED'
+          ? 'Chuyển khoản không thành công, số dư đã được hoàn lại.'
+          : 'Lệnh rút tiền đang được xử lý tự động.',
   )
 export const useRespondDispute = () =>
   useMockAction(
